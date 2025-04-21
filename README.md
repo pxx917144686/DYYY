@@ -42,3 +42,12 @@ source ~/.zshrc
 </table>
 
 </details>
+
+
+
+<h1 align="center">
+  <br>
+  关于. `清理缓存+打包编译 `
+</h1>
+
+![Preview](./x/cd.png)
