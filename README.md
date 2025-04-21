@@ -1,4 +1,4 @@
-# DYYY
+# iOS、macOS、Linux 和 Windows 都可以使用的～
 抖音++
 
 <table>
@@ -100,3 +100,98 @@ Theos 中的命令以 Makefile 目标的形式实现，通过 `make <命令>` �
 | `make troubleshoot`          | 提供故障排除信息的快速链接，并将 make 输出上传到 GitHub Gist 以便分享。详见帮助文档。 |
 | `make clean-packages`        | 从 `$THEOS_PACKAGE_DIR` 中删除所有包。                                    |
 | `make show`                  | 在系统文件管理器中打开存放包的目录。                                      |
+
+
+
+
+<details>
+<summary> 👉  关于. ` 抖音首页 ` </summary>
+
+![Preview](./x/首页.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 双击触发 ` </summary>
+
+![Preview](./x/双击.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 菜单 ` </summary>
+
+![Preview](./x/菜单.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 基本设置 ` </summary>
+
+![Preview](./x/基本设置.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 界面设置 ` </summary>
+
+![Preview](./x/界面设置.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 隐藏设置 ` </summary>
+
+![Preview](./x/隐藏设置.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 顶栏移除 ` </summary>
+
+![Preview](./x/顶栏移除.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 增强设置1 ` </summary>
+
+![Preview](./x/增强设置1_3.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 增强设置2 ` </summary>
+
+![Preview](./x/增强设置2_3.png)
+</details> 
+
+<details>
+<summary> 👉  关于. ` 增强设置3 ` </summary>
+
+![Preview](./x/增强设置3_3.png)
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
