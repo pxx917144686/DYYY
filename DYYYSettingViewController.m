@@ -111,6 +111,11 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handleSettingPanelPan:)];
         [self.view addGestureRecognizer:pan];
     }
+
+    if (![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYInterfaceDownload"]) {
+        [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:@"DYYYInterfaceDownload"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
 }
 
 - (void)backButtonTapped:(id)sender {
@@ -264,7 +269,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"时间标签颜色" key:@"DYYYLabelColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
                 [DYYYSettingItem itemWithTitle:@"隐藏系统顶栏" key:@"DYYYisHideStatusbar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"关注二次确认" key:@"DYYYfollowTips" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"收藏二次确认" key:@"DYYYcollectTips" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"收藏二次确认" key:@"DYYYcollectTips" type:DYYYSettingItemTypeSwitch]
             ],
             @[
                 [DYYYSettingItem itemWithTitle:@"设置顶栏透明" key:@"DYYYtopbartransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
@@ -387,7 +392,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"  -城市" key:@"DYYYisEnableAreaCity" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -市区或县城" key:@"DYYYisEnableAreaDistrict" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -街道或小区" key:@"DYYYisEnableAreaStreet" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
+                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"https://api.qsy.ink/api/douyin?url="],
                 [DYYYSettingItem itemWithTitle:@"清晰度" key:@"DYYYShowAllVideoQuality" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"屏蔽广告" key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
@@ -834,7 +839,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         // 处理时间属地显示开关逻辑...
         if ([item.key hasPrefix:@"DYYYisEnableArea"] && 
             ![item.key isEqualToString:@"DYYYisEnableArea"]) {
-            // 现有代码...
             BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
             switchView.enabled = parentEnabled;
             
@@ -844,7 +848,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                                   [item.key isEqualToString:@"DYYYisEnableAreaStreet"];
             
             if (isAreaSubSwitch) {
-                // 现有代码...
                 BOOL anyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaProvince"] ||
                                 [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaCity"] ||
                                 [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaDistrict"] ||
@@ -929,16 +932,21 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             speedField.tag = 999;
             accessoryView = speedField;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-        } else {
-            UIView *colorView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
-            colorView.layer.cornerRadius = 15;
-            colorView.clipsToBounds = YES;
-            colorView.layer.borderWidth = 1.0;
-            colorView.layer.borderColor = [UIColor whiteColor].CGColor;
-            NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
-            colorView.backgroundColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBackgroundColor];
-            accessoryView = colorView;
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (item.type == DYYYSettingItemTypeColorPicker) {
+            // 彩色取色按钮
+            UIButton *colorButton = [UIButton buttonWithType:UIButtonTypeSystem];
+            colorButton.frame = CGRectMake(0, 0, 36, 36);
+            colorButton.layer.cornerRadius = 18;
+            colorButton.clipsToBounds = YES;
+            colorButton.backgroundColor = [UIColor clearColor];
+            UIImage *paletteImage = [UIImage systemImageNamed:@"paintpalette.fill"];
+            [colorButton setImage:paletteImage forState:UIControlStateNormal];
+            colorButton.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.95];
+            [colorButton addTarget:self action:@selector(showColorPicker) forControlEvents:UIControlEventTouchUpInside];
+
+            // 只保留画板按钮，不再添加关闭按钮
+            accessoryView = colorButton;
+            cell.accessoryType = UITableViewCellAccessoryNone;
         }
         
         // 设置重置按钮约束 - 选择器类型
