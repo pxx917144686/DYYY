@@ -1,6 +1,3 @@
-# iOS、macOS、Linux 和 Windows 都可以使用的～
-抖音++
-
 <table>
 <tr>
 <td>
