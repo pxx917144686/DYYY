@@ -2015,7 +2015,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 }
 
 - (void)showSourceCodePopup {
-    NSString *githubURL = @"https://github.com/pxx917144686/Surge_pxx/releases";
+    NSString *githubURL = @"https://github.com/pxx917144686/DYYY";
     
     // 添加跳转前的动画效果
     CAKeyframeAnimation *pulseAnimation = [CAKeyframeAnimation animationWithKeyPath:@"transform.scale"];
