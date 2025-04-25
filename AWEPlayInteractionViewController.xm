@@ -3,6 +3,7 @@
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
 
+// 为AWEPlayInteractionViewController添加接口声明
 @interface AWEPlayInteractionViewController (DYYYAdditions)
 - (void)createFluentDesignDraggableMenuWithAwemeModel:(AWEAwemeModel *)awemeModel touchPoint:(CGPoint)touchPoint;
 - (void)dismissFluentMenu:(UITapGestureRecognizer *)gesture;
@@ -22,7 +23,6 @@
 - (void)handleModuleButtonTap:(UIButton *)sender;
 - (void)resizeMenuPan:(UIPanGestureRecognizer *)pan;
 - (void)customMenuButtonTapped:(UIButton *)button;
-- (void)showDYYYColorPickerFromMenuButton:(UIButton *)button;
 - (void)handleDYYYBackgroundColorChanged:(NSNotification *)notification;
 - (void)dyyy_handleSettingPanelPan:(UIPanGestureRecognizer *)pan;
 @end
@@ -98,13 +98,13 @@
             [view removeFromSuperview];
         }
     }
-    NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
-    UIColor *customBgColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor colorWithWhite:0 alpha:0.4];
+    // 创建透明背景
     UIView *overlayView = [[UIView alloc] initWithFrame:topVC.view.bounds];
-    overlayView.backgroundColor = customBgColor;
+    overlayView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.3]; // 半透明黑色背景
     overlayView.alpha = 0;
     overlayView.tag = 9527;
 
+    // 监听背景色变化
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleDYYYBackgroundColorChanged:) name:@"DYYYBackgroundColorChanged" object:nil];
 
     CGFloat menuHeight = 480;
@@ -118,25 +118,27 @@
     menuContainer.layer.cornerRadius = 20;
     menuContainer.clipsToBounds = YES;
     menuContainer.layer.masksToBounds = NO;
-    menuContainer.backgroundColor = [UIColor clearColor];
+    menuContainer.backgroundColor = [UIColor whiteColor]; // 白色弹窗背景
     menuContainer.layer.shadowColor = [UIColor blackColor].CGColor;
     menuContainer.layer.shadowOffset = CGSizeMake(0, -10);
     menuContainer.layer.shadowRadius = 20;
     menuContainer.layer.shadowOpacity = 0.3;
     [overlayView addSubview:menuContainer];
 
-    UIVisualEffectView *contentPanel = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
+    UIVisualEffectView *contentPanel = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight]]; // 改为浅色风格
     contentPanel.frame = menuContainer.bounds;
     contentPanel.layer.cornerRadius = 20;
     contentPanel.clipsToBounds = YES;
     [menuContainer addSubview:contentPanel];
 
+    // 头像功能只保留一个，且放在弹窗顶部（headerView之上）
     CGFloat avatarSize = 72;
     UIImageView *avatarImageView = [[UIImageView alloc] initWithFrame:CGRectMake((menuWidth-avatarSize)/2, -avatarSize/2, avatarSize, avatarSize)];
     avatarImageView.layer.cornerRadius = avatarSize/2;
     avatarImageView.clipsToBounds = YES;
     avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
 
+    // 统一读取 DYYYSettingViewController 头像路径
     NSString *avatarPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"DYYYAvatar.jpg"];
     UIImage *avatarImage = [UIImage imageWithContentsOfFile:avatarPath];
     if (!avatarImage) {
@@ -147,8 +149,9 @@
     avatarImageView.userInteractionEnabled = YES;
     UITapGestureRecognizer *avatarTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_avatarTapped:)];
     [avatarImageView addGestureRecognizer:avatarTap];
-    [menuContainer addSubview:avatarImageView];
+    [menuContainer addSubview:avatarImageView]; // 放在menuContainer顶部
 
+    // 头像下方昵称（同步 DYYYSettingViewController 的自定义文本）
     UILabel *avatarLabel = [[UILabel alloc] initWithFrame:CGRectMake((menuWidth-120)/2, avatarImageView.frame.origin.y+avatarSize+2, 120, 18)];
     NSString *customTapText = [[NSUserDefaults standardUserDefaults] stringForKey:@"DYYYAvatarTapText"];
     avatarLabel.text = customTapText.length > 0 ? customTapText : @"pxx917144686";
@@ -157,10 +160,12 @@
     avatarLabel.textAlignment = NSTextAlignmentCenter;
     [menuContainer addSubview:avatarLabel];
 
+    // headerView内移除头像相关代码，只保留菜单按钮和关闭按钮
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, menuWidth, 100)];
     headerView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.1];
     [contentPanel.contentView addSubview:headerView];
 
+    // 调整大小按钮（替代关闭按钮，右上角）
     UIButton *resizeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     resizeButton.frame = CGRectMake(menuWidth - 90, 20, 30, 30);
     UIImage *resizeImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
@@ -173,6 +178,7 @@
     [resizeButton addTarget:self action:@selector(customMenuButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:resizeButton];
 
+    // 新增关闭按钮，紧挨右侧
     UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     closeButton.frame = CGRectMake(menuWidth - 50, 20, 30, 30);
     UIImage *closeImage = [UIImage systemImageNamed:@"xmark.circle.fill"];
@@ -183,6 +189,7 @@
     [closeButton addTarget:self action:@selector(dismissFluentMenuByButton:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:closeButton];
 
+    // 菜单按钮（彩色）放在左侧，更加高级
     UIButton *menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
     menuButton.frame = CGRectMake(20, 20, 70, 30);
     [menuButton setTitle:@"菜单" forState:UIControlStateNormal];
@@ -196,16 +203,6 @@
     menuButton.layer.shadowOffset = CGSizeMake(0, 2);
     [menuButton addTarget:self action:@selector(showDYYYSettingPanelFromMenuButton:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:menuButton];
-
-    UIButton *colorButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    colorButton.frame = CGRectMake(100, 20, 30, 30);
-    UIImage *paletteImage = [UIImage systemImageNamed:@"paintpalette.fill"];
-    [colorButton setImage:paletteImage forState:UIControlStateNormal];
-    colorButton.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.95];
-    colorButton.backgroundColor = [UIColor clearColor];
-    colorButton.layer.cornerRadius = 15;
-    [colorButton addTarget:self action:@selector(showDYYYColorPickerFromMenuButton:) forControlEvents:UIControlEventTouchUpInside];
-    [headerView addSubview:colorButton];
 
     BOOL isImageContent = (awemeModel.awemeType == 68);
     UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 100, menuWidth, menuHeight - 100)];
@@ -394,6 +391,7 @@
         [menuModules addObject:dislikeModule];
     }
 
+    // 读取上次保存的顺序
     NSArray *savedOrder = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYModuleOrder"];
     NSMutableArray *orderedModules = [NSMutableArray arrayWithArray:menuModules];
     if (savedOrder && [savedOrder isKindOfClass:[NSArray class]] && savedOrder.count == menuModules.count) {
@@ -409,7 +407,7 @@
         }
     }
 
-    CGFloat moduleWidth = menuWidth - 32;
+    CGFloat moduleWidth = menuWidth - 32; // 两侧留16pt间距
     CGFloat moduleHeight = 64;
     CGFloat spacing = 14;
     int columns = 1;
@@ -418,9 +416,11 @@
 
     NSMutableArray *moduleViews = [NSMutableArray array];
 
+    // --- 按顺序布局按钮 ---
     for (int i = 0; i < orderedModules.count; i++) {
         NSDictionary *moduleInfo = orderedModules[i];
 
+        // 创建按钮容器
         UIButton *tileButton = [UIButton buttonWithType:UIButtonTypeCustom];
         tileButton.frame = CGRectMake(16, spacing + i * (moduleHeight + spacing), moduleWidth, moduleHeight);
         tileButton.backgroundColor = [UIColor colorWithWhite:1 alpha:0.13];
@@ -432,6 +432,7 @@
         tileButton.layer.borderWidth = 0;
         tileButton.tag = i + 100;
 
+        // 渐变背景
         CAGradientLayer *gradientLayer = [CAGradientLayer layer];
         gradientLayer.frame = tileButton.bounds;
         gradientLayer.cornerRadius = 16;
@@ -443,6 +444,7 @@
         gradientLayer.endPoint = CGPointMake(1, 0.5);
         [tileButton.layer insertSublayer:gradientLayer atIndex:0];
 
+        // 动画
         CABasicAnimation *gradientAnimation = [CABasicAnimation animationWithKeyPath:@"colors"];
         gradientAnimation.fromValue = @[
             (id)[DYYYManager colorWithHexString:moduleInfo[@"color"]].CGColor,
@@ -457,27 +459,54 @@
         gradientAnimation.repeatCount = HUGE_VALF;
         [gradientLayer addAnimation:gradientAnimation forKey:@"gradientAnimation"];
 
+        // 标题调整：右移，为左侧图标留出空间
         [tileButton setTitle:moduleInfo[@"title"] forState:UIControlStateNormal];
         [tileButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         tileButton.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
         tileButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-        tileButton.titleEdgeInsets = UIEdgeInsetsMake(0, 24, 0, 56);
+        tileButton.titleEdgeInsets = UIEdgeInsetsMake(0, 64, 0, 24); // 增加左侧边距，为图标留空间
 
+        // 左侧图标 - 修改为彩色图标
         CGFloat iconSize = 32;
-        UIImage *icon = [UIImage systemImageNamed:moduleInfo[@"icon"]];
-        UIImageView *iconView = [[UIImageView alloc] initWithImage:[icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]];
-        iconView.tintColor = [UIColor whiteColor];
+        NSString *iconName = moduleInfo[@"icon"];
+        UIColor *iconColor = [DYYYManager colorWithHexString:moduleInfo[@"color"]];
+        
+        // 创建彩色图标容器
+        UIView *iconContainer = [[UIView alloc] initWithFrame:CGRectMake(20, (moduleHeight - iconSize) / 2, iconSize, iconSize)];
+        iconContainer.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
+        iconContainer.layer.cornerRadius = iconSize/2;
+        [tileButton addSubview:iconContainer];
+        
+        // 图标视图
+        UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, iconSize, iconSize)];
         iconView.contentMode = UIViewContentModeScaleAspectFit;
-        iconView.frame = CGRectMake(moduleWidth - iconSize - 24, (moduleHeight - iconSize) / 2, iconSize, iconSize);
-        iconView.userInteractionEnabled = NO;
-        [tileButton addSubview:iconView];
+        iconView.tintColor = iconColor; // 使用模块对应的颜色
+        
+        // 设置彩色系统图标
+        UIImage *defaultIcon = [UIImage systemImageNamed:iconName];
+        if (defaultIcon) {
+            // 使用原始渲染模式以保留图标颜色
+            iconView.image = [defaultIcon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        }
+        
+        [iconContainer addSubview:iconView];
+        
+        // 右侧添加iOS风格的">"指示器
+        UIImageView *chevronView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
+        chevronView.tintColor = [UIColor lightGrayColor];
+        chevronView.contentMode = UIViewContentModeScaleAspectFit;
+        chevronView.frame = CGRectMake(moduleWidth - 24, (moduleHeight - 20) / 2, 12, 20);
+        [tileButton addSubview:chevronView];
 
+        // 触感动画
         [tileButton addTarget:self action:@selector(moduleButtonTouchDown:) forControlEvents:UIControlEventTouchDown];
         [tileButton addTarget:self action:@selector(moduleButtonTouchUp:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
 
+        // 点击事件
         [tileButton addTarget:self action:@selector(handleModuleButtonTap:) forControlEvents:UIControlEventTouchUpInside];
         objc_setAssociatedObject(tileButton, "moduleAction", moduleInfo[@"action"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
+        // 拖拽手势
         UILongPressGestureRecognizer *dragGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleModuleDrag:)];
         dragGesture.minimumPressDuration = 0.1;
         [tileButton addGestureRecognizer:dragGesture];
@@ -486,6 +515,7 @@
         [moduleViews addObject:tileButton];
     }
 
+    // 保存moduleViews到scrollView
     objc_setAssociatedObject(scrollView, "moduleViews", moduleViews, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissFluentMenu:)];
@@ -493,6 +523,7 @@
 
     [topVC.view addSubview:overlayView];
 
+    // 新增：弹窗支持拖动（仿DYYYSettingViewController）
     UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handleSettingPanelPan:)];
     [menuContainer addGestureRecognizer:dragPan];
 
@@ -524,50 +555,12 @@
 }
 
 %new
-- (void)showDYYYColorPickerFromMenuButton:(UIButton *)button {
-    if (@available(iOS 14.0, *)) {
-        UIColorPickerViewController *picker = [[UIColorPickerViewController alloc] init];
-        NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
-        UIColor *currentColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor colorWithWhite:0 alpha:0.4];
-        picker.selectedColor = currentColor;
-        picker.delegate = (id)self;
-        picker.modalPresentationStyle = UIModalPresentationPopover;
-        UIViewController *topVC = [DYYYManager getActiveTopController];
-        [topVC presentViewController:picker animated:YES completion:nil];
-        UIPopoverPresentationController *popover = picker.popoverPresentationController;
-        if (popover) {
-            popover.sourceView = button;
-            popover.sourceRect = button.bounds;
-            popover.permittedArrowDirections = UIPopoverArrowDirectionAny;
-        }
-    } else {
-        [DYYYManager showToast:@"需iOS 14+支持原生调色板"];
-    }
-}
-
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000
-- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)viewController {
-    UIColor *color = viewController.selectedColor;
-    NSData *colorData = [NSKeyedArchiver archivedDataWithRootObject:color];
-    [[NSUserDefaults standardUserDefaults] setObject:colorData forKey:@"DYYYBackgroundColor"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYBackgroundColorChanged" object:nil];
-}
-- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController {
-    if ([self respondsToSelector:@selector(colorPickerViewControllerDidSelectColor:)]) {
-        [(id)self colorPickerViewControllerDidSelectColor:viewController];
-    }
-}
-#endif
-
-%new
 - (void)handleDYYYBackgroundColorChanged:(NSNotification *)notification {
     UIViewController *topVC = [DYYYManager getActiveTopController];
     for (UIView *view in topVC.view.subviews) {
         if (view.tag == 9527) {
-            NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
-            UIColor *customBgColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor colorWithWhite:0 alpha:0.4];
-            view.backgroundColor = customBgColor;
+            // 保持半透明黑色背景
+            view.backgroundColor = [UIColor colorWithWhite:0 alpha:0.3];
             break;
         }
     }
@@ -599,7 +592,7 @@
 %new
 - (void)dismissFluentMenuByButton:(UIButton *)button {
     UIView *headerView = button.superview;
-    UIView *contentPanel = headerView.superview.superview;
+    UIView *contentPanel = headerView.superview;
     UIView *menuContainer = contentPanel.superview;
     UIView *overlayView = menuContainer.superview;
     [UIView animateWithDuration:0.3 animations:^{
@@ -657,6 +650,7 @@
             newFrame.origin.y = btnOrigin.y + offsetY;
             draggedBtn.frame = newFrame;
 
+            // 计算拖动中心点对应的目标index
             CGFloat dragCenterY = CGRectGetMidY(draggedBtn.frame);
             NSInteger toIndex = fromIndex;
             for (NSInteger i = 0; i < moduleViews.count; i++) {
@@ -671,9 +665,11 @@
                 }
             }
             if (toIndex != fromIndex && toIndex >= 0 && toIndex < moduleViews.count) {
+                // 交换数组顺序
                 [moduleViews removeObjectAtIndex:fromIndex];
                 [moduleViews insertObject:draggedBtn atIndex:toIndex];
 
+                // 动画调整所有按钮位置
                 [UIView animateWithDuration:0.18 animations:^{
                     for (NSInteger i = 0; i < moduleViews.count; i++) {
                         UIButton *btn = moduleViews[i];
@@ -695,6 +691,7 @@
         case UIGestureRecognizerStateEnded:
         case UIGestureRecognizerStateCancelled: {
             if (!isDragging) break;
+            // 回弹所有按钮
             [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.2 options:UIViewAnimationOptionCurveEaseOut animations:^{
                 for (NSInteger i = 0; i < moduleViews.count; i++) {
                     UIButton *btn = moduleViews[i];
@@ -705,6 +702,7 @@
                     btn.alpha = 1.0;
                 }
             } completion:nil];
+            // 保存顺序
             NSMutableArray *orderArr = [NSMutableArray array];
             for (UIButton *btn in moduleViews) {
                 NSNumber *tagNum = @(btn.tag - 100);
@@ -779,6 +777,7 @@
     }
     UIView *menuContainer = sender.superview.superview.superview;
     UIScrollView *scrollView = nil;
+    // 修正：contentPanel 需为 UIVisualEffectView，contentView 属性属于 UIVisualEffectView
     UIView *realContentView = menuContainer;
     if ([menuContainer isKindOfClass:[UIVisualEffectView class]]) {
         realContentView = ((UIVisualEffectView *)menuContainer).contentView;
@@ -792,8 +791,9 @@
     if (!scrollView) return;
     NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
     if (!moduleViews) return;
+    // 获取menuWidth
     CGFloat menuWidth = scrollView.superview.superview.frame.size.width;
-    CGFloat moduleWidth = menuWidth - 32;
+    CGFloat moduleWidth = menuWidth - 32; // 两侧留16pt间距
     CGFloat moduleHeight = 64;
     CGFloat spacing = 14;
     int columns = 1;
@@ -818,6 +818,7 @@
 
 %new
 - (void)showDYYYSettingPanelFromMenuButton:(UIButton *)button {
+    // 复用 DYYY.xm 里 UIWindow 的双指长按弹窗逻辑
     UIViewController *topVC = [DYYYManager getActiveTopController];
     if (topVC) {
         UIViewController *settingVC = [[NSClassFromString(@"DYYYSettingViewController") alloc] init];
@@ -833,6 +834,7 @@
                 settingVC.modalPresentationStyle = UIModalPresentationFullScreen;
             }
 
+            // 全屏时加关闭按钮
             if (settingVC.modalPresentationStyle == UIModalPresentationFullScreen) {
                 UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
                 [closeButton setTitle:@"关闭" forState:UIControlStateNormal];
@@ -847,6 +849,7 @@
                 [closeButton addTarget:self action:@selector(dismissDYYYSettingPanel:) forControlEvents:UIControlEventTouchUpInside];
             }
 
+            // 顶部小横条
             UIView *handleBar = [[UIView alloc] init];
             handleBar.backgroundColor = [UIColor whiteColor];
             handleBar.layer.cornerRadius = 2.5;
@@ -876,7 +879,7 @@
     picker.allowsEditing = YES;
     picker.delegate = (id)self;
     picker.modalPresentationStyle = UIModalPresentationFullScreen;
-    picker.view.tag = 10001;
+    picker.view.tag = 10001; // 标记为头像
     [[DYYYManager getActiveTopController] presentViewController:picker animated:YES completion:nil];
 }
 
@@ -887,7 +890,7 @@
     picker.allowsEditing = YES;
     picker.delegate = (id)self;
     picker.modalPresentationStyle = UIModalPresentationFullScreen;
-    picker.view.tag = 10002;
+    picker.view.tag = 10002; // 标记为相册图片
     [[DYYYManager getActiveTopController] presentViewController:picker animated:YES completion:nil];
 }
 
@@ -895,13 +898,17 @@
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
     UIImage *image = info[UIImagePickerControllerEditedImage] ?: info[UIImagePickerControllerOriginalImage];
     if (picker.view.tag == 10001) {
+        // 头像
         NSString *avatarPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"DYYYAvatar.jpg"];
         [UIImageJPEGRepresentation(image, 0.92) writeToFile:avatarPath atomically:YES];
         [[picker presentingViewController] dismissViewControllerAnimated:YES completion:^{
+            // 刷新弹窗头像
             [self refreshDYYYAvatarAndAlbum];
+            // 通知设置页刷新头像
             [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYAvatarChanged" object:nil];
         }];
     } else if (picker.view.tag == 10002) {
+        // 自定义相册图片
         NSString *albumPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/DYYY_custom_album_image.png"];
         [UIImagePNGRepresentation(image) writeToFile:albumPath atomically:YES];
         [[NSUserDefaults standardUserDefaults] setObject:albumPath forKey:@"DYYYCustomAlbumImagePath"];
@@ -930,6 +937,7 @@
         }
     }
     if (!overlayView) return;
+    // 刷新头像和昵称
     for (UIView *sub in overlayView.subviews) {
         for (UIView *subsub in sub.subviews) {
             if ([subsub isKindOfClass:[UIImageView class]]) {
@@ -977,6 +985,7 @@
     }
     void (^action)(void) = objc_getAssociatedObject(sender, "moduleAction");
     if (action) {
+        // 关闭弹窗动画
         UIView *overlayView = nil;
         UIView *view = sender;
         while (view) {
@@ -1016,15 +1025,10 @@
     CGPoint translation = [pan translationInView:overlayView];
     static CGFloat startHeight = 0;
     UIScrollView *scrollView = nil;
+    // 修正：contentPanel 需为 UIVisualEffectView，contentView 属性属于 UIVisualEffectView
     UIView *realContentView = contentPanel;
     if ([contentPanel isKindOfClass:[UIVisualEffectView class]]) {
         realContentView = ((UIVisualEffectView *)contentPanel).contentView;
-    }
-    for (UIView *sub in realContentView.subviews) {
-        if ([sub isKindOfClass:[UIScrollView class]]) {
-            scrollView = (UIScrollView *)sub;
-            break;
-        }
     }
     CGFloat minHeight = 240;
     CGFloat maxHeight = overlayView.bounds.size.height - 80;
@@ -1039,6 +1043,7 @@
     } else if (pan.state == UIGestureRecognizerStateChanged) {
         CGFloat newHeight = startHeight - translation.y;
         CGFloat contentNeedHeight = scrollView ? scrollView.contentSize.height : 0;
+        // 智能最小高度：内容少时紧凑，内容多时撑满，且不超屏
         CGFloat smartMin = headerHeight + avatarHeight + MIN(contentNeedHeight, maxHeight * 0.6) + safeBottom + 24;
         CGFloat smartMax = maxHeight;
         newHeight = MAX(MIN(newHeight, smartMax), MAX(minHeight, smartMin));
@@ -1080,6 +1085,7 @@
 
 %new
 - (void)customMenuButtonTapped:(UIButton *)button {
+    // 最大化弹窗
     UIView *headerView = button.superview;
     UIView *contentPanel = headerView.superview.superview;
     UIView *menuContainer = contentPanel.superview;
@@ -1095,6 +1101,7 @@
         frame.size.height = maxHeight;
         menuContainer.frame = frame;
         contentPanel.frame = menuContainer.bounds;
+        // 同步调整scrollView高度
         UIScrollView *scrollView = nil;
         UIView *realContentView = contentPanel;
         if ([contentPanel isKindOfClass:[UIVisualEffectView class]]) {
@@ -1122,7 +1129,7 @@
     static CGFloat startOriginY = 0;
     static BOOL isDragging = NO;
     CGFloat minY = overlayView.bounds.size.height - menuContainer.frame.size.height;
-    CGFloat maxY = overlayView.bounds.size.height - 100;
+    CGFloat maxY = overlayView.bounds.size.height - 100; // 最多拖到屏幕底部上方100px
 
     if (pan.state == UIGestureRecognizerStateBegan) {
         startY = [pan locationInView:overlayView].y;
@@ -1140,6 +1147,7 @@
         CGFloat velocityY = [pan velocityInView:overlayView].y;
         CGFloat currentOriginY = menuContainer.frame.origin.y;
         CGFloat threshold = overlayView.bounds.size.height - menuContainer.frame.size.height / 2;
+        // 如果下拉速度较快或拖动到一半以下，则关闭弹窗
         if (velocityY > 800 || currentOriginY > threshold) {
             [UIView animateWithDuration:0.25 animations:^{
                 CGRect frame = menuContainer.frame;
@@ -1150,6 +1158,7 @@
                 [overlayView removeFromSuperview];
             }];
         } else {
+            // 回弹到顶部
             [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.3 options:UIViewAnimationOptionCurveEaseOut animations:^{
                 CGRect frame = menuContainer.frame;
                 frame.origin.y = minY;
