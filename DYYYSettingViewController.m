@@ -103,19 +103,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     [self setupSectionTitles];
     [self setupFooterLabel];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleBackgroundColorChanged) name:@"DYYYBackgroundColorChanged" object:nil];
-
-    // 新增：添加拖动手势，仅在弹窗模式下
-    if (self.presentingViewController && (self.modalPresentationStyle == UIModalPresentationPageSheet ||
-                                          self.modalPresentationStyle == UIModalPresentationFormSheet ||
-                                          self.modalPresentationStyle == UIModalPresentationFullScreen)) {
-        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handleSettingPanelPan:)];
-        [self.view addGestureRecognizer:pan];
-    }
-
-    if (![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYInterfaceDownload"]) {
-        [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:@"DYYYInterfaceDownload"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-    }
 }
 
 - (void)backButtonTapped:(id)sender {
@@ -269,7 +256,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"时间标签颜色" key:@"DYYYLabelColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
                 [DYYYSettingItem itemWithTitle:@"隐藏系统顶栏" key:@"DYYYisHideStatusbar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"关注二次确认" key:@"DYYYfollowTips" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"收藏二次确认" key:@"DYYYcollectTips" type:DYYYSettingItemTypeSwitch]
+                [DYYYSettingItem itemWithTitle:@"收藏二次确认" key:@"DYYYcollectTips" type:DYYYSettingItemTypeSwitch],
             ],
             @[
                 [DYYYSettingItem itemWithTitle:@"设置顶栏透明" key:@"DYYYtopbartransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
@@ -392,7 +379,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"  -城市" key:@"DYYYisEnableAreaCity" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -市区或县城" key:@"DYYYisEnableAreaDistrict" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -街道或小区" key:@"DYYYisEnableAreaStreet" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"https://api.qsy.ink/api/douyin?url="],
+                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
                 [DYYYSettingItem itemWithTitle:@"清晰度" key:@"DYYYShowAllVideoQuality" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"屏蔽广告" key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
@@ -412,6 +399,14 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"长按下载功能-开关" key:@"DYYYLongPressDownload" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -视频" key:@"DYYYLongPressVideoDownload" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -音频弹出分享" key:@"DYYYLongPressAudioDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -图片" key:@"DYYYLongPressImageDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -实况动图" key:@"DYYYLongPressLivePhotoDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"长按面板-复制功能" key:@"DYYYCopyText" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -复制原文本" key:@"DYYYCopyOriginalText" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -复制分享链接" key:@"DYYYCopyShareLink" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"双击操作-开关" key:@"DYYYEnableDoubleOpenAlertController" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -保存视频/图片" key:@"DYYYDoubleTapDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -保存音频" key:@"DYYYDoubleTapDownloadAudio" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制文案" key:@"DYYYDoubleTapCopyDesc" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -打开评论" key:@"DYYYDoubleTapComment" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -点赞视频" key:@"DYYYDoubleTapLike" type:DYYYSettingItemTypeSwitch],
@@ -795,6 +790,13 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     cell.textLabel.font = [UIFont systemFontOfSize:16];
     cell.backgroundColor = [UIColor clearColor];
     cell.detailTextLabel.text = nil; // 清空，防止复用时异常
+    
+    // 为单元格添加左侧彩色图标
+    UIImage *icon = [self iconImageForSettingItem:item];
+    if (icon) {
+        cell.imageView.image = icon;
+        cell.imageView.tintColor = [self colorForSettingItem:item];
+    }
 
     // 微软风格卡片背景
     UIView *card = [cell.contentView viewWithTag:8888];
@@ -811,23 +813,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         [cell.contentView insertSubview:card atIndex:0];
     }
     
-    // 创建重置按钮，使用自动布局
-    UIButton *resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    resetButton.translatesAutoresizingMaskIntoConstraints = NO;
-    resetButton.tag = 555;
-    [resetButton setImage:[UIImage systemImageNamed:@"arrow.counterclockwise"] forState:UIControlStateNormal];
-    resetButton.tintColor = [UIColor systemGrayColor];
-    resetButton.alpha = 0.7;
-    [resetButton addTarget:self action:@selector(resetButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-    resetButton.accessibilityLabel = item.key;
-    [cell.contentView addSubview:resetButton];
-    
-    // 设置重置按钮大小
-    [NSLayoutConstraint activateConstraints:@[
-        [resetButton.widthAnchor constraintEqualToConstant:30],
-        [resetButton.heightAnchor constraintEqualToConstant:30]
-    ]];
-    
     // 创建单元格的配件视图
     UIView *accessoryView = nil;
     
@@ -839,6 +824,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         // 处理时间属地显示开关逻辑...
         if ([item.key hasPrefix:@"DYYYisEnableArea"] && 
             ![item.key isEqualToString:@"DYYYisEnableArea"]) {
+            // 现有代码...
             BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
             switchView.enabled = parentEnabled;
             
@@ -848,6 +834,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                                   [item.key isEqualToString:@"DYYYisEnableAreaStreet"];
             
             if (isAreaSubSwitch) {
+                // 现有代码...
                 BOOL anyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaProvince"] ||
                                 [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaCity"] ||
                                 [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaDistrict"] ||
@@ -871,12 +858,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         [switchView addTarget:self action:@selector(animatedSwitchToggled:) forControlEvents:UIControlEventValueChanged];
         switchView.tag = indexPath.section * 1000 + indexPath.row;
         accessoryView = switchView;
-        
-        // 设置重置按钮约束 - 开关类型
-        [NSLayoutConstraint activateConstraints:@[
-            [resetButton.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-            [resetButton.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-60]
-        ]];
     } else if (item.type == DYYYSettingItemTypeTextField) {
         // 文本输入类型
         if ([item.key isEqualToString:@"DYYYCustomAlbumImage"]) {
@@ -885,14 +866,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             [chooseButton addTarget:self action:@selector(showImagePickerForCustomAlbum) forControlEvents:UIControlEventTouchUpInside];
             chooseButton.frame = CGRectMake(0, 0, 80, 30);
             accessoryView = chooseButton;
-
-            // 不再使用 cell.detailTextLabel
-            
-            // 设置重置按钮约束 - 选择图片按钮类型
-            [NSLayoutConstraint activateConstraints:@[
-                [resetButton.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-                [resetButton.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-90]
-            ]];
         } else {
             // 关键：加宽文本框宽度，避免被遮挡
             UITextField *textField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 160, 30)];
@@ -906,18 +879,11 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             [textField addTarget:self action:@selector(textFieldDidChange:) forControlEvents:UIControlEventEditingDidEnd];
             textField.tag = indexPath.section * 1000 + indexPath.row;
 
-            // 不再设置 rightView/paddingView，直接让 accessoryView 宽度足够
             accessoryView = textField;
 
             if ([item.key isEqualToString:@"DYYYAvatarTapText"]) {
                 [textField addTarget:self action:@selector(avatarTextFieldDidChange:) forControlEvents:UIControlEventEditingChanged];
             }
-            
-            // 设置重置按钮约束 - 文本框类型
-            [NSLayoutConstraint activateConstraints:@[
-                [resetButton.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-                [resetButton.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-15]
-            ]];
         }
     } else if (item.type == DYYYSettingItemTypeSpeedPicker || item.type == DYYYSettingItemTypeColorPicker) {
         // 倍速选择器或颜色选择器类型
@@ -932,35 +898,17 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             speedField.tag = 999;
             accessoryView = speedField;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-        } else if (item.type == DYYYSettingItemTypeColorPicker) {
-            // 彩色取色按钮
-            UIButton *colorButton = [UIButton buttonWithType:UIButtonTypeSystem];
-            colorButton.frame = CGRectMake(0, 0, 36, 36);
-            colorButton.layer.cornerRadius = 18;
-            colorButton.clipsToBounds = YES;
-            colorButton.backgroundColor = [UIColor clearColor];
-            UIImage *paletteImage = [UIImage systemImageNamed:@"paintpalette.fill"];
-            [colorButton setImage:paletteImage forState:UIControlStateNormal];
-            colorButton.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.95];
-            [colorButton addTarget:self action:@selector(showColorPicker) forControlEvents:UIControlEventTouchUpInside];
-
-            // 只保留画板按钮，不再添加关闭按钮
-            accessoryView = colorButton;
-            cell.accessoryType = UITableViewCellAccessoryNone;
+        } else {
+            UIView *colorView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+            colorView.layer.cornerRadius = 15;
+            colorView.clipsToBounds = YES;
+            colorView.layer.borderWidth = 1.0;
+            colorView.layer.borderColor = [UIColor whiteColor].CGColor;
+            NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
+            colorView.backgroundColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBackgroundColor];
+            accessoryView = colorView;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
-        
-        // 设置重置按钮约束 - 选择器类型
-        [NSLayoutConstraint activateConstraints:@[
-            [resetButton.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-            [resetButton.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-90]
-        ]];
-    } else {
-        // 默认类型
-        // 设置重置按钮约束 - 默认类型
-        [NSLayoutConstraint activateConstraints:@[
-            [resetButton.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-            [resetButton.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-20]
-        ]];
     }
     
     // 设置单元格的配件视图
@@ -968,10 +916,138 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         cell.accessoryView = accessoryView;
     }
     
-    // 保证内容在卡片之上
-    [cell.contentView bringSubviewToFront:resetButton];
-    
     return cell;
+}
+
+// 根据设置项返回图标名称
+- (UIImage *)iconImageForSettingItem:(DYYYSettingItem *)item {
+    NSString *iconName;
+    
+    // 根据设置项的key选择合适的图标
+    if ([item.key containsString:@"Danmu"] || [item.key containsString:@"弹幕"]) {
+        iconName = @"text.bubble.fill";
+    } else if ([item.key containsString:@"Color"] || [item.key containsString:@"颜色"]) {
+        iconName = @"paintbrush.fill";
+    } else if ([item.key containsString:@"Hide"] || [item.key containsString:@"hidden"]) {
+        iconName = @"eye.slash.fill";
+    } else if ([item.key containsString:@"Download"] || [item.key containsString:@"下载"]) {
+        iconName = @"arrow.down.circle.fill";
+    } else if ([item.key containsString:@"Video"] || [item.key containsString:@"视频"]) {
+        iconName = @"video.fill";
+    } else if ([item.key containsString:@"Audio"] || [item.key containsString:@"音频"]) {
+        iconName = @"speaker.wave.2.fill";
+    } else if ([item.key containsString:@"Image"] || [item.key containsString:@"图片"]) {
+        iconName = @"photo.fill";
+    } else if ([item.key containsString:@"Speed"] || [item.key containsString:@"倍速"]) {
+        iconName = @"speedometer";
+    } else if ([item.key containsString:@"Enable"] || [item.key containsString:@"启用"]) {
+        iconName = @"checkmark.circle.fill";
+    } else if ([item.key containsString:@"Disable"] || [item.key containsString:@"禁用"]) {
+        iconName = @"xmark.circle.fill";
+    } else if ([item.key containsString:@"Time"] || [item.key containsString:@"时间"]) {
+        iconName = @"clock.fill";
+    } else if ([item.key containsString:@"Date"] || [item.key containsString:@"日期"]) {
+        iconName = @"calendar";
+    } else if ([item.key containsString:@"Button"] || [item.key containsString:@"按钮"]) {
+        iconName = @"hand.tap.fill";
+    } else if ([item.key containsString:@"Avatar"] || [item.key containsString:@"头像"]) {
+        iconName = @"person.crop.circle.fill";
+    } else if ([item.key containsString:@"Comment"] || [item.key containsString:@"评论"]) {
+        iconName = @"message.fill";
+    } else if ([item.key containsString:@"Clean"] || [item.key containsString:@"清理"] || [item.key containsString:@"清屏"]) {
+        iconName = @"trash.fill";
+    } else if ([item.key containsString:@"Share"] || [item.key containsString:@"分享"]) {
+        iconName = @"square.and.arrow.up.fill";
+    } else if ([item.key containsString:@"Background"] || [item.key containsString:@"背景"]) {
+        iconName = @"rectangle.fill.on.rectangle.fill";
+    } else if ([item.key containsString:@"Like"] || [item.key containsString:@"点赞"]) {
+        iconName = @"heart.fill";
+    } else if ([item.key containsString:@"Notification"] || [item.key containsString:@"通知"]) {
+        iconName = @"bell.fill";
+    } else if ([item.key containsString:@"Copy"] || [item.key containsString:@"复制"]) {
+        iconName = @"doc.on.doc.fill";
+    } else if ([item.key containsString:@"Text"] || [item.key containsString:@"文本"]) {
+        iconName = @"text.alignleft";
+    } else if ([item.key containsString:@"Location"] || [item.key containsString:@"位置"] || [item.key containsString:@"属地"]) {
+        iconName = @"location.fill";
+    } else if ([item.key containsString:@"Area"] || [item.key containsString:@"地区"]) {
+        iconName = @"mappin.and.ellipse";
+    } else if ([item.key containsString:@"Layout"] || [item.key containsString:@"布局"]) {
+        iconName = @"square.grid.2x2.fill";
+    } else if ([item.key containsString:@"Transparent"] || [item.key containsString:@"透明"]) {
+        iconName = @"square.on.circle.fill";
+    } else if ([item.key containsString:@"Live"] || [item.key containsString:@"直播"]) {
+        iconName = @"antenna.radiowaves.left.and.right";
+    } else if ([item.key containsString:@"Double"] || [item.key containsString:@"双击"]) {
+        iconName = @"hand.tap.fill";
+    } else if ([item.key containsString:@"Long"] || [item.key containsString:@"长按"]) {
+        iconName = @"hand.draw.fill";
+    } else if ([item.key containsString:@"ScreenDisplay"] || [item.key containsString:@"全屏"]) {
+        iconName = @"rectangle.expand.vertical";
+    } else if ([item.key containsString:@"Index"] || [item.key containsString:@"首页"]) {
+        iconName = @"house.fill";
+    } else if ([item.key containsString:@"Friends"] || [item.key containsString:@"朋友"]) {
+        iconName = @"person.2.fill";
+    } else if ([item.key containsString:@"Msg"] || [item.key containsString:@"消息"]) {
+        iconName = @"envelope.fill";
+    } else if ([item.key containsString:@"Self"] || [item.key containsString:@"我的"]) {
+        iconName = @"person.crop.square.fill";
+    } else if ([item.key containsString:@"NoAds"] || [item.key containsString:@"广告"]) {
+        iconName = @"xmark.octagon.fill";
+    } else if ([item.key containsString:@"NoUpdates"] || [item.key containsString:@"更新"]) {
+        iconName = @"arrow.triangle.2.circlepath";
+    } else if ([item.key containsString:@"InterfaceDownload"] || [item.key containsString:@"接口"]) {
+        iconName = @"link.circle.fill";
+    } else if ([item.key containsString:@"Scale"] || [item.key containsString:@"缩放"]) {
+        iconName = @"arrow.up.left.and.down.right.magnifyingglass";
+    } else if ([item.key containsString:@"Blur"] || [item.key containsString:@"模糊"] || [item.key containsString:@"玻璃"]) {
+        iconName = @"drop.fill";
+    } else if ([item.key containsString:@"Shop"] || [item.key containsString:@"商城"]) {
+        iconName = @"cart.fill";
+    } else if ([item.key containsString:@"Tips"] || [item.key containsString:@"提示"]) {
+        iconName = @"exclamationmark.bubble.fill";
+    } else if ([item.key containsString:@"Format"] || [item.key containsString:@"格式"]) {
+        iconName = @"textformat";
+    } else if ([item.key containsString:@"Filter"] || [item.key containsString:@"过滤"]) {
+        iconName = @"line.horizontal.3.decrease.circle.fill";
+    } else {
+        // 默认图标
+        iconName = @"gearshape.fill";
+    }
+    
+    UIImage *icon = [UIImage systemImageNamed:iconName];
+    if (@available(iOS 15.0, *)) {
+        return [icon imageWithConfiguration:[UIImageSymbolConfiguration configurationWithHierarchicalColor:[self colorForSettingItem:item]]];
+    } else {
+        return icon;
+    }
+}
+
+// 根据设置项返回颜色
+- (UIColor *)colorForSettingItem:(DYYYSettingItem *)item {
+    // 根据设置项类型返回不同颜色
+    if ([item.key containsString:@"Hide"] || [item.key containsString:@"hidden"]) {
+        return [UIColor systemRedColor];
+    } else if ([item.key containsString:@"Enable"] || [item.key containsString:@"启用"]) {
+        return [UIColor systemGreenColor];
+    } else if ([item.key containsString:@"Color"] || [item.key containsString:@"颜色"]) {
+        return [UIColor systemPurpleColor];
+    } else if ([item.key containsString:@"Double"] || [item.key containsString:@"双击"]) {
+        return [UIColor systemOrangeColor];
+    } else if ([item.key containsString:@"Download"] || [item.key containsString:@"下载"]) {
+        return [UIColor systemBlueColor];
+    } else if ([item.key containsString:@"Video"] || [item.key containsString:@"视频"]) {
+        return [UIColor systemIndigoColor];
+    } else if ([item.key containsString:@"Audio"] || [item.key containsString:@"音频"]) {
+        return [UIColor systemTealColor];
+    } else if ([item.key containsString:@"Speed"] || [item.key containsString:@"倍速"]) {
+        return [UIColor systemYellowColor];
+    } else if ([item.key containsString:@"Time"] || [item.key containsString:@"时间"]) {
+        return [UIColor systemOrangeColor];
+    }
+    
+    // 默认颜色
+    return [UIColor systemBlueColor];
 }
 
 // 微软风格UISwitch动画，联动卡片
@@ -1939,7 +2015,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 }
 
 - (void)showSourceCodePopup {
-    NSString *githubURL = @"https://github.com/pxx917144686/DYYY";
+    NSString *githubURL = @"https://github.com/pxx917144686/Surge_pxx/releases";
     
     // 添加跳转前的动画效果
     CAKeyframeAnimation *pulseAnimation = [CAKeyframeAnimation animationWithKeyPath:@"transform.scale"];
