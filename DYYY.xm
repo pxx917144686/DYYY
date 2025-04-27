@@ -2341,21 +2341,28 @@ static void DYYYAddCustomViewToParent(UIView *view, CGFloat transparency) {
 }
 %end
 
-// 强制启用新版抖音长按 UI（现代风）
+// 新版抖音长按 UI（现代风）
+%group needDelay
 %hook AWELongPressPanelManager
 - (BOOL)shouldShowModernLongPressPanel {
-	// 从 NSUserDefaults 读取开关状态
-	BOOL isEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"];
-	
-	// 如果开关未设置，默认启用现代风格面板
-	if (![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYisEnableModern"]) {
-		isEnabled = YES;
-		[[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableModern"];
-	}
-	
-	return isEnabled; // 返回是否启用现代风格面板
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"] ?: YES;
 }
-
+%end
+%hook AWELongPressPanelDataManager
++ (BOOL)enableModernLongPressPanelConfigWithSceneIdentifier:(id)arg1 {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"] ?: YES;
+}
+%end
+%hook AWELongPressPanelABSettings
++ (NSUInteger)modernLongPressPanelStyleMode {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"] ? 1 : 0;
+}
+%end
+%hook AWEModernLongPressPanelUIConfig
++ (NSUInteger)modernLongPressPanelStyleMode {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"] ? 1 : 0;
+}
+%end
 %end
 
 // 聊天视频底部评论框背景透明
