@@ -3,7 +3,6 @@
 #import <Photos/Photos.h>
 #import <objc/runtime.h>
 
-
 typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
     DYYYSettingItemTypeSwitch,
     DYYYSettingItemTypeTextField,
@@ -52,6 +51,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 #endif
 >
 
+@property (nonatomic, strong) UIImpactFeedbackGenerator *feedbackGenerator;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSArray<NSArray<DYYYSettingItem *> *> *settingSections;
 @property (nonatomic, strong) NSArray<NSArray<DYYYSettingItem *> *> *filteredSections;
@@ -88,6 +88,10 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     self.isSearching = NO;
     self.isKVOAdded = NO;
     
+    // 初始化触觉反馈生成器
+    self.feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+    [self.feedbackGenerator prepare];
+    
     UIBarButtonItem *backItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"chevron.left"]
                                                                  style:UIBarButtonItemStylePlain
                                                                 target:self
@@ -103,6 +107,13 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     [self setupSectionTitles];
     [self setupFooterLabel];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleBackgroundColorChanged) name:@"DYYYBackgroundColorChanged" object:nil];
+    
+    // 设置链接解析的默认值
+    NSString *interfaceDownload = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYInterfaceDownload"];
+    if (interfaceDownload == nil || [interfaceDownload stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]].length == 0) {
+        [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:@"DYYYInterfaceDownload"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
 }
 
 - (void)backButtonTapped:(id)sender {
@@ -373,13 +384,13 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"  -时:分:秒" key:@"DYYYDateTimeFormat_HMS" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -时:分" key:@"DYYYDateTimeFormat_HM" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -年-月-日" key:@"DYYYDateTimeFormat_YMD" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"属地前缀" key:@"DYYYLocationPrefix" type:DYYYSettingItemTypeTextField placeholder:@"IP: "],
+                [DYYYSettingItem itemWithTitle:@"属地前缀" key:@"DYYYLocationPrefix" type:DYYYSettingItemTypeTextField placeholder:@"IP : "],
                 [DYYYSettingItem itemWithTitle:@"时间属地显示-开关" key:@"DYYYisEnableArea" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -省级" key:@"DYYYisEnableAreaProvince" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -城市" key:@"DYYYisEnableAreaCity" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -市区或县城" key:@"DYYYisEnableAreaDistrict" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -街道或小区" key:@"DYYYisEnableAreaStreet" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
+                [DYYYSettingItem itemWithTitle:@"链接解析" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不设置，默认"],
                 [DYYYSettingItem itemWithTitle:@"清晰度" key:@"DYYYShowAllVideoQuality" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"屏蔽广告" key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
@@ -405,8 +416,8 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"  -复制原文本" key:@"DYYYCopyOriginalText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制分享链接" key:@"DYYYCopyShareLink" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"双击操作-开关" key:@"DYYYEnableDoubleOpenAlertController" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"  -保存视频/图片" key:@"DYYYDoubleTapDownload" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"  -保存音频" key:@"DYYYDoubleTapDownloadAudio" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -保存视频/图片/实况动图" key:@"DYYYDoubleTapDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -音频弹出分享" key:@"DYYYDoubleTapDownloadAudio" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制文案" key:@"DYYYDoubleTapCopyDesc" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -打开评论" key:@"DYYYDoubleTapComment" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -点赞视频" key:@"DYYYDoubleTapLike" type:DYYYSettingItemTypeSwitch],
@@ -449,7 +460,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     sourceCodeButton.frame = CGRectMake((self.view.bounds.size.width - 200) / 2, 50, 200, 40);
     sourceCodeButton.layer.cornerRadius = 20;
     sourceCodeButton.clipsToBounds = YES;
-    sourceCodeButton.tag = 101; // 添加标签便于后续找到
+    sourceCodeButton.tag = 101;
     
     // 创建渐变背景
     CAGradientLayer *gradientLayer = [CAGradientLayer layer];
@@ -736,7 +747,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     headerButton.backgroundColor = [UIColor systemBackgroundColor];
     headerButton.layer.cornerRadius = 10;
     headerButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    headerButton.contentEdgeInsets = UIEdgeInsetsMake(0, 15, 0, 0);
+    headerButton.contentEdgeInsets = UIEdgeInsetsMake(0, 40, 0, 0); // 预留左侧空间给箭头
     headerButton.titleLabel.font = [UIFont boldSystemFontOfSize:17];
     [headerButton setTitle:self.isSearching ? self.filteredSectionTitles[section] : self.sectionTitles[section] forState:UIControlStateNormal];
     [headerButton setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
@@ -744,8 +755,37 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     [headerButton addTarget:self action:@selector(headerTapped:) forControlEvents:UIControlEventTouchUpInside];
     
     UIImageView *arrowImageView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:[self.expandedSections containsObject:@(section)] ? @"chevron.down" : @"chevron.right"]];
-    arrowImageView.frame = CGRectMake(tableView.bounds.size.width - 45, 12, 20, 20);
-    arrowImageView.tintColor = [UIColor systemGrayColor];
+    // 修改箭头位置到左侧 - 适配各种iPhone机型
+    arrowImageView.frame = CGRectMake(25, 12, 20, 20);
+    
+    // 使用彩色箭头 - 为每个分区分配不同颜色
+    UIColor *arrowColor;
+    switch (section) {
+        case 0:
+            arrowColor = [UIColor systemBlueColor]; // 基本设置
+            break;
+        case 1:
+            arrowColor = [UIColor systemPurpleColor]; // 界面设置
+            break;
+        case 2:
+            arrowColor = [UIColor systemRedColor]; // 隐藏设置
+            break;
+        case 3:
+            arrowColor = [UIColor systemOrangeColor]; // 界面设置
+            break;
+        case 4:
+            arrowColor = [UIColor systemGreenColor]; // 增强设置
+            break;
+        default:
+            arrowColor = [UIColor systemTealColor];
+            break;
+    }
+    arrowImageView.tintColor = arrowColor;
+    // 添加轻微阴影效果使图标更突出
+    arrowImageView.layer.shadowColor = [UIColor blackColor].CGColor;
+    arrowImageView.layer.shadowOffset = CGSizeMake(0, 1);
+    arrowImageView.layer.shadowOpacity = 0.2;
+    arrowImageView.layer.shadowRadius = 1.5;
     arrowImageView.tag = 100;
     [headerView addSubview:headerButton];
     [headerView addSubview:arrowImageView];
@@ -899,13 +939,47 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             accessoryView = speedField;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         } else {
+            // 为菜单背景颜色添加彩色渐变效果
             UIView *colorView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
             colorView.layer.cornerRadius = 15;
             colorView.clipsToBounds = YES;
             colorView.layer.borderWidth = 1.0;
             colorView.layer.borderColor = [UIColor whiteColor].CGColor;
+            
+            // 从 UserDefaults 获取保存的颜色
             NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBackgroundColor"];
-            colorView.backgroundColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBackgroundColor];
+            UIColor *currentColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBackgroundColor];
+            
+            // 创建渐变背景展示当前颜色效果
+            CAGradientLayer *gradientLayer = [CAGradientLayer layer];
+            gradientLayer.frame = colorView.bounds;
+            gradientLayer.cornerRadius = 15;
+            
+            // 使用当前颜色创建渐变效果
+            if ([currentColor isEqual:[UIColor whiteColor]] || [currentColor isEqual:[UIColor systemBackgroundColor]]) {
+                // 如果是白色或系统背景色，使用彩虹渐变表示取色器
+                gradientLayer.colors = @[
+                    (id)[UIColor systemRedColor].CGColor,
+                    (id)[UIColor systemOrangeColor].CGColor,
+                    (id)[UIColor systemYellowColor].CGColor,
+                    (id)[UIColor systemGreenColor].CGColor,
+                    (id)[UIColor systemBlueColor].CGColor,
+                    (id)[UIColor systemPurpleColor].CGColor
+                ];
+                gradientLayer.startPoint = CGPointMake(0, 0);
+                gradientLayer.endPoint = CGPointMake(1, 1);
+            } else {
+                // 使用选择的颜色进行渐变
+                gradientLayer.colors = @[
+                    (id)[currentColor colorWithAlphaComponent:0.7].CGColor,
+                    (id)currentColor.CGColor,
+                    (id)[currentColor colorWithAlphaComponent:0.9].CGColor
+                ];
+                gradientLayer.startPoint = CGPointMake(0, 0);
+                gradientLayer.endPoint = CGPointMake(1, 1);
+            }
+            
+            [colorView.layer insertSublayer:gradientLayer atIndex:0];
             accessoryView = colorView;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
@@ -923,8 +997,12 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 - (UIImage *)iconImageForSettingItem:(DYYYSettingItem *)item {
     NSString *iconName;
     
-    // 根据设置项的key选择合适的图标
-    if ([item.key containsString:@"Danmu"] || [item.key containsString:@"弹幕"]) {
+    // 为彩色取色器添加特殊处理
+    if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
+        iconName = @"paintpalette.fill";
+    } 
+    // 其他根据设置项的key选择合适的图标...
+    else if ([item.key containsString:@"Danmu"] || [item.key containsString:@"弹幕"]) {
         iconName = @"text.bubble.fill";
     } else if ([item.key containsString:@"Color"] || [item.key containsString:@"颜色"]) {
         iconName = @"paintbrush.fill";
@@ -1017,6 +1095,10 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     
     UIImage *icon = [UIImage systemImageNamed:iconName];
     if (@available(iOS 15.0, *)) {
+        // 为颜色背景特殊处理
+        if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
+            return [icon imageWithConfiguration:[UIImageSymbolConfiguration configurationWithHierarchicalColor:[UIColor systemPinkColor]]];
+        }
         return [icon imageWithConfiguration:[UIImageSymbolConfiguration configurationWithHierarchicalColor:[self colorForSettingItem:item]]];
     } else {
         return icon;
@@ -1025,6 +1107,11 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 
 // 根据设置项返回颜色
 - (UIColor *)colorForSettingItem:(DYYYSettingItem *)item {
+    // 为取色器设置特殊颜色
+    if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
+        return [UIColor systemPinkColor];
+    }
+    
     // 根据设置项类型返回不同颜色
     if ([item.key containsString:@"Hide"] || [item.key containsString:@"hidden"]) {
         return [UIColor systemRedColor];
@@ -1063,7 +1150,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         sender.layer.shadowRadius = 8;
         sender.layer.shadowOffset = CGSizeMake(0, 2);
         card.transform = CGAffineTransformMakeScale(0.97, 0.97);
-        card.layer.shadowOpacity = 0.18;
+               card.layer.shadowOpacity =0.18;
     } completion:^(BOOL finished) {
         [UIView animateWithDuration:0.22 delay:0 usingSpringWithDamping:0.5 initialSpringVelocity:0.7 options:0 animations:^{
             sender.transform = CGAffineTransformIdentity;
@@ -1152,6 +1239,10 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 #pragma mark - Actions
 
 - (void)switchToggled:(UISwitch *)sender {
+    // 触发触觉反馈
+    [self.feedbackGenerator impactOccurred];
+    [self.feedbackGenerator prepare];
+    
     NSIndexPath *indexPath = [NSIndexPath indexPathForRow:sender.tag % 1000 inSection:sender.tag / 1000];
     NSArray<NSArray<DYYYSettingItem *> *> *sections = self.isSearching ? self.filteredSections : self.settingSections;
     if (indexPath.section >= sections.count || indexPath.row >= sections[indexPath.section].count) {
@@ -1159,119 +1250,38 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     }
     
     DYYYSettingItem *item = sections[indexPath.section][indexPath.row];
+    BOOL isOn = sender.isOn; // 保存用户切换后的实际值
     
-    // 处理时间属地显示开关组
-    if ([item.key isEqualToString:@"DYYYisEnableArea"]) {
-        // 主开关操作 - 所有子开关跟随主开关状态
-        BOOL mainEnabled = sender.isOn;
-        [[NSUserDefaults standardUserDefaults] setBool:mainEnabled forKey:@"DYYYisEnableArea"];
+    // 处理时间属地显示开关逻辑...
+    if ([item.key hasPrefix:@"DYYYisEnableArea"] && 
+        ![item.key isEqualToString:@"DYYYisEnableArea"]) {
+        BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
+        sender.enabled = parentEnabled;
         
-        // 如果主开关关闭，关闭所有子开关
-        if (!mainEnabled) {
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaProvince"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaCity"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaDistrict"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaStreet"];
-        } 
-        // 如果主开关开启，打开所有子开关
-        else {
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaProvince"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaCity"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaDistrict"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaStreet"];
-        }
+        BOOL isAreaSubSwitch = [item.key isEqualToString:@"DYYYisEnableAreaProvince"] ||
+                              [item.key isEqualToString:@"DYYYisEnableAreaCity"] ||
+                              [item.key isEqualToString:@"DYYYisEnableAreaDistrict"] ||
+                              [item.key isEqualToString:@"DYYYisEnableAreaStreet"];
         
-        // 更新UI中所有子开关的状态
-        [self updateAreaSubSwitchesUI:indexPath.section enabled:mainEnabled];
-    } 
-    // 处理子开关操作
-    else if ([item.key isEqualToString:@"DYYYisEnableAreaProvince"] || 
-             [item.key isEqualToString:@"DYYYisEnableAreaCity"] || 
-             [item.key isEqualToString:@"DYYYisEnableAreaDistrict"] || 
-             [item.key isEqualToString:@"DYYYisEnableAreaStreet"]) {
-        
-        // 当任何子开关打开时
-        if (sender.isOn) {
-            // 确保主开关打开
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableArea"];
-            
-            // 打开所有子开关
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaProvince"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaCity"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaDistrict"];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYisEnableAreaStreet"];
-            
-            // 更新UI中所有开关的状态
-            [self updateAreaMainSwitchUI:indexPath.section];
-            [self updateAreaSubSwitchesUI:indexPath.section enabled:YES];
-        } 
-        // 当任何子开关关闭时
-        else {
-            // 将当前子开关设置为关闭
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-            
-            // 检查是否所有子开关都已关闭
-            BOOL anyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaProvince"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaCity"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaDistrict"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaStreet"];
-            
-            // 如果所有子开关都关闭，也关闭主开关
-            if (!anyEnabled) {
-                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableArea"];
-                [self updateAreaMainSwitchUI:indexPath.section];
-            }
-        }
-    }
-    
-    // 检查父级设置是否启用（对于子开关）
-    if ([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] || 
-        [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] || 
-        [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"]) {
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableCustomAlbum"]) {
-            // 如果父级开关关闭，则不允许打开子级设置
+        if (isAreaSubSwitch && !parentEnabled) {
+            // 如果父开关关闭，子开关不能打开
             sender.on = NO;
-            [DYYYManager showToast:@"请先开启「自定义选择相册图片」"];
+            isOn = NO;
+            [DYYYManager showToast:@"请先开启「时间属地显示-开关」"];
             return;
         }
     }
     
-    // 相册尺寸开关互斥逻辑
-    if ([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] && sender.on) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeMedium"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeLarge"];
-        
-        // 刷新界面，更新其他子开关状态
-        [self updateMutuallyExclusiveSwitches:indexPath.section excludingItemKey:item.key];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
-    } 
-    else if ([item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] && sender.on) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeSmall"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeLarge"];
-        
-        // 刷新界面，更新其他子开关状态
-        [self updateMutuallyExclusiveSwitches:indexPath.section excludingItemKey:item.key];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
-    }
-    else if ([item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"] && sender.on) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeSmall"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeMedium"];
-        
-        // 刷新界面，更新其他子开关状态
-        [self updateMutuallyExclusiveSwitches:indexPath.section excludingItemKey:item.key];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
-    }
-    // 主开关关闭时，关闭所有子开关
-    else if ([item.key isEqualToString:@"DYYYEnableCustomAlbum"]) {
-        if (!sender.on) {
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeSmall"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeMedium"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCustomAlbumSizeLarge"];
-            
-            // 刷新界面，更新所有子开关状态
-            [self updateAllSubswitchesForSection:indexPath.section];
+    // 检查双击操作开关的父子关系
+    if ([item.key hasPrefix:@"DYYYDoubleTap"] && 
+        ![item.key isEqualToString:@"DYYYEnableDoubleOpenAlertController"]) {
+        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableDoubleOpenAlertController"]) {
+            // 如果父级开关关闭，则不允许打开子级设置
+            sender.on = NO;
+            isOn = NO;
+            [DYYYManager showToast:@"请先开启「双击操作-开关」"];
+            return;
         }
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
     }
     
     // 检查长按下载功能的父子开关关系
@@ -1282,6 +1292,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressDownload"]) {
             // 如果父级开关关闭，则不允许打开子级设置
             sender.on = NO;
+            isOn = NO;
             [DYYYManager showToast:@"请先开启「长按下载功能」"];
             return;
         }
@@ -1293,13 +1304,14 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYCopyText"]) {
             // 如果父级开关关闭，则不允许打开子级设置
             sender.on = NO;
+            isOn = NO;
             [DYYYManager showToast:@"请先开启「复制文案功能」"];
             return;
         }
     }
     
     // 长按下载功能主开关关闭时，关闭所有子开关
-    if ([item.key isEqualToString:@"DYYYLongPressDownload"] && !sender.on) {
+    if ([item.key isEqualToString:@"DYYYLongPressDownload"] && !isOn) {
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressVideoDownload"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressAudioDownload"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressImageDownload"];
@@ -1308,9 +1320,8 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         // 刷新界面，更新所有子开关状态
         [self updateSubswitchesForSection:indexPath.section parentKey:@"DYYYLongPressDownload"];
     }
-    
     // 复制文案功能主开关关闭时，关闭所有子开关
-    else if ([item.key isEqualToString:@"DYYYCopyText"] && !sender.on) {
+    else if ([item.key isEqualToString:@"DYYYCopyText"] && !isOn) {
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCopyOriginalText"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCopyShareLink"];
         
@@ -1321,7 +1332,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     // 处理日期时间格式开关组
     if ([item.key isEqualToString:@"DYYYShowDateTime"]) {
         // 主开关操作 - 所有子开关跟随主开关状态
-        BOOL mainEnabled = sender.isOn;
+        BOOL mainEnabled = isOn;
         [[NSUserDefaults standardUserDefaults] setBool:mainEnabled forKey:@"DYYYShowDateTime"];
         
         // 如果主开关关闭，关闭所有子开关
@@ -1331,10 +1342,8 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_HMS"];
             [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_HM"];
             [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMD"];
-            
-            // 清除原格式设置
             [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
-        }
+        } 
         // 如果主开关打开，默认启用第一个格式
         else if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"] && 
                 ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"] && 
@@ -1347,18 +1356,19 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         
         // 更新UI中所有子开关的状态
         [self updateDateTimeFormatSubSwitchesUI:indexPath.section enabled:mainEnabled];
-    }
+    } 
     // 处理日期时间格式子开关操作
     else if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
             // 如果父级开关关闭，则不允许打开子级设置
             sender.on = NO;
+            isOn = NO;
             [DYYYManager showToast:@"请先开启「视频-显示日期时间」"];
             return;
         }
         
         // 当任何子开关打开时
-        if (sender.isOn) {
+        if (isOn) {
             // 确保主开关打开
             [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYShowDateTime"];
             
@@ -1392,7 +1402,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             
             // 更新UI中主开关的状态
             [self updateDateTimeFormatMainSwitchUI:indexPath.section];
-        }
+        } 
         // 当任何子开关关闭时
         else {
             // 将当前子开关设置为关闭
@@ -1409,17 +1419,18 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             if (!anyEnabled) {
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
-                [self updateDateTimeFormatMainSwitchUI:indexPath.section];
+                for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
+                    [self updateDateTimeFormatMainSwitchUI:section];
+                }
             }
         }
     }
     
-    // 保存开关状态
-    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:item.key];
+    // 保存开关状态 - 使用isOn变量，不是sender.isOn，因为可能已经被上述逻辑修改
+    [[NSUserDefaults standardUserDefaults] setBool:isOn forKey:item.key];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-// 添加新方法，用于更新时间属地显示主开关的UI状态
 - (void)updateAreaMainSwitchUI:(NSInteger)section {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
@@ -1442,7 +1453,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     }
 }
 
-// 添加新方法，用于更新时间属地显示子开关的UI状态
 - (void)updateAreaSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
@@ -1538,14 +1548,13 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
             
             if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *cellSwitch = (UISwitch *)cell.accessoryView;
-                cellSwitch.on = NO;
+                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
+                subSwitch.on = NO;
             }
         }
     }
 }
 
-// 添加日期时间格式主开关UI更新方法
 - (void)updateDateTimeFormatMainSwitchUI:(NSInteger)section {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
@@ -1568,7 +1577,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     }
 }
 
-// 添加日期时间格式子开关UI更新方法
 - (void)updateDateTimeFormatSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
@@ -1583,23 +1591,12 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             
             if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
                 UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                
-                // 如果主开关关闭，所有子开关都关闭
-                if (!enabled) {
-                    subSwitch.on = NO;
-                } else {
-                    // 主开关打开时，根据存储的值设置子开关状态
-                    subSwitch.on = [[NSUserDefaults standardUserDefaults] boolForKey:item.key];
-                }
-                
-                // 设置子开关是否可用
-                subSwitch.enabled = enabled;
+                subSwitch.on = enabled;
             }
         }
     }
 }
 
-// 添加日期时间格式互斥开关更新方法
 - (void)updateDateTimeFormatExclusiveSwitch:(NSInteger)section currentKey:(NSString *)currentKey {
     NSArray<NSString *> *allFormatKeys = @[@"DYYYDateTimeFormat_YMDHM", 
                                           @"DYYYDateTimeFormat_MDHM", 
@@ -1643,17 +1640,24 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     }
     
     DYYYSettingItem *item = sections[indexPath.section][indexPath.row];
-    [[NSUserDefaults standardUserDefaults] setObject:textField.text forKey:item.key];
+    
+    // 添加对链接解析接口的特殊处理
+    if ([item.key isEqualToString:@"DYYYInterfaceDownload"]) {
+        NSString *text = [textField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if (text.length == 0) {
+            textField.text = @"https://api.qsy.ink/api/douyin?url=";
+            [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:item.key];
+        } else {
+            [[NSUserDefaults standardUserDefaults] setObject:textField.text forKey:item.key];
+        }
+    } else {
+        [[NSUserDefaults standardUserDefaults] setObject:textField.text forKey:item.key];
+    }
+    
     [[NSUserDefaults standardUserDefaults] synchronize];
     
     // 处理特殊键
     if ([item.key isEqualToString:@"DYYYCustomAlbumImage"]) {
-        // 检查自定义选择相册图片功能是否启用
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableCustomAlbum"]) {
-            [DYYYManager showToast:@"请先开启「自定义选择相册图片」"];
-            return;
-        }
-        
         [self showImagePickerForCustomAlbum];
     }
 }
@@ -1663,6 +1667,10 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 }
 
 - (void)headerTapped:(UIButton *)sender {
+    // 触发触觉反馈
+    [self.feedbackGenerator impactOccurred];
+    [self.feedbackGenerator prepare];
+    
     NSInteger section = sender.tag;
     NSArray<NSArray<DYYYSettingItem *> *> *sections = self.isSearching ? self.filteredSections : self.settingSections;
     if (section >= sections.count) {
@@ -1787,7 +1795,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                                                    handler:^(UIAlertAction * _Nonnull action) {
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYCustomAlbumImagePath"];
                 [[NSUserDefaults standardUserDefaults] synchronize];
-                [DYYYManager showToast:@"已恢复默认相册图片"];
+                [DYYYManager showToast:@"自定义相册图片已设置"];
                 [self.tableView reloadData];
                 [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
             }]];
@@ -1818,8 +1826,10 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMD"];
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
                 
-                // 更新UI
-                [self updateDateTimeFormatSubSwitchesUI:indexPath.section enabled:NO];
+                // 更新UI中子开关的状态
+                for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
+                    [self updateDateTimeFormatSubSwitchesUI:section enabled:NO];
+                }
             }
             else if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
                 // 重置一个子开关时检查是否有其他子开关启用
@@ -1833,20 +1843,48 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                     }
                 }
                 
-                // 如果没有其他子开关启用，也关闭主开关
+                // 如果所有子开关都关闭，也关闭主开关并清除格式
                 if (!anyEnabled) {
                     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
                     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
-                    [self updateDateTimeFormatMainSwitchUI:indexPath.section];
+                    for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
+                        [self updateDateTimeFormatMainSwitchUI:section];
+                    }
                 }
             }
             
-            if (self.tableView) {
-                [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+            // 特殊处理时间属地显示开关组
+            if ([item.key isEqualToString:@"DYYYisEnableArea"]) {
+                // 重置主开关也重置所有子开关
+                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaProvince"];
+                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaCity"];
+                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaDistrict"];
+                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaStreet"];
+                
+                // 更新UI
+                for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
+                    [self updateAreaSubSwitchesUI:section enabled:NO];
+                }
             }
+            
+            // 针对自定义相册图片和大小，重置后刷新按钮
+            if ([item.key isEqualToString:@"DYYYCustomAlbumImagePath"] ||
+                [item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] ||
+                [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
+                [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"] ||
+                [item.key isEqualToString:@"DYYYEnableCustomAlbum"]) {
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYCustomAlbumSettingChanged" object:nil];
+            }
+            
+            // 处理头像文本
             if ([item.key isEqualToString:@"DYYYAvatarTapText"]) {
                 self.avatarTapLabel.text = @"pxx917144686";
             }
+            
+            // 刷新UI
+            [self.tableView reloadData];
+            
+            // 显示提示
             [DYYYManager showToast:[NSString stringWithFormat:@"已重置: %@", item.title]];
             NSLog(@"DYYY: Reset %@", item.key);
         }];
@@ -1961,15 +1999,15 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
         // 重置一个子开关时检查是否有其他子开关启用
         BOOL anyEnabled = NO;
         for (NSString *formatKey in @[@"DYYYDateTimeFormat_YMDHM", @"DYYYDateTimeFormat_MDHM", 
-                                @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
-                                @"DYYYDateTimeFormat_YMD"]) {
+                                      @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
+                                      @"DYYYDateTimeFormat_YMD"]) {
             if (![formatKey isEqualToString:key] && [[NSUserDefaults standardUserDefaults] boolForKey:formatKey]) {
                 anyEnabled = YES;
                 break;
             }
         }
         
-        // 如果没有其他子开关启用，也关闭主开关
+        // 如果所有子开关都关闭，也关闭主开关并清除格式
         if (!anyEnabled) {
             [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
             [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
@@ -2032,27 +2070,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:githubURL] options:@{} completionHandler:nil];
     });
-}
-
-#pragma mark - Button Animation
-
-- (void)buttonTouchDown:(UIButton *)sender {
-    [UIView animateWithDuration:0.1 animations:^{
-        sender.transform = CGAffineTransformMakeScale(0.95, 0.95);
-        sender.alpha = 0.8;
-    }];
-}
-
-- (void)buttonTouchUp:(UIButton *)sender {
-    [UIView animateWithDuration:0.2 
-                          delay:0
-         usingSpringWithDamping:0.4
-          initialSpringVelocity:0.5
-                        options:UIViewAnimationOptionCurveEaseOut
-                     animations:^{
-        sender.transform = CGAffineTransformIdentity;
-        sender.alpha = 1.0;
-    } completion:nil];
 }
 
 #pragma mark - Notification Handling
