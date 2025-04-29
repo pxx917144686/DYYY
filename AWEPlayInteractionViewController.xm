@@ -592,16 +592,72 @@
 %new
 - (void)dismissFluentMenuByButton:(UIButton *)button {
     UIView *headerView = button.superview;
+    if (!headerView) return;
+    
     UIView *contentPanel = headerView.superview;
-    UIView *menuContainer = contentPanel.superview;
-    UIView *overlayView = menuContainer.superview;
-    [UIView animateWithDuration:0.3 animations:^{
+    if (!contentPanel) return;
+    
+    // 找到menuContainer和overlayView
+    UIView *menuContainer = nil;
+    UIView *overlayView = nil;
+    UIView *currentView = contentPanel;
+    
+    // 遍历视图层次结构以正确找到overlayView
+    while (currentView) {
+        if (currentView.tag == 9527) {
+            overlayView = currentView;
+            break;
+        }
+        
+        if (currentView.layer.cornerRadius == 20) {
+            menuContainer = currentView;
+        }
+        
+        currentView = currentView.superview;
+    }
+    
+    if (!overlayView) return;
+    if (!menuContainer) menuContainer = contentPanel.superview;
+    
+    // 移除通知观察者以防止内存泄漏和后续事件处理
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYBackgroundColorChanged" object:nil];
+    
+    // 移除所有手势识别器
+    NSArray *gestures = [NSArray arrayWithArray:overlayView.gestureRecognizers];
+    for (UIGestureRecognizer *gesture in gestures) {
+        gesture.enabled = NO;
+        [overlayView removeGestureRecognizer:gesture];
+    }
+    
+    // 禁用menuContainer上的手势
+    if (menuContainer) {
+        gestures = [NSArray arrayWithArray:menuContainer.gestureRecognizers];
+        for (UIGestureRecognizer *gesture in gestures) {
+            gesture.enabled = NO;
+            [menuContainer removeGestureRecognizer:gesture];
+        }
+    }
+    
+    // 设置用户交互为NO，防止动画期间的触摸事件
+    overlayView.userInteractionEnabled = NO;
+    
+    [UIView animateWithDuration:0.25 animations:^{
         overlayView.alpha = 0;
-        CGRect frame = menuContainer.frame;
-        frame.origin.y = overlayView.bounds.size.height;
-        menuContainer.frame = frame;
+        
+        if (menuContainer) {
+            CGRect frame = menuContainer.frame;
+            frame.origin.y = overlayView.bounds.size.height;
+            menuContainer.frame = frame;
+        }
     } completion:^(BOOL finished) {
-        [overlayView removeFromSuperview];
+        // 确保在主线程中执行视图移除
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // 移除子视图
+            for (UIView *subview in overlayView.subviews) {
+                [subview removeFromSuperview];
+            }
+            [overlayView removeFromSuperview];
+        });
     }];
 }
 
