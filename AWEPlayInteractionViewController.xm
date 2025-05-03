@@ -3,6 +3,20 @@
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
 
+// 添加颜色圆圈图像生成函数声明
+UIImage *createColorCircleImage(UIColor *color, CGSize size) {
+    UIGraphicsBeginImageContextWithOptions(size, NO, 0);
+    [color setFill];
+    [[UIColor whiteColor] setStroke];
+    UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(1, 1, size.width - 2, size.height - 2)];
+    path.lineWidth = 1.0;
+    [path fill];
+    [path stroke];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
+
 // 为AWEPlayInteractionViewController添加接口声明
 @interface AWEPlayInteractionViewController (DYYYAdditions)
 - (void)createFluentDesignDraggableMenuWithAwemeModel:(AWEAwemeModel *)awemeModel touchPoint:(CGPoint)touchPoint;
@@ -25,6 +39,17 @@
 - (void)customMenuButtonTapped:(UIButton *)button;
 - (void)handleDYYYBackgroundColorChanged:(NSNotification *)notification;
 - (void)dyyy_handleSettingPanelPan:(UIPanGestureRecognizer *)pan;
+- (void)toggleBlurStyle:(UIButton *)button;
+- (void)showBlurColorPicker:(UIButton *)button;
+- (void)updateBlurEffectWithColor:(UIColor *)color;
+- (void)updateColorPickerButtonWithColor:(UIColor *)color;
+- (UIImage *)imageWithColor:(UIColor *)color size:(CGSize)size;
+- (void)refreshCurrentView;
+- (void)showVideoDebugInfo:(AWEAwemeModel *)model;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000
+- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)viewController API_AVAILABLE(ios(14.0));
+- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController API_AVAILABLE(ios(14.0));
+#endif
 @end
 
 %hook AWEPlayInteractionViewController
@@ -125,11 +150,49 @@
     menuContainer.layer.shadowOpacity = 0.3;
     [overlayView addSubview:menuContainer];
 
-    UIVisualEffectView *contentPanel = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight]]; // 改为浅色风格
+    // 获取保存的颜色
+    NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBlurEffectColor"];
+    UIColor *blurColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : nil;
+    
+    // 决定毛玻璃效果风格
+    UIBlurEffectStyle blurStyle = UIBlurEffectStyleLight;
+    if (blurColor) {
+        CGFloat brightness = 0;
+        [blurColor getWhite:&brightness alpha:nil];
+        if (brightness < 0.5) {
+            // 深色
+            if (@available(iOS 13.0, *)) {
+                blurStyle = UIBlurEffectStyleSystemMaterialDark;
+            } else {
+                blurStyle = UIBlurEffectStyleDark;
+            }
+        }
+    } else {
+        // 使用默认风格
+        BOOL isModernStyle = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableModern"];
+        if (isModernStyle) {
+            if (@available(iOS 13.0, *)) {
+                blurStyle = UIBlurEffectStyleSystemMaterialDark;
+            } else {
+                blurStyle = UIBlurEffectStyleDark;
+            }
+        }
+    }
+
+    UIVisualEffectView *contentPanel = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:blurStyle]];
     contentPanel.frame = menuContainer.bounds;
     contentPanel.layer.cornerRadius = 20;
     contentPanel.clipsToBounds = YES;
     [menuContainer addSubview:contentPanel];
+    
+    // 如果有保存的颜色，应用背景色
+    if (blurColor) {
+        UIView *colorView = [[UIView alloc] initWithFrame:contentPanel.bounds];
+        colorView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        colorView.backgroundColor = [blurColor colorWithAlphaComponent:0.3];
+        colorView.tag = 8888;
+        [contentPanel.contentView insertSubview:colorView atIndex:0];
+    }
 
     // 头像功能只保留一个，且放在弹窗顶部（headerView之上）
     CGFloat avatarSize = 72;
@@ -163,32 +226,131 @@
     // headerView内移除头像相关代码，只保留菜单按钮和关闭按钮
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, menuWidth, 100)];
     headerView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.1];
+    headerView.tag = 100; // 添加标签方便找到
     [contentPanel.contentView addSubview:headerView];
 
-    // 调整大小按钮（替代关闭按钮，右上角）
-    UIButton *resizeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    resizeButton.frame = CGRectMake(menuWidth - 90, 20, 30, 30);
-    UIImage *resizeImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
-    [resizeButton setImage:resizeImage forState:UIControlStateNormal];
-    resizeButton.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.95];
-    resizeButton.backgroundColor = [UIColor clearColor];
+    // 修改为彩色调整大小按钮（右上角）
+    UIButton *resizeButton = [UIButton buttonWithType:UIButtonTypeCustom]; // 改为 Custom 类型
+    resizeButton.frame = CGRectMake(menuWidth - 130, 20, 30, 30);  // 位置左移，为切换按钮留出空间
     resizeButton.layer.cornerRadius = 15;
+    resizeButton.clipsToBounds = YES;
+
+    // 添加渐变背景
+    CAGradientLayer *resizeGradient = [CAGradientLayer layer];
+    resizeGradient.frame = resizeButton.bounds;
+    resizeGradient.cornerRadius = 15;
+    resizeGradient.colors = @[
+        (id)[UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.9].CGColor,
+        (id)[UIColor colorWithRed:0.4 green:0.7 blue:1 alpha:0.9].CGColor
+    ];
+    resizeGradient.startPoint = CGPointMake(0, 0);
+    resizeGradient.endPoint = CGPointMake(1, 1);
+    [resizeButton.layer insertSublayer:resizeGradient atIndex:0];
+
+    // 单独创建图标视图，添加到按钮上方
+    UIImageView *resizeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(5, 5, 20, 20)];
+    resizeImageView.contentMode = UIViewContentModeScaleAspectFit;
+    UIImage *resizeImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
+    resizeImageView.image = [resizeImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    resizeImageView.tintColor = [UIColor whiteColor];
+    [resizeButton addSubview:resizeImageView];
+
+    // 添加阴影 - 在父视图添加，避免与圆角冲突
+    resizeButton.layer.shadowColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.4].CGColor;
+    resizeButton.layer.shadowOffset = CGSizeMake(0, 2);
+    resizeButton.layer.shadowRadius = 4;
+    resizeButton.layer.shadowOpacity = 0.8;
+
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(resizeMenuPan:)];
     [resizeButton addGestureRecognizer:pan];
     [resizeButton addTarget:self action:@selector(customMenuButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:resizeButton];
 
-    // 新增关闭按钮，紧挨右侧
-    UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    // 在resizeButton旁边添加颜色选择按钮 - 替换原来的切换按钮
+    UIButton *colorPickerButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    colorPickerButton.frame = CGRectMake(menuWidth - 90, 20, 30, 30); // 放在resizeButton右侧
+    colorPickerButton.layer.cornerRadius = 15;
+    colorPickerButton.clipsToBounds = YES;
+
+    // 根据保存的颜色创建渐变背景
+    CAGradientLayer *toggleGradient = [CAGradientLayer layer];
+    toggleGradient.frame = colorPickerButton.bounds;
+    toggleGradient.cornerRadius = 15;
+    
+    // 使用保存的颜色或默认紫色
+    UIColor *buttonColor = blurColor ? blurColor : [UIColor colorWithRed:0.5 green:0.3 blue:1.0 alpha:0.9];
+    toggleGradient.colors = @[
+        (id)[buttonColor colorWithAlphaComponent:0.9].CGColor,
+        (id)[buttonColor colorWithAlphaComponent:0.7].CGColor
+    ];
+    
+    toggleGradient.startPoint = CGPointMake(0, 0);
+    toggleGradient.endPoint = CGPointMake(1, 1);
+    [colorPickerButton.layer insertSublayer:toggleGradient atIndex:0];
+
+    // 单独创建图标视图，添加到按钮上方
+    UIImageView *toggleImageView = [[UIImageView alloc] initWithFrame:CGRectMake(5, 5, 20, 20)];
+    toggleImageView.contentMode = UIViewContentModeScaleAspectFit;
+    UIImage *toggleImage = [UIImage systemImageNamed:@"paintpalette.fill"];  // 更改为取色器图标
+    toggleImageView.image = [toggleImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    toggleImageView.tintColor = [UIColor whiteColor];
+    [colorPickerButton addSubview:toggleImageView];
+
+    // 添加阴影
+    colorPickerButton.layer.shadowColor = [buttonColor colorWithAlphaComponent:0.4].CGColor;
+    colorPickerButton.layer.shadowOffset = CGSizeMake(0, 2);
+    colorPickerButton.layer.shadowRadius = 4;
+    colorPickerButton.layer.shadowOpacity = 0.8;
+
+    // 添加点击事件 - 现在调用颜色选择器
+    [colorPickerButton addTarget:self action:@selector(toggleBlurStyle:) forControlEvents:UIControlEventTouchUpInside];
+
+    // 设置按钮标签，用于识别
+    colorPickerButton.tag = 200;
+
+    [headerView addSubview:colorPickerButton];
+
+    // 新增关闭按钮，紧挨右侧，使用相同风格
+    UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom]; // 改为 Custom 类型
     closeButton.frame = CGRectMake(menuWidth - 50, 20, 30, 30);
-    UIImage *closeImage = [UIImage systemImageNamed:@"xmark.circle.fill"];
-    [closeButton setImage:closeImage forState:UIControlStateNormal];
-    closeButton.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.95];
-    closeButton.backgroundColor = [UIColor clearColor];
     closeButton.layer.cornerRadius = 15;
+    closeButton.clipsToBounds = YES;
+
+    // 添加渐变背景
+    CAGradientLayer *closeGradient = [CAGradientLayer layer];
+    closeGradient.frame = closeButton.bounds;
+    closeGradient.cornerRadius = 15;
+    closeGradient.colors = @[
+        (id)[UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:0.9].CGColor,
+        (id)[UIColor colorWithRed:1.0 green:0.5 blue:0.5 alpha:0.9].CGColor
+    ];
+    closeGradient.startPoint = CGPointMake(0, 0);
+    closeGradient.endPoint = CGPointMake(1, 1);
+    [closeButton.layer insertSublayer:closeGradient atIndex:0];
+
+    // 单独创建图标视图，添加到按钮上方
+    UIImageView *closeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(5, 5, 20, 20)];
+    closeImageView.contentMode = UIViewContentModeScaleAspectFit;
+    UIImage *closeImage = [UIImage systemImageNamed:@"xmark.circle.fill"];
+    closeImageView.image = [closeImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    closeImageView.tintColor = [UIColor whiteColor];
+    [closeButton addSubview:closeImageView];
+
+    // 添加阴影
+    closeButton.layer.shadowColor = [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:0.4].CGColor;
+    closeButton.layer.shadowOffset = CGSizeMake(0, 2);
+    closeButton.layer.shadowRadius = 4;
+    closeButton.layer.shadowOpacity = 0.8;
+
     [closeButton addTarget:self action:@selector(dismissFluentMenuByButton:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:closeButton];
 
+    // 确保按钮显示在最上层
+    [headerView bringSubviewToFront:resizeButton];
+    [headerView bringSubviewToFront:colorPickerButton];
+    [headerView bringSubviewToFront:closeButton];
+
+    // 以下是原有代码...
     // 菜单按钮（彩色）放在左侧，更加高级
     UIButton *menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
     menuButton.frame = CGRectMake(20, 20, 70, 30);
@@ -319,7 +481,7 @@
     NSString *apiKey = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYInterfaceDownload"];
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDoubleInterfaceDownload"] && apiKey.length > 0) {
         NSDictionary *apiModule = @{
-            @"title": @"接口保存",
+            @"title": @"解析下载",
             @"icon": @"network",
             @"color": @"#4A5568",
             @"action": ^{
@@ -332,6 +494,47 @@
             }
         };
         [menuModules addObject:apiModule];
+    }
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableAdvancedSettings"] || 
+        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableAdvancedSettings"]) {
+        NSDictionary *advancedSettingsModule = @{
+            @"title": @"其他功能",
+            @"icon": @"gearshape.2.fill",
+            @"color": @"#007AFF",
+            @"action": ^{
+                UIViewController *topVC = [DYYYManager getActiveTopController];
+                if (topVC) {
+                    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"高级设置" 
+                                                                                  message:@"选择高级功能" 
+                                                                          preferredStyle:UIAlertControllerStyleActionSheet];
+                    
+                    [alert addAction:[UIAlertAction actionWithTitle:@"清除缓存" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                        [DYYYManager shared]; 
+                        [DYYYManager showToast:@"缓存已清除"];
+                    }]];
+                    
+                    [alert addAction:[UIAlertAction actionWithTitle:@"刷新视图" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                        [self refreshCurrentView];
+                        [DYYYManager showToast:@"视图已刷新"];
+                    }]];
+                    
+                    [alert addAction:[UIAlertAction actionWithTitle:@"视频信息" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                        [self showVideoDebugInfo:awemeModel];
+                    }]];
+                    
+                    [alert addAction:[UIAlertAction actionWithTitle:@"强制关闭广告" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYBlockAllAds"];
+                        [[NSUserDefaults standardUserDefaults] synchronize];
+                        [DYYYManager showToast:@"已强制关闭广告，重启App生效"];
+                    }]];
+                    
+                    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+                    
+                    [topVC presentViewController:alert animated:YES completion:nil];
+                }
+            }
+        };
+        [menuModules addObject:advancedSettingsModule];
     }
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDoubleTapCopyDesc"] || ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDoubleTapCopyDesc"]) {
         NSDictionary *copyTextModule = @{
@@ -1080,12 +1283,22 @@
     UIView *overlayView = menuContainer.superview;
     CGPoint translation = [pan translationInView:overlayView];
     static CGFloat startHeight = 0;
-    UIScrollView *scrollView = nil;
-    // 修正：contentPanel 需为 UIVisualEffectView，contentView 属性属于 UIVisualEffectView
+    
+    // 修正：获取真实内容视图并使用它查找scrollView
     UIView *realContentView = contentPanel;
     if ([contentPanel isKindOfClass:[UIVisualEffectView class]]) {
         realContentView = ((UIVisualEffectView *)contentPanel).contentView;
     }
+    
+    // 查找scrollView并使用它
+    UIScrollView *scrollView = nil;
+    for (UIView *sub in realContentView.subviews) {
+        if ([sub isKindOfClass:[UIScrollView class]]) {
+            scrollView = (UIScrollView *)sub;
+            break;
+        }
+    }
+    
     CGFloat minHeight = 240;
     CGFloat maxHeight = overlayView.bounds.size.height - 80;
     CGFloat headerHeight = headerView.frame.size.height;
@@ -1094,48 +1307,25 @@
     if (@available(iOS 11.0, *)) {
         safeBottom = overlayView.safeAreaInsets.bottom;
     }
+    
+    // 完整实现此方法，确保使用scrollView和safeBottom变量
     if (pan.state == UIGestureRecognizerStateBegan) {
         startHeight = menuContainer.frame.size.height;
     } else if (pan.state == UIGestureRecognizerStateChanged) {
         CGFloat newHeight = startHeight - translation.y;
-        CGFloat contentNeedHeight = scrollView ? scrollView.contentSize.height : 0;
-        // 智能最小高度：内容少时紧凑，内容多时撑满，且不超屏
-        CGFloat smartMin = headerHeight + avatarHeight + MIN(contentNeedHeight, maxHeight * 0.6) + safeBottom + 24;
-        CGFloat smartMax = maxHeight;
-        newHeight = MAX(MIN(newHeight, smartMax), MAX(minHeight, smartMin));
+        newHeight = MAX(minHeight, MIN(newHeight, maxHeight));
+        
         CGRect frame = menuContainer.frame;
+        frame.size.height = newHeight + safeBottom; 
         frame.origin.y = overlayView.bounds.size.height - newHeight;
-        frame.size.height = newHeight;
         menuContainer.frame = frame;
+        
         contentPanel.frame = menuContainer.bounds;
+        
+        // 调整滚动视图的高度
         if (scrollView) {
-            CGFloat scrollH = newHeight - headerHeight;
-            scrollView.frame = CGRectMake(0, headerHeight, menuContainer.frame.size.width, MAX(0, scrollH));
+            scrollView.frame = CGRectMake(0, headerHeight, menuContainer.frame.size.width, newHeight - headerHeight);
         }
-    } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
-        CGFloat contentNeedHeight = scrollView ? scrollView.contentSize.height : 0;
-        CGFloat smartTarget = headerHeight + avatarHeight + contentNeedHeight + safeBottom + 24;
-        CGFloat smartMax = maxHeight;
-        CGFloat smartMin = headerHeight + avatarHeight + MIN(contentNeedHeight, maxHeight * 0.6) + safeBottom + 24;
-        CGFloat targetHeight;
-        if (contentNeedHeight < maxHeight * 0.5) {
-            targetHeight = MAX(minHeight, smartMin);
-        } else if (smartTarget > smartMax * 0.95) {
-            targetHeight = smartMax;
-        } else {
-            targetHeight = smartTarget;
-        }
-        [UIView animateWithDuration:0.25 animations:^{
-            CGRect frame = menuContainer.frame;
-            frame.origin.y = overlayView.bounds.size.height - targetHeight;
-            frame.size.height = targetHeight;
-            menuContainer.frame = frame;
-            contentPanel.frame = menuContainer.bounds;
-            if (scrollView) {
-                CGFloat scrollH = targetHeight - headerHeight;
-                scrollView.frame = CGRectMake(0, headerHeight, menuContainer.frame.size.width, MAX(0, scrollH));
-            }
-        }];
     }
 }
 
@@ -1151,12 +1341,14 @@
     if (@available(iOS 11.0, *)) {
         safeBottom = overlayView.safeAreaInsets.bottom;
     }
+    
     [UIView animateWithDuration:0.25 animations:^{
         CGRect frame = menuContainer.frame;
         frame.origin.y = overlayView.bounds.size.height - maxHeight;
-        frame.size.height = maxHeight;
+        frame.size.height = maxHeight + safeBottom; // 使用safeBottom调整高度
         menuContainer.frame = frame;
         contentPanel.frame = menuContainer.bounds;
+        
         // 同步调整scrollView高度
         UIScrollView *scrollView = nil;
         UIView *realContentView = contentPanel;
@@ -1171,7 +1363,7 @@
         }
         if (scrollView) {
             CGFloat headerHeight = headerView.frame.size.height;
-            CGFloat scrollH = maxHeight - headerHeight;
+            CGFloat scrollH = maxHeight - headerHeight + safeBottom; // 加上safeBottom
             scrollView.frame = CGRectMake(0, headerHeight, menuContainer.frame.size.width, MAX(0, scrollH));
         }
     }];
@@ -1223,6 +1415,377 @@
         }
         isDragging = NO;
     }
+}
+
+%new
+- (void)toggleBlurStyle:(UIButton *)button {
+    // 弹出颜色选择器
+    [self showBlurColorPicker:button];
+}
+
+%new
+- (void)showBlurColorPicker:(UIButton *)button {
+    if (@available(iOS 14.0, *)) {
+        UIColorPickerViewController *picker = [[UIColorPickerViewController alloc] init];
+        // 从用户默认设置中获取当前的毛玻璃背景色
+        NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBlurEffectColor"];
+        UIColor *currentColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBackgroundColor];
+        picker.selectedColor = currentColor;
+        picker.delegate = (id)self;
+        
+        // 实时更新 - 开启连续更新模式
+        picker.supportsAlpha = YES;
+        
+        // 设置标题和说明
+        picker.title = @"选择毛玻璃效果颜色";
+        
+        // 使用半屏模式弹出（适配不同设备）
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            picker.modalPresentationStyle = UIModalPresentationPopover;
+            picker.popoverPresentationController.sourceView = button;
+            picker.popoverPresentationController.sourceRect = button.bounds;
+        } else {
+            picker.modalPresentationStyle = UIModalPresentationPageSheet;
+        }
+        
+        // 执行触感反馈
+        if (@available(iOS 10.0, *)) {
+            UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+            [generator prepare];
+            [generator impactOccurred];
+        }
+        
+        // 呈现颜色选择器视图控制器
+        [[DYYYManager getActiveTopController] presentViewController:picker animated:YES completion:nil];
+    } else {
+        // iOS 14以下的设备，使用替代的选择器
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选择毛玻璃效果样式"
+                                                                       message:nil
+                                                                preferredStyle:UIAlertControllerStyleActionSheet];
+        
+        // 添加预定义颜色选项
+        NSArray<NSDictionary *> *colors = @[
+            @{@"name": @"浅色", @"color": [UIColor whiteColor]},
+            @{@"name": @"深色", @"color": [UIColor darkGrayColor]},
+            @{@"name": @"蓝色", @"color": [UIColor systemBlueColor]},
+            @{@"name": @"红色", @"color": [UIColor systemRedColor]},
+            @{@"name": @"绿色", @"color": [UIColor systemGreenColor]},
+            @{@"name": @"紫色", @"color": [UIColor systemPurpleColor]},
+            @{@"name": @"橙色", @"color": [UIColor systemOrangeColor]},
+            @{@"name": @"粉色", @"color": [UIColor systemPinkColor]},
+            @{@"name": @"黄色", @"color": [UIColor systemYellowColor]},
+            @{@"name": @"青色", @"color": [UIColor cyanColor]}
+        ];
+        
+        for (NSDictionary *colorInfo in colors) {
+            NSString *name = colorInfo[@"name"];
+            UIColor *color = colorInfo[@"color"];
+            UIAlertAction *action = [UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                // 应用所选颜色
+                [self updateBlurEffectWithColor:color];
+                
+                // 保存用户选择
+                NSData *colorData = [NSKeyedArchiver archivedDataWithRootObject:color];
+                [[NSUserDefaults standardUserDefaults] setObject:colorData forKey:@"DYYYBlurEffectColor"];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+                
+                // 立即更新颜色选择按钮
+                [self updateColorPickerButtonWithColor:color];
+                
+                // 触感反馈
+                if (@available(iOS 10.0, *)) {
+                    UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+                    [generator prepare];
+                    [generator impactOccurred];
+                }
+            }];
+            
+            // 添加颜色指示图标 - 使用全局辅助函数替代实例方法
+            UIImage *colorImage = createColorCircleImage(color, CGSizeMake(20, 20));
+            [action setValue:colorImage forKey:@"image"];
+            [alert addAction:action];
+        }
+        
+        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
+        [alert addAction:cancelAction];
+        
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            alert.popoverPresentationController.sourceView = button;
+            alert.popoverPresentationController.sourceRect = button.bounds;
+        }
+        
+        [[DYYYManager getActiveTopController] presentViewController:alert animated:YES completion:nil];
+    }
+}
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000
+%new
+- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)viewController {
+    if (@available(iOS 14.0, *)) {
+        UIColor *color = viewController.selectedColor;
+        
+        // 立即应用颜色效果
+        [self updateBlurEffectWithColor:color];
+        
+        // 保存用户选择
+        NSData *colorData = [NSKeyedArchiver archivedDataWithRootObject:color];
+        [[NSUserDefaults standardUserDefaults] setObject:colorData forKey:@"DYYYBlurEffectColor"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        
+        // 立即更新颜色选择按钮的外观
+        [self updateColorPickerButtonWithColor:color];
+        
+        // 触感反馈
+        if (@available(iOS 10.0, *)) {
+            UISelectionFeedbackGenerator *generator = [[UISelectionFeedbackGenerator alloc] init];
+            [generator prepare];
+            [generator selectionChanged];
+        }
+    }
+}
+
+%new
+- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController {
+    // 颜色选择器关闭时，确保使用最终选择的颜色
+    if (@available(iOS 14.0, *)) {
+        UIColor *finalColor = viewController.selectedColor;
+        [self updateBlurEffectWithColor:finalColor];
+        
+        // 保存用户选择
+        NSData *colorData = [NSKeyedArchiver archivedDataWithRootObject:finalColor];
+        [[NSUserDefaults standardUserDefaults] setObject:colorData forKey:@"DYYYBlurEffectColor"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+}
+#endif
+
+%new
+- (void)updateColorPickerButtonWithColor:(UIColor *)color {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    for (UIView *view in topVC.view.subviews) {
+        if (view.tag == 9527) {
+            for (UIView *subview in view.subviews) {
+                // 找到按钮容器
+                if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+                    UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
+                    for (UIView *contentSubview in blurView.contentView.subviews) {
+                        if (contentSubview.tag == 100) { // headerView
+                            for (UIView *headerSubview in contentSubview.subviews) {
+                                if ([headerSubview isKindOfClass:[UIButton class]] && headerSubview.tag == 200) { // 颜色选择按钮
+                                    UIButton *colorButton = (UIButton *)headerSubview;
+                                    
+                                    // 更新按钮图标颜色
+                                    for (UIView *btnSubview in colorButton.subviews) {
+                                        if ([btnSubview isKindOfClass:[UIImageView class]]) {
+                                            UIImageView *imageView = (UIImageView *)btnSubview;
+                                            imageView.tintColor = [UIColor whiteColor]; // 确保图标保持白色清晰可见
+                                        }
+                                    }
+                                    
+                                    // 更新渐变背景
+                                    for (CALayer *layer in colorButton.layer.sublayers) {
+                                        if ([layer isKindOfClass:[CAGradientLayer class]]) {
+                                            CAGradientLayer *gradientLayer = (CAGradientLayer *)layer;
+                                            
+                                            // 动画过渡到新颜色
+                                            CABasicAnimation *colorAnimation = [CABasicAnimation animationWithKeyPath:@"colors"];
+                                            colorAnimation.fromValue = gradientLayer.colors;
+                                            colorAnimation.toValue = @[
+                                                (id)[color colorWithAlphaComponent:0.9].CGColor,
+                                                (id)[color colorWithAlphaComponent:0.7].CGColor
+                                            ];
+                                            colorAnimation.duration = 0.3;
+                                            colorAnimation.removedOnCompletion = YES;
+                                            colorAnimation.fillMode = kCAFillModeForwards;
+                                            [gradientLayer addAnimation:colorAnimation forKey:@"colorAnimation"];
+                                            
+                                            // 更新实际颜色值
+                                            gradientLayer.colors = @[
+                                                (id)[color colorWithAlphaComponent:0.9].CGColor,
+                                                (id)[color colorWithAlphaComponent:0.7].CGColor
+                                            ];
+                                            
+                                            // 更新阴影颜色
+                                            colorButton.layer.shadowColor = [color colorWithAlphaComponent:0.4].CGColor;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+    }
+}
+
+%new
+- (void)updateBlurEffectWithColor:(UIColor *)color {
+    // 获取视图层次
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    for (UIView *view in topVC.view.subviews) {
+        if (view.tag == 9527) {
+            for (UIView *subview in view.subviews) {
+                // 查找毛玻璃效果视图
+                if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+                    UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
+                    
+                    // 处理不同的颜色以创建不同风格的毛玻璃效果
+                    UIBlurEffect *blurEffect;
+                    
+                    // 确定最合适的模糊效果风格
+                    UIBlurEffectStyle style = UIBlurEffectStyleLight;
+                    CGFloat brightness = 0;
+                    [color getWhite:&brightness alpha:nil];
+                    
+                    if (brightness < 0.5) {
+                        // 深色
+                        if (@available(iOS 13.0, *)) {
+                            style = UIBlurEffectStyleSystemMaterialDark;
+                        } else {
+                            style = UIBlurEffectStyleDark;
+                        }
+                    } else {
+                        // 浅色
+                        if (@available(iOS 13.0, *)) {
+                            style = UIBlurEffectStyleSystemMaterialLight;
+                        } else {
+                            style = UIBlurEffectStyleLight;
+                        }
+                    }
+                    
+                    blurEffect = [UIBlurEffect effectWithStyle:style];
+                    
+                    // 应用新的毛玻璃效果 - 使用更短的动画时间
+                    [UIView transitionWithView:blurView 
+                                      duration:0.2
+                                       options:UIViewAnimationOptionTransitionCrossDissolve
+                                    animations:^{
+                                        [blurView setEffect:blurEffect];
+                                        
+                                        // 添加一个背景色层让毛玻璃效果带有所选颜色
+                                        UIView *colorView = [blurView viewWithTag:8888];
+                                        if (!colorView) {
+                                            colorView = [[UIView alloc] initWithFrame:blurView.bounds];
+                                            colorView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                                            colorView.tag = 8888;
+                                            [blurView.contentView insertSubview:colorView atIndex:0];
+                                        }
+                                        colorView.backgroundColor = [color colorWithAlphaComponent:0.3];
+                                    } 
+                                    completion:nil];
+                    
+                    // 立即更新颜色选择按钮
+                    [self updateColorPickerButtonWithColor:color];
+                    
+                    break;
+                }
+            }
+            break;
+        }
+    }
+}
+
+%new
+- (UIImage *)imageWithColor:(UIColor *)color size:(CGSize)size {
+    UIGraphicsBeginImageContextWithOptions(size, YES, 0);
+    [color setFill];
+    [[UIColor whiteColor] setStroke];
+    UIBezierPath *path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(1, 1, size.width - 2, size.height - 2)];
+    path.lineWidth = 1.0;
+    [path fill];
+    [path stroke];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
+
+%new
+- (void)refreshCurrentView {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    if ([topVC isKindOfClass:%c(AWEFeedTableViewVC)]) {
+        [topVC.view setNeedsLayout];
+        [topVC.view layoutIfNeeded];
+    }
+}
+
+%new
+- (void)showVideoDebugInfo:(AWEAwemeModel *)model {
+    if (!model) {
+        [DYYYManager showToast:@"无法获取视频信息"];
+        return;
+    }
+    
+    NSMutableString *debugInfo = [NSMutableString string];
+    
+    // 视频ID - 尝试使用不同的属性名
+    NSString *videoId = [model valueForKey:@"aweme_id"] ?: [model valueForKey:@"awemeId"] ?: [model valueForKey:@"ID"] ?: @"未知";
+    [debugInfo appendFormat:@"视频ID: %@\n", videoId];
+    
+    // 视频时长 - 使用顶层属性videoDuration
+    [debugInfo appendFormat:@"视频时长: %.1f秒\n", model.videoDuration/1000.0];
+    
+    if (model.video) {
+        // 视频分辨率、比特率和格式 - 使用valueForKey安全获取
+        NSNumber *width = [model.video valueForKey:@"width"];
+        NSNumber *height = [model.video valueForKey:@"height"];
+        if (width && height) {
+            [debugInfo appendFormat:@"视频分辨率: %@x%@\n", width, height];
+        } else {
+            [debugInfo appendString:@"视频分辨率: 未知\n"];
+        }
+        
+        NSNumber *bitrate = [model.video valueForKey:@"bitrate"];
+        if (bitrate) {
+            [debugInfo appendFormat:@"视频比特率: %@\n", bitrate];
+        } else {
+            [debugInfo appendString:@"视频比特率: 未知\n"];
+        }
+        
+        NSString *format = [model.video valueForKey:@"format"];
+        [debugInfo appendFormat:@"视频格式: %@\n", format ?: @"未知"];
+    }
+    
+    [debugInfo appendFormat:@"视频类型: %@\n", @(model.awemeType)];
+    
+    // 点赞状态 - 尝试不同的属性名
+    BOOL isLiked = NO;
+    if ([model respondsToSelector:@selector(isDigg)]) {
+        isLiked = [model performSelector:@selector(isDigg)];
+    } else if ([model respondsToSelector:@selector(userDigg)]) {
+        isLiked = [model performSelector:@selector(userDigg)];
+    } else if ([model respondsToSelector:@selector(userHasDigg)]) {
+        isLiked = [model performSelector:@selector(userHasDigg)];
+    }
+    [debugInfo appendFormat:@"是否已点赞: %@\n", isLiked ? @"是" : @"否"];
+    
+    // 统计信息
+    if (model.statistics) {
+        [debugInfo appendFormat:@"点赞数: %@\n", model.statistics.diggCount ?: @"0"];
+        
+        // 评论数 - 尝试不同的属性名
+        NSNumber *commentCount = [model.statistics valueForKey:@"commentCount"] ?: 
+                                [model.statistics valueForKey:@"comment_count"] ?: 
+                                @0;
+        [debugInfo appendFormat:@"评论数: %@\n", commentCount];
+    }
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"视频调试信息" 
+                                                                   message:debugInfo 
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"复制信息" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [[UIPasteboard generalPasteboard] setString:debugInfo];
+        [DYYYManager showToast:@"调试信息已复制"];
+    }]];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleCancel handler:nil]];
+    
+    [[DYYYManager getActiveTopController] presentViewController:alert animated:YES completion:nil];
 }
 
 %end
