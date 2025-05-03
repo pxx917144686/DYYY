@@ -408,6 +408,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"图标更换-开关" key:@"DYYYEnableCustomAlbum" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -本地相册" key:@"DYYYCustomAlbumImage" type:DYYYSettingItemTypeTextField placeholder:@"点击选择图片"],
                 [DYYYSettingItem itemWithTitle:@"长按下载功能-开关" key:@"DYYYLongPressDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -图片转视频" key:@"DYYYLongPressImageToVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -视频" key:@"DYYYLongPressVideoDownload" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -音频弹出分享" key:@"DYYYLongPressAudioDownload" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -图片" key:@"DYYYLongPressImageDownload" type:DYYYSettingItemTypeSwitch],
@@ -417,6 +418,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
                 [DYYYSettingItem itemWithTitle:@"  -复制分享链接" key:@"DYYYCopyShareLink" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"双击操作-开关" key:@"DYYYEnableDoubleOpenAlertController" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -保存视频/图片/实况动图" key:@"DYYYDoubleTapDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -图片转视频" key:@"DYYYEnableImageToVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -音频弹出分享" key:@"DYYYDoubleTapDownloadAudio" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制文案" key:@"DYYYDoubleTapCopyDesc" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -打开评论" key:@"DYYYDoubleTapComment" type:DYYYSettingItemTypeSwitch],
@@ -1273,8 +1275,15 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     }
     
     // 检查双击操作开关的父子关系
-    if ([item.key hasPrefix:@"DYYYDoubleTap"] && 
-        ![item.key isEqualToString:@"DYYYEnableDoubleOpenAlertController"]) {
+    if ([item.key isEqualToString:@"DYYYDoubleTapDownload"] ||
+        [item.key isEqualToString:@"DYYYEnableImageToVideo"] || 
+        [item.key isEqualToString:@"DYYYDoubleTapDownloadAudio"] ||        
+        [item.key isEqualToString:@"DYYYDoubleTapCopyDesc"] ||
+        [item.key isEqualToString:@"DYYYDoubleTapComment"] ||
+        [item.key isEqualToString:@"DYYYDoubleTapLike"] ||
+        [item.key isEqualToString:@"DYYYDoubleTapshowSharePanel"] ||
+        [item.key isEqualToString:@"DYYYDoubleTapshowDislikeOnVideo"] ||
+        [item.key isEqualToString:@"DYYYDoubleInterfaceDownload"]) {
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableDoubleOpenAlertController"]) {
             // 如果父级开关关闭，则不允许打开子级设置
             sender.on = NO;
@@ -1283,10 +1292,26 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
             return;
         }
     }
+
+    // 双击操作-开关关闭时，关闭所有子开关
+    if ([item.key isEqualToString:@"DYYYEnableDoubleOpenAlertController"] && !isOn) {
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapDownload"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYEnableImageToVideo"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapDownloadAudio"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapCopyDesc"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapComment"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapLike"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapshowSharePanel"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapshowDislikeOnVideo"]; 
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleInterfaceDownload"];        
+        // 刷新界面，更新所有子开关状态
+        [self updateSubswitchesForSection:indexPath.section parentKey:@"DYYYEnableDoubleOpenAlertController"];
+    }
     
     // 检查长按下载功能的父子开关关系
-    if ([item.key isEqualToString:@"DYYYLongPressVideoDownload"] || 
-        [item.key isEqualToString:@"DYYYLongPressAudioDownload"] || 
+    if ([item.key isEqualToString:@"DYYYLongPressVideoDownload"] ||
+        [item.key isEqualToString:@"DYYYLongPressImageToVideo"] || 
+        [item.key isEqualToString:@"DYYYLongPressAudioDownload"] ||        
         [item.key isEqualToString:@"DYYYLongPressImageDownload"] ||
         [item.key isEqualToString:@"DYYYLongPressLivePhotoDownload"]) {
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressDownload"]) {
@@ -1313,6 +1338,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     // 长按下载功能主开关关闭时，关闭所有子开关
     if ([item.key isEqualToString:@"DYYYLongPressDownload"] && !isOn) {
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressVideoDownload"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressImageToVideo"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressAudioDownload"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressImageDownload"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressLivePhotoDownload"];
@@ -1527,22 +1553,28 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 - (void)updateSubswitchesForSection:(NSInteger)section parentKey:(NSString *)parentKey {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
-    NSString *prefix = nil;
+    NSArray *keysToUpdate = nil;
+    
     if ([parentKey isEqualToString:@"DYYYLongPressDownload"]) {
-        prefix = @"DYYYLongPress";
+        keysToUpdate = @[@"DYYYLongPressVideoDownload", @"DYYYLongPressImageToVideo", 
+                          @"DYYYLongPressAudioDownload", @"DYYYLongPressImageDownload", 
+                          @"DYYYLongPressLivePhotoDownload"];
     } else if ([parentKey isEqualToString:@"DYYYCopyText"]) {
-        prefix = @"DYYYCopy";
+        keysToUpdate = @[@"DYYYCopyOriginalText", @"DYYYCopyShareLink"];
     } else if ([parentKey isEqualToString:@"DYYYEnableDoubleOpenAlertController"]) {
-        prefix = @"DYYYDoubleTap";
+        keysToUpdate = @[@"DYYYDoubleTapDownload", @"DYYYEnableImageToVideo", 
+                          @"DYYYDoubleTapDownloadAudio", @"DYYYDoubleTapCopyDesc", 
+                          @"DYYYDoubleTapComment", @"DYYYDoubleTapLike", 
+                          @"DYYYDoubleTapshowSharePanel", @"DYYYDoubleTapshowDislikeOnVideo", 
+                          @"DYYYDoubleInterfaceDownload"];
     }
     
-    if (!prefix) return;
+    if (!keysToUpdate) return;
     
     for (NSUInteger row = 0; row < sectionItems.count; row++) {
         DYYYSettingItem *item = sectionItems[row];
         
-        // 只处理相关子开关
-        if ([item.key hasPrefix:prefix] && ![item.key isEqualToString:parentKey]) {
+        if ([keysToUpdate containsObject:item.key]) {
             // 查找并更新cell的开关状态
             NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
             UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
