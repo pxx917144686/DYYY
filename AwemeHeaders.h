@@ -117,6 +117,20 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property (nonatomic, strong) NSArray *groupArr;
 @property (nonatomic, assign) NSInteger groupType;
 @property (nonatomic, copy) NSString *groupTitle;
+- (void)setIsDYYYCustomGroup:(BOOL)isCustom;
+- (BOOL)isDYYYCustomGroup;
+@property (nonatomic, assign) BOOL isModern;
+@end
+
+// AWEModernLongPressHorizontalSettingCell - 现代长按水平设置单元格
+@interface AWEModernLongPressHorizontalSettingCell : UIView
+@property (nonatomic, strong) NSArray *dataArray;
+@property (nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
+@end
+
+@interface AWEModernLongPressInteractiveCell : UICollectionViewCell
+@property (nonatomic, strong) NSArray *dataArray;
+@property (nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
 @end
 
 // AWELongPressPanelManager - 长按面板管理
@@ -341,6 +355,11 @@ typedef NS_ENUM(NSInteger, MediaType) {
 // AWEModernLongPressPanelTableViewController - 现代长按面板控制器
 @interface AWEModernLongPressPanelTableViewController : UIViewController
 @property (nonatomic, strong) AWEAwemeModel *awemeModel;
+- (void)showVideoDebugInfo:(id)awemeModel;
+- (void)refreshCurrentView;
+- (void)performCommentAction;
+- (void)performLikeAction;
+- (void)showSharePanel;
 @end
 
 // AWESettingSectionModel - 设置分区模型
@@ -801,4 +820,20 @@ typedef NS_ENUM(NSInteger, MediaType) {
 + (instancetype)sharedInstance;
 - (void)downloadVideoWithAwemeModel:(AWEAwemeModel *)awemeModel completion:(void(^)(NSURL *localURL, NSError *error))completion;
 - (BOOL)canDownloadVideo:(AWEAwemeModel *)awemeModel;
+@end
+
+@interface AWEModernLongPressPanelTableViewController (DYYYExtension)
+- (UIView *)findButtonWithAccessibilityLabel:(NSString *)label inView:(UIView *)view;
+- (void)refreshCurrentView;
+- (void)showVideoDebugInfo:(id)awemeModel;
+- (void)performCommentAction;
+- (void)performLikeAction;
+- (void)showSharePanel;
+@end
+
+@interface AWEModernLongPressPanelTableViewController (DYYYAdditions)
+- (void)showVideoDebugInfo:(id)awemeModel;
+- (void)extractVideoHashtags:(id)awemeModel;
+- (void)shareToThirdParty:(id)awemeModel;
+- (void)refreshCurrentView;
 @end
