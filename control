@@ -1,11 +1,9 @@
-Package: com.huami.dyyy
-Name: DYYY
-Version: 2.1-7
-Description: 仅供学习交流，请在 24 小时内自觉删除。
-Homepage: https://github.com/huami1314/DYYY
-Section: Tweaks
-Depends: firmware (>= 5.0), mobilesubstrate
-Priority: optional
-Maintainer: huami
-Author: huami
+Package: com.flex.lib
+Name: FLEX 调试工具
+Maintainer: pxx917144686
+Version: 1.0
 Architecture: iphoneos-arm
+Description: FLEX (中文版)
+Author: FLEX Team & pxx917144686
+Section: Development
+Depends: firmware (>= 14.0)
