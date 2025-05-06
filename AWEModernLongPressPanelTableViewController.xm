@@ -2,9 +2,10 @@
 #import <objc/runtime.h>
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
+#import "FLEXHeaders.h"
 
-@interface AWEModernLongPressPanelTableViewController (DYYYAdditions)
-- (void)showGlobalVideoDebugInfo;
+@interface AWEModernLongPressPanelTableViewController (DYYY_FLEX)
+- (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel;
 @end
 
 // 全局变量
@@ -15,6 +16,15 @@ static AWEAwemeModel *g_savedAwemeModel = nil;
 %end
 
 %hook AWEModernLongPressPanelTableViewController
+
+%new
+- (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {
+    // 保存当前视频模型，以防被释放
+    g_savedAwemeModel = awemeModel;
+    
+    // 直接打开 FLEX 调试器
+    [[%c(FLEXManager) sharedManager] showExplorer];
+}
 
 %new
 - (void)refreshCurrentView {
@@ -444,7 +454,31 @@ static AWEAwemeModel *g_savedAwemeModel = nil;
 
         [viewModels addObject:apiDownload];
     }
-    
+
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFLEX"] || 
+        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableFLEX"]) {
+        AWELongPressPanelBaseViewModel *flexViewModel = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
+        flexViewModel.awemeModel = self.awemeModel;
+        flexViewModel.actionType = 675;
+        flexViewModel.duxIconName = @"ic_xiaoxihuazhonghua_outlined";
+        flexViewModel.describeString = @"FLEX调试";
+
+        // 修改FLEX功能菜单的调用方式
+        flexViewModel.action = ^{
+            // 保存当前视频模型
+            AWEAwemeModel *currentAwemeModel = self.awemeModel;
+            
+            // 关闭长按面板
+            AWELongPressPanelManager *panelManager = [%c(AWELongPressPanelManager) shareInstance];
+            [panelManager dismissWithAnimation:YES completion:^{
+                // 直接调用修复后的FLEX菜单方法
+                [self fixFLEXMenu:currentAwemeModel];
+            }];
+        };
+
+        [viewModels addObject:flexViewModel];
+    }
+
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableAdvancedSettings"] || 
         ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableAdvancedSettings"]) {
         AWELongPressPanelBaseViewModel *advancedFunctions = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
