@@ -1,0 +1,9 @@
+Package: com.flex.lib
+Name: FLEX 调试工具
+Maintainer: pxx917144686
+Version: 1.0
+Architecture: iphoneos-arm
+Description: FLEX (中文版)
+Author: FLEX Team & pxx917144686
+Section: Development
+Depends: firmware (>= 14.0)
