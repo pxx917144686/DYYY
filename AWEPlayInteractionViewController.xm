@@ -2,6 +2,7 @@
 #import <objc/runtime.h>
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
+#import "FLEXHeaders.h"
 
 // 添加颜色圆圈图像生成函数声明
 UIImage *createColorCircleImage(UIColor *color, CGSize size) {
@@ -548,6 +549,21 @@ UIImage *createColorCircleImage(UIColor *color, CGSize size) {
             }
         };
         [menuModules addObject:copyTextModule];
+    }
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFLEX"] || 
+        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableFLEX"]) {
+        // 创建FLEX调试功能对象
+        NSDictionary *flexModule = @{
+            @"title": @"FLEX调试",
+            @"icon": @"bug",
+            @"color": @"#FF9500",
+            @"action": ^{
+                // 显示FLEX调试界面
+                [[%c(FLEXManager) sharedManager] showExplorer];
+            }
+        };
+        // 使用现有的 menuModules 数组变量
+        [menuModules addObject:flexModule];
     }
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDoubleTapComment"] || ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDoubleTapComment"]) {
         NSDictionary *commentModule = @{
