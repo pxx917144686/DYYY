@@ -46,7 +46,10 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = DYYY
 
 # 源代码文件
-DYYY_FILES = DYYY.xm DYYYFloatClearButton.xm DYYYFloatSpeedButton.xm AWEPlayInteractionViewController.xm CityManager.m DYYYManager.m DYYYSettingViewController.m
+DYYY_FILES = DYYY.xm DYYYFloatClearButton.xm DYYYFloatSpeedButton.xm AWEPlayInteractionViewController.xm AWEModernLongPressPanelTableViewController.xm CityManager.m DYYYManager.m DYYYSettingViewController.m
+
+# 添加 FLEX 源文件
+DYYY_FILES += $(shell find FLEX -name '*.m' -o -name '*.mm') FLEX/flex_fishhook.c
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
@@ -60,6 +63,12 @@ $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
 $(TWEAK_NAME)_FRAMEWORKS = UIKit CoreGraphics QuartzCore Foundation AVFoundation MediaPlayer
+
+# 修改 FLEX 库配置部分
+$(TWEAK_NAME)_LIBRARIES = 
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS)/include
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX # 添加 FLEX 头文件路径
 
 # 编译规则
 include $(THEOS_MAKE_PATH)/tweak.mk
