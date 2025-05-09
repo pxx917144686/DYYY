@@ -111,7 +111,7 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
     // 设置链接解析的默认值
     NSString *interfaceDownload = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYInterfaceDownload"];
     if (interfaceDownload == nil || [interfaceDownload stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]].length == 0) {
-        [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:@"DYYYInterfaceDownload"];
+        [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?key=DYYY&url=" forKey:@"DYYYInterfaceDownload"];
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 }
