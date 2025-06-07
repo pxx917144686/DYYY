@@ -1,7 +1,8 @@
-#import "DYYYManager.h"
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <signal.h>
+#import "DYYYManager.h"
+
 // 添加变量跟踪是否在目标视图控制器中
 static BOOL isInPlayInteractionVC = NO;
 // HideUIButton 接口声明

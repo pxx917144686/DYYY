@@ -1,87 +1,172 @@
 #import <UIKit/UIKit.h>
 #import "AwemeHeaders.h"
 
+// 主题管理类（外部类声明）
 @interface AWEUIThemeManager : NSObject
 @property (nonatomic, assign) BOOL isLightTheme;
 @end
 
+/**
+ * DYYY 主管理器类
+ * 处理UI、媒体下载、保存和视频合成等功能
+ */
 @interface DYYYManager : NSObject
-//存储文件类行
-@property (nonatomic, strong, readonly) NSMutableDictionary<NSString *, NSDictionary *> *fileLinks; 
+
+#pragma mark - 属性和基础方法
+//存储文件类型
+@property (nonatomic, strong) NSMutableDictionary *fileLinks;
+
+/**
+ * 获取单例实例
+ */
 + (instancetype)shared;
 
+#pragma mark - UI相关方法
+/**
+ * 获取当前活动窗口
+ */
 + (UIWindow *)getActiveWindow;
+
+/**
+ * 获取当前顶层控制器
+ */
 + (UIViewController *)getActiveTopController;
+
+/**
+ * 根据十六进制字符串创建颜色对象
+ * @param hexString 十六进制颜色字符串
+ */
 + (UIColor *)colorWithHexString:(NSString *)hexString;
+
+/**
+ * 显示提示信息
+ * @param text 要显示的文本
+ */
 + (void)showToast:(NSString *)text;
 
-// 简单的保存方法 - 无错误回调
-+ (void)saveMedia:(NSURL *)mediaURL mediaType:(MediaType)mediaType completion:(void (^)(void))completion;
-
-// 新增带错误处理的保存方法
-+ (void)saveMedia:(NSURL *)mediaURL mediaType:(MediaType)mediaType withErrorHandling:(void (^)(BOOL success, NSError *error))completion;
-
-// 媒体描述与类型处理
-+ (NSString *)getMediaTypeDescription:(MediaType)mediaType;
-
-// 检查照片库权限
-+ (void)checkPhotoLibraryPermission:(void (^)(BOOL granted))completion;
-// 检查媒体文件是否有效
-+ (BOOL)isValidMediaFile:(NSURL *)fileURL;
-
-// 保存不同类型媒体的方法
-+ (void)saveImageToPhotoLibrary:(NSURL *)imageURL mediaType:(MediaType)mediaType completion:(void (^)(BOOL success, NSError *error))completion;
-+ (void)saveVideoToPhotoLibrary:(NSURL *)videoURL completion:(void (^)(BOOL success, NSError *error))completion;
-
-// 新增带进度的下载方法
-+ (void)downloadLivePhoto:(NSURL *)imageURL videoURL:(NSURL *)videoURL completion:(void (^)(void))completion;
-+ (void)downloadAllLivePhotos:(NSArray<NSDictionary *> *)livePhotos;
-+ (void)downloadAllLivePhotosWithProgress:(NSArray<NSDictionary *> *)livePhotos progress:(void (^)(NSInteger current, NSInteger total))progressBlock completion:(void (^)(NSInteger successCount, NSInteger totalCount))completion;
-+ (void)downloadMedia:(NSURL *)url mediaType:(MediaType)mediaType completion:(void (^)(void))completion;
-+ (void)downloadMediaWithProgress:(NSURL *)url mediaType:(MediaType)mediaType progress:(void (^)(float progress))progressBlock completion:(void (^)(BOOL success, NSURL *fileURL))completion;
-+ (void)cancelAllDownloads;
-
-// 并发下载多个图片
-+ (void)downloadAllImages:(NSMutableArray *)imageURLs;
-+ (void)downloadAllImagesWithProgress:(NSMutableArray *)imageURLs progress:(void (^)(NSInteger current, NSInteger total))progressBlock completion:(void (^)(NSInteger successCount, NSInteger totalCount))completion;
-// 重新实现的LivePhoto保存方法，添加错误处理
-- (void)saveLivePhoto:(NSString *)imageSourcePath videoUrl:(NSString *)videoSourcePath completion:(void (^)(BOOL success, NSError *error))completion;
-//获取主题状态
+/**
+ * 检查当前是否为暗黑模式
+ */
 + (BOOL)isDarkMode;
 
-// 为抖音视频添加专用下载方法
-+ (void)downloadAwemeVideo:(AWEAwemeModel *)awemeModel completion:(void (^)(BOOL success, NSURL *fileURL, NSError *error))completion;
+#pragma mark - 媒体保存方法
+/**
+ * 保存媒体文件到相册
+ * @param mediaURL 媒体文件URL
+ * @param mediaType 媒体类型
+ * @param completion 完成回调
+ */
++ (void)saveMedia:(NSURL *)mediaURL 
+        mediaType:(MediaType)mediaType 
+       completion:(void (^)(void))completion;
 
-// 安全获取下载URL的方法
-+ (NSURL *)getSafeDownloadURLFromVideoModel:(AWEVideoModel *)videoModel;
-+ (NSURL *)getSafeDownloadURLFromURLModel:(URLModel *)urlModel;
-+ (NSURL *)getSafeDownloadURLFromAWEURLModel:(AWEURLModel *)urlModel;
+/**
+ * 保存实况照片
+ * @param imageSourcePath 图片源路径
+ * @param videoSourcePath 视频源路径
+ */
+- (void)saveLivePhoto:(NSString *)imageSourcePath 
+             videoUrl:(NSString *)videoSourcePath;
 
-// 长按视频下载处理
-+ (void)handleLongPressVideoDownload:(AWEAwemeModel *)awemeModel fromViewController:(UIViewController *)viewController;
+#pragma mark - 媒体下载方法
+/**
+ * 下载媒体文件
+ * @param url 媒体URL
+ * @param mediaType 媒体类型
+ * @param completion 完成回调
+ */
++ (void)downloadMedia:(NSURL *)url 
+            mediaType:(MediaType)mediaType 
+           completion:(void (^)(BOOL success))completion;
 
-// 错误处理和状态报告
-+ (NSError *)createErrorWithCode:(NSInteger)code message:(NSString *)message;
-+ (void)logDownloadStatus:(NSString *)message forAwemeModel:(AWEAwemeModel *)model;
+/**
+ * 带进度的媒体下载
+ * @param url 媒体URL
+ * @param mediaType 媒体类型
+ * @param progressBlock 进度回调
+ * @param completion 完成回调
+ */
++ (void)downloadMediaWithProgress:(NSURL *)url
+                        mediaType:(MediaType)mediaType
+                         progress:(void (^)(float progress))progressBlock
+                       completion:(void (^)(BOOL success, NSURL *fileURL))completion;
 
-// 检查视频下载权限和条件
-+ (BOOL)canDownloadVideo:(AWEAwemeModel *)awemeModel;
+/**
+ * 下载实况照片
+ * @param imageURL 图片URL
+ * @param videoURL 视频URL
+ * @param completion 完成回调
+ */
++ (void)downloadLivePhoto:(NSURL *)imageURL 
+                 videoURL:(NSURL *)videoURL 
+               completion:(void (^)(void))completion;
 
-// 新增转换和保存GIF的方法
-+ (void)convertHeicToGif:(NSURL *)heicURL completion:(void (^)(NSURL *gifURL, BOOL success))completion;
-+ (void)convertWebpToGifNative:(NSURL *)webpURL completion:(void (^)(NSURL *gifURL, BOOL success))completion;
-+ (void)saveGifToPhotoLibrary:(NSURL *)gifURL mediaType:(MediaType)mediaType completion:(void (^)(void))completion;
+/**
+ * 批量下载实况照片
+ * @param livePhotos 实况照片数组
+ */
++ (void)downloadAllLivePhotos:(NSArray<NSDictionary *> *)livePhotos;
 
-// 新增方法
-+ (NSArray<NSString *> *)detectQRCodesInImage:(UIImage *)image;
-+ (BOOL)aiDetectImageUnsafe:(UIImage *)image;
-+ (BOOL)aiDetectVideoUnsafe:(NSURL *)videoURL;
-+ (NSData *)smartCompressImage:(UIImage *)image maxSizeKB:(NSInteger)maxKB;
-+ (void)saveImagesSerially:(NSArray<NSURL *> *)imageURLs mediaTypes:(NSArray<NSNumber *> *)mediaTypes completion:(void (^)(NSInteger successCount, NSInteger totalCount))completion;
-+ (NSDictionary *)extractEXIFMetadata:(NSURL *)fileURL;
+/**
+ * 带进度的批量实况照片下载
+ * @param livePhotos 实况照片数组
+ * @param progressBlock 进度回调
+ * @param completion 完成回调
+ */
++ (void)downloadAllLivePhotosWithProgress:(NSArray<NSDictionary *> *)livePhotos
+                                 progress:(void (^)(NSInteger current, NSInteger total))progressBlock
+                               completion:(void (^)(NSInteger successCount, NSInteger totalCount))completion;
 
-// 添加缺失的接口下载方法
-+ (void)parseAndDownloadVideoWithShareLink:(NSString *)shareLink apiKey:(NSString *)apiKey;
-// 批量资源下载方法
-+ (void)batchDownloadResources:(NSArray *)videos images:(NSArray *)images;
+/**
+ * 批量下载图片
+ * @param imageURLs 图片URL数组
+ */
++ (void)downloadAllImages:(NSMutableArray *)imageURLs;
+
+/**
+ * 带进度的批量图片下载
+ * @param imageURLs 图片URL数组
+ * @param progressBlock 进度回调
+ * @param completion 完成回调
+ */
++ (void)downloadAllImagesWithProgress:(NSMutableArray *)imageURLs
+                             progress:(void (^)(NSInteger current, NSInteger total))progressBlock
+                           completion:(void (^)(NSInteger successCount, NSInteger totalCount))completion;
+
+/**
+ * 取消所有下载任务
+ */
++ (void)cancelAllDownloads;
+
+#pragma mark - 视频处理方法
+/**
+ * 解析分享链接并下载视频
+ * @param shareLink 视频分享链接
+ * @param apiKey API密钥
+ */
++ (void)parseAndDownloadVideoWithShareLink:(NSString *)shareLink 
+                                    apiKey:(NSString *)apiKey;
+
+/**
+ * 批量下载视频和图片资源
+ * @param videos 视频资源数组
+ * @param images 图片资源数组
+ */
++ (void)batchDownloadResources:(NSArray *)videos 
+                        images:(NSArray *)images;
+
+/**
+ * 从多种媒体源创建视频
+ * @param imageURLs 图片URL数组
+ * @param livePhotos 实况照片数组（每项包含图片和视频URL）
+ * @param bgmURL 背景音乐URL
+ * @param progressBlock 进度回调
+ * @param completion 完成回调
+ */
++ (void)createVideoFromMedia:(NSArray<NSString *> *)imageURLs
+                  livePhotos:(NSArray<NSDictionary *> *)livePhotos
+                      bgmURL:(NSString *)bgmURL
+                    progress:(void (^)(NSInteger current, NSInteger total, NSString *status))progressBlock
+                  completion:(void (^)(BOOL success, NSString *message))completion;
+
 @end

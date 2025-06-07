@@ -1,164 +1,145 @@
 #import <UIKit/UIKit.h>
 #import <Photos/Photos.h>
 
-#define DYYY 100
-
-// 媒体类型枚举
+#define DYYYGetBool(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
+#define DYYY_IGNORE_GLOBAL_ALPHA_TAG 114514
 typedef NS_ENUM(NSInteger, MediaType) {
-    MediaTypeUnknown,
-    MediaTypeImage,
-    MediaTypeVideo,
-    MediaTypeAudio,
-    MediaTypeGIF,
-    MediaTypeHeic,
-    MediaTypeLivePhoto
+  MediaTypeVideo,
+  MediaTypeImage,
+  MediaTypeAudio,
+  MediaTypeHeic
 };
 
-// URLModel - 视频或图片的URL模型
 @interface URLModel : NSObject
-@property (nonatomic, strong) NSArray *originURLList;
-- (NSURL *)getDYYYSrcURLDownload;
+@property(nonatomic, strong) NSArray *originURLList;
 @end
 
-@interface URLModel (DYYYAdditions)
-- (NSURL *)getSafeDownloadURL;
-- (NSString *)getFilename;
-@end
-
-// DUXToast - 显示提示信息
 @interface DUXToast : NSObject
 + (void)showText:(NSString *)text;
 @end
 
-// AWEURLModel - 抖音URL模型
 @interface AWEURLModel : NSObject
+@property(nonatomic, copy) NSArray *originURLList;
+@property(nonatomic, assign) NSInteger imageWidth;
+@property(nonatomic, assign) NSInteger imageHeight;
+@property(nonatomic, copy) NSString *URLKey;
 - (NSArray *)originURLList;
 - (id)URI;
 - (NSURL *)getDYYYSrcURLDownload;
 @end
 
-@interface AWEURLModel (DYYYAdditions)
-- (NSURL *)getSafeDownloadURL;
-- (NSString *)getFilename;
-@end
-
-// AWEVideoModel - 视频模型
 @interface AWEVideoModel : NSObject
-@property (retain, nonatomic) AWEURLModel *playURL;
-@property (copy, nonatomic) NSArray *manualBitrateModels;
-@property (copy, nonatomic) NSArray *bitrateModels;
-@property (nonatomic, strong) URLModel *h264URL;
-@property (nonatomic, strong) URLModel *coverURL;
+@property(nonatomic, strong) AWEURLModel *playLowBitURL;
+@property(retain, nonatomic) AWEURLModel *playURL;
+@property(copy, nonatomic) NSArray *manualBitrateModels;
+@property(copy, nonatomic) NSArray *bitrateModels;
+@property(copy, nonatomic) NSArray *bitrateRawData;
+@property(nonatomic, strong) URLModel *h264URL;
+@property(nonatomic, strong) URLModel *coverURL;
 @end
 
-// AWEMusicModel - 音乐模型
 @interface AWEMusicModel : NSObject
-@property (nonatomic, strong) URLModel *playURL;
+@property(nonatomic, strong) URLModel *playURL;
 @end
 
-// AWEImageAlbumImageModel - 相册图片模型
 @interface AWEImageAlbumImageModel : NSObject
-@property (nonatomic, strong) NSArray *urlList;
-@property (retain, nonatomic) AWEVideoModel *clipVideo;
+@property(nonatomic, strong) NSArray *urlList;
+@property(retain, nonatomic) AWEVideoModel *clipVideo;
 @end
 
-// AWEAwemeTextExtraModel - 文本额外信息（如标签）
-@interface AWEAwemeTextExtraModel : NSObject
-@property (nonatomic, copy) NSString *hashtagName;
-@end
-
-// AWEAwemeStatisticsModel - 统计数据（如点赞数）
 @interface AWEAwemeStatisticsModel : NSObject
-@property (nonatomic, strong) NSNumber *diggCount;
+@property(nonatomic, strong) NSNumber *diggCount;
 @end
 
-// AWESearchAwemeExtraModel - 搜索额外信息
 @interface AWESearchAwemeExtraModel : NSObject
 @end
 
-// AWEAwemeModel - 抖音内容模型
+@interface AWEAwemeTextExtraModel : NSObject
+@property(nonatomic, copy) NSString *hashtagName;
+@property(nonatomic, copy) NSString *hashtagId;
+@property(nonatomic, copy) NSString *type;
+@property(nonatomic, assign) NSRange textRange;
+@property(nonatomic, copy) NSString *awemeId;
+@property(nonatomic, copy) NSString *userId;
+@property(nonatomic, copy) NSString *userUniqueId;
+@property(nonatomic, copy) NSString *secUid;
+@end
+
+@interface AWEUserModel : NSObject
+@property(copy, nonatomic) NSString *nickname;
+@property(copy, nonatomic) NSString *shortID;
+@end
+
 @interface AWEAwemeModel : NSObject
-@property (nonatomic, assign, readwrite) CGFloat videoDuration;
-@property (nonatomic, strong) AWEVideoModel *video;
-@property (nonatomic, strong) AWEMusicModel *music;
-@property (nonatomic, strong) NSArray<AWEImageAlbumImageModel *> *albumImages;
-@property (nonatomic, assign) NSInteger currentImageIndex;
-@property (nonatomic, assign) NSInteger awemeType;
-@property (nonatomic, strong) NSString *cityCode;
-@property (nonatomic, strong) NSString *ipAttribution;
-@property (nonatomic, strong) id currentAweme;
-@property (nonatomic, copy) NSString *descriptionString;
-@property (nonatomic, copy) NSString *desc;
-@property (nonatomic, assign) BOOL isAds;
-@property (nonatomic, assign) BOOL isLive;
-@property (nonatomic, strong) NSString *shareURL;
-@property (nonatomic, strong) id hotSpotLynxCardModel;
-@property (nonatomic, strong) id liveReason;
-@property (nonatomic, strong) id shareRecExtra;
-@property (nonatomic, copy) NSString *itemTitle;
-@property (nonatomic, strong) NSArray *textExtras;
-@property (nonatomic, strong) NSNumber *createTime;
-@property (nonatomic, strong) AWEAwemeStatisticsModel *statistics;
-- (AWESearchAwemeExtraModel *)searchExtraModel;
+@property(nonatomic, strong, readwrite) NSNumber *createTime;
+@property(nonatomic, assign, readwrite) CGFloat videoDuration;
+@property(nonatomic, strong) AWEVideoModel *video;
+@property(nonatomic, strong) AWEMusicModel *music;
+@property(nonatomic, strong) NSArray<AWEImageAlbumImageModel *> *albumImages;
+@property(nonatomic, assign) NSInteger currentImageIndex;
+@property(nonatomic, assign) NSInteger awemeType;
+@property(nonatomic, strong) NSString *cityCode;
+@property(nonatomic, strong) NSString *ipAttribution;
+@property(nonatomic, strong) id currentAweme;
+@property(nonatomic, copy) NSString *descriptionString;
+@property(nonatomic, assign) BOOL isAds;
+@property(nonatomic, assign) BOOL isLive;
+@property(nonatomic, strong) NSString *shareURL;
+@property(nonatomic, strong) id hotSpotLynxCardModel;
+@property(nonatomic, copy) NSString *liveReason;
+@property(nonatomic, strong) id shareRecExtra; // 推荐视频专有属性
+@property(nonatomic, strong) NSArray<AWEAwemeTextExtraModel *> *textExtras;
+@property(nonatomic, copy) NSString *itemTitle;
+@property(nonatomic, copy) NSString *descriptionSimpleString;
+@property(nonatomic, strong) NSString *itemID;
+@property(nonatomic, strong) AWEUserModel *author;
+
+@property(nonatomic, strong) AWEAwemeStatisticsModel *statistics;
 - (BOOL)isLive;
+- (AWESearchAwemeExtraModel *)searchExtraModel;
 @end
 
-// AWELongPressPanelBaseViewModel - 长按面板基础模型
 @interface AWELongPressPanelBaseViewModel : NSObject
-@property (nonatomic, strong) id awemeModel;
-@property (nonatomic, assign) NSInteger actionType;
-@property (nonatomic, strong) NSString *duxIconName;
-@property (nonatomic, strong) NSString *describeString;
-@property (nonatomic, copy) void (^action)(void);
+@property(nonatomic, copy) NSString *describeString;
+@property(nonatomic, assign) NSInteger enterMethod;
+@property(nonatomic, assign) NSInteger actionType;
+@property(nonatomic, assign) BOOL showIfNeed;
+@property(nonatomic, copy) NSString *duxIconName;
+@property(nonatomic, copy) void (^action)(void);
+@property(nonatomic) BOOL isModern;
+@property(nonatomic, strong) AWEAwemeModel *awemeModel;
+- (void)setDuxIconName:(NSString *)iconName;
+- (void)setDescribeString:(NSString *)descString;
+- (void)setAction:(void (^)(void))action;
 @end
 
-// AWELongPressPanelViewGroupModel - 长按面板分组模型
 @interface AWELongPressPanelViewGroupModel : NSObject
-@property (nonatomic, strong) NSArray *groupArr;
-@property (nonatomic, assign) NSInteger groupType;
-@property (nonatomic, copy) NSString *groupTitle;
-- (void)setIsDYYYCustomGroup:(BOOL)isCustom;
-- (BOOL)isDYYYCustomGroup;
-@property (nonatomic, assign) BOOL isModern;
+@property(nonatomic) unsigned long long groupType;
+@property(nonatomic) NSArray *groupArr;
+@property(nonatomic) long long numberOfRowsInSection;
+@property(nonatomic) long long cellHeight;
+@property(nonatomic) BOOL hasMore;
+@property(nonatomic) BOOL isModern;
+@property(nonatomic) BOOL isDYYYCustomGroup;
 @end
 
-// AWEModernLongPressHorizontalSettingCell - 现代长按水平设置单元格
-@interface AWEModernLongPressHorizontalSettingCell : UIView
-@property (nonatomic, strong) NSArray *dataArray;
-@property (nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
-@end
-
-@interface AWEModernLongPressInteractiveCell : UICollectionViewCell
-@property (nonatomic, strong) NSArray *dataArray;
-@property (nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
-@end
-
-// AWELongPressPanelManager - 长按面板管理
 @interface AWELongPressPanelManager : NSObject
 + (instancetype)shareInstance;
-- (void)dismissWithAnimation:(BOOL)flag completion:(void (^)(void))completion;
-- (id)awemeModel;
-- (NSDictionary *)logExtraDict;
-- (NSString *)referString;
+- (void)dismissWithAnimation:(BOOL)animated completion:(void (^)(void))completion;
+- (BOOL)shouldShowMordenLongPressPanel;
+- (BOOL)showShareFriends;
 @end
 
-// AWELongPressPanelCustomViewModel - 自定义长按面板模型
-@interface AWELongPressPanelCustomViewModel : AWELongPressPanelBaseViewModel
-+ (instancetype)longPressPanelViewModel;
-@property (nonatomic, strong) NSString *describeString;
-@property (nonatomic, strong) NSString *duxIconName;
-@property (nonatomic, strong) AWELongPressPanelManager *panelManager;
-@property (nonatomic, strong) id awemeModel;
-@property (nonatomic, strong) NSDictionary *logExtraDict;
-@property (nonatomic, strong) NSString *referString;
-@property (nonatomic, copy) void (^action)(void);
-@end
-
-// AWENormalModeTabBarGeneralButton - 通用按钮
 @interface AWENormalModeTabBarGeneralButton : UIButton
+@property(nonatomic) NSInteger status;
 @end
 
-// AWEProgressLoadingView - 加载进度视图
+@interface AWEHPTopTabItemBadgeContentView : UIView
+@end
+
+@interface AWEFeedTabJumpGuideView : UIView
+@end
+
 @interface AWEProgressLoadingView : UIView
 - (id)initWithType:(NSInteger)arg1 title:(NSString *)arg2;
 - (id)initWithType:(NSInteger)arg1 title:(NSString *)arg2 progressTextFont:(UIFont *)arg3 progressCircleWidth:(NSNumber *)arg4;
@@ -168,369 +149,599 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (void)showOnView:(id)arg1 animated:(BOOL)arg2 afterDelay:(CGFloat)arg3;
 @end
 
-// AWENormalModeTabBarBadgeContainerView - 标签容器视图
 @interface AWENormalModeTabBarBadgeContainerView : UIView
+
 @end
 
-// AWEFeedContainerContentView - 内容容器视图
 @interface AWEFeedContainerContentView : UIView
 - (UIViewController *)findViewController:(UIViewController *)vc ofClass:(Class)targetClass;
 @end
 
-// AWELeftSideBarEntranceView - 左侧栏入口视图
 @interface AWELeftSideBarEntranceView : UIView
+- (void)setNumericalRedDot:(id)numericalRedDot;
+- (void)setRedDot:(id)redDot;
 @end
 
-// AWEDanmakuContentLabel - 弹幕内容标签
 @interface AWEDanmakuContentLabel : UILabel
 - (UIColor *)colorFromHexString:(NSString *)hexString baseColor:(UIColor *)baseColor;
 @end
 
-// AWELandscapeFeedEntryView - 横屏入口视图
 @interface AWELandscapeFeedEntryView : UIView
 @end
 
-// AWEPlayInteractionViewController - 交互视图控制器
+@interface AWEIMFeedVideoQuickReplayInputViewController : UIViewController
+@end
+
+@interface AWEHPSearchBubbleEntranceView : UIView
+@end
+
 @interface AWEPlayInteractionViewController : UIViewController
-@property (nonatomic, strong) UIView *view;
+@property(nonatomic, strong) UIView *view;
+@property(nonatomic, strong) NSString *referString;
 - (void)performCommentAction;
 - (void)performLikeAction;
 - (void)showSharePanel;
 - (void)showDislikeOnVideo;
-- (void)speedButtonTapped:(id)sender;
+- (void)onVideoPlayerViewDoubleClicked:(id)arg1;
 - (UIViewController *)firstAvailableUIViewController;
-- (void)createFluentDesignDraggableMenuWithAwemeModel:(AWEAwemeModel *)awemeModel touchPoint:(CGPoint)touchPoint;
+- (void)speedButtonTapped:(id)sender;
+- (void)buttonTouchDown:(id)sender;
+- (void)buttonTouchUp:(id)sender;
 @end
 
-// UIView 分类 - 获取视图控制器
 @interface UIView (Transparency)
 - (UIViewController *)firstAvailableUIViewController;
 @end
 
-// AWEFeedVideoButton - 视频按钮
 @interface AWEFeedVideoButton : UIButton
 @end
 
-// AWEMusicCoverButton - 音乐封面按钮
 @interface AWEMusicCoverButton : UIButton
 @end
 
-// AWEAwemePlayVideoViewController - 视频播放控制器
 @interface AWEAwemePlayVideoViewController : UIViewController
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context;
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context;
 - (void)setVideoControllerPlaybackRate:(double)arg0;
+
 @end
 
-// AWEDanmakuItemTextInfo - 弹幕文本信息
 @interface AWEDanmakuItemTextInfo : NSObject
 - (void)setDanmakuTextColor:(id)arg1;
 - (UIColor *)colorFromHexStringForTextInfo:(NSString *)hexString;
 @end
 
-// AWECommentMiniEmoticonPanelView - 表情面板视图
 @interface AWECommentMiniEmoticonPanelView : UIView
+
 @end
 
-// AWEBaseElementView - 基础元素视图
 @interface AWEBaseElementView : UIView
+
 @end
 
-// AWETextViewInternal - 内部文本视图
+@interface AWESearchEntranceView : UIView
+
+@end
+
 @interface AWETextViewInternal : UITextView
+
 @end
 
-// AWECommentPublishGuidanceView - 评论引导视图
 @interface AWECommentPublishGuidanceView : UIView
+
 @end
 
-// AWEPlayInteractionFollowPromptView - 关注提示视图
 @interface AWEPlayInteractionFollowPromptView : UIView
 @end
 
-// AWENormalModeTabBarTextView - 文本视图
 @interface AWENormalModeTabBarTextView : UIView
+
 @end
 
-// AWEPlayInteractionNewBaseController - 新交互基础控制器
+@interface AWEFamiliarNavView : UIView
+@end
+
 @interface AWEPlayInteractionNewBaseController : UIView
-@property (retain, nonatomic) AWEAwemeModel *model;
+@property(retain, nonatomic) AWEAwemeModel *model;
 @end
 
-// AWEPlayInteractionProgressController - 进度控制器
 @interface AWEPlayInteractionProgressController : AWEPlayInteractionNewBaseController
 - (UIViewController *)findViewController:(UIViewController *)vc ofClass:(Class)targetClass;
-@property (retain, nonatomic) id progressSlider;
+@property(retain, nonatomic) id progressSlider;
 - (NSString *)formatTimeFromSeconds:(CGFloat)seconds;
 - (NSString *)convertSecondsToTimeString:(NSInteger)totalSeconds;
 @end
 
-// AWEAdAvatarView - 广告头像视图
 @interface AWEAdAvatarView : UIView
+
 @end
 
-// AWENormalModeTabBar - 普通模式标签栏
 @interface AWENormalModeTabBar : UIView
+@property(nonatomic, assign, readonly) UITabBarController *yy_viewController;
 @end
 
-// AWEPlayInteractionListenFeedView - 听视频视图
 @interface AWEPlayInteractionListenFeedView : UIView
+
 @end
 
-// AWEFeedLiveMarkView - 直播标记视图
 @interface AWEFeedLiveMarkView : UIView
+
 @end
 
-// AWEPlayInteractionTimestampElement - 时间戳元素
 @interface AWEPlayInteractionTimestampElement : UIView
-@property (nonatomic, strong) AWEAwemeModel *model;
+@property(nonatomic, strong) AWEAwemeModel *model;
 @end
 
-// AWEFeedTableViewController - Feed 表格控制器
 @interface AWEFeedTableViewController : UIViewController
 @end
 
-// AWEFeedTableView - Feed 表格视图
 @interface AWEFeedTableView : UIView
 @end
 
-// AWEPlayInteractionProgressContainerView - 进度容器视图
+@interface AWEAwemeDetailTableView : UITableView
+@end
+
+@interface AWECommentInputViewController : UIViewController
+@end
+
+@interface AWEAwemeDetailTableViewCell : UIView
+@end
+
+@interface IESLiveFeedDrawerEntranceView : UIView
+@end
+
 @interface AWEPlayInteractionProgressContainerView : UIView
 @end
 
-// AFDFastSpeedView - 快速播放视图
 @interface AFDFastSpeedView : UIView
 @end
 
-// AWEUserWorkCollectionViewComponentCell - 用户作品单元格
 @interface AWEUserWorkCollectionViewComponentCell : UICollectionViewCell
 @end
 
-// AWEFeedRefreshFooter - Feed 刷新底部视图
 @interface AWEFeedRefreshFooter : UIView
 @end
 
-// AWERLSegmentView - 分段视图
 @interface AWERLSegmentView : UIView
 @end
 
-// AWEBaseListViewController - 基础列表控制器
 @interface AWEBaseListViewController : UIViewController
 - (void)applyBlurEffectIfNeeded;
 - (UILabel *)findCommentLabel:(UIView *)view;
 @end
 
-// AWEFeedTemplateAnchorView - 模板锚点视图
+// 隐藏视频定位
 @interface AWEFeedTemplateAnchorView : UIView
 @end
 
-// AWEPlayInteractionSearchAnchorView - 搜索锚点视图
+// 隐藏同城定位
+@interface AWEMarkView : UIView
+@property(nonatomic, readonly) UILabel *markLabel;
+@end
+
 @interface AWEPlayInteractionSearchAnchorView : UIView
 @end
 
-// AWETemplateHotspotView - 热点视图
 @interface AWETemplateHotspotView : UIView
 @end
 
-// AWEAwemeMusicInfoView - 音乐信息视图
 @interface AWEAwemeMusicInfoView : UIView
 @end
 
-// AWEStoryContainerCollectionView - 故事容器视图
+@interface AWETemplatePlayletView : UIView
+@end
+
+@interface AFDRecommendToFriendEntranceLabel : UILabel
+@end
+
 @interface AWEStoryContainerCollectionView : UIView
 @end
 
-// AWELiveNewPreStreamViewController - 直播预览控制器
 @interface AWELiveNewPreStreamViewController : UIViewController
 @end
 
-// CommentInputContainerView - 评论输入容器
 @interface CommentInputContainerView : UIView
 @end
 
-// AWELongPressPanelTableViewController - 长按面板表格控制器
 @interface AWELongPressPanelTableViewController : UIViewController
-@property (nonatomic, strong) AWEAwemeModel *awemeModel;
+@property(nonatomic, strong) AWEAwemeModel *awemeModel;
 @end
 
-// AWEModernLongPressPanelTableViewController - 现代长按面板控制器
 @interface AWEModernLongPressPanelTableViewController : UIViewController
-@property (nonatomic, strong) AWEAwemeModel *awemeModel;
-- (void)showVideoDebugInfo:(id)awemeModel;
-- (void)refreshCurrentView;
-- (void)performCommentAction;
-- (void)performLikeAction;
-- (void)showSharePanel;
+@property(nonatomic, strong) AWEAwemeModel *awemeModel;
 @end
 
-// AWESettingSectionModel - 设置分区模型
-@interface AWESettingSectionModel : NSObject
-@property (nonatomic, copy) NSString *sectionHeaderTitle;
-@property (nonatomic, assign) CGFloat sectionHeaderHeight;
-@property (nonatomic, assign) NSInteger type;
-@property (nonatomic, strong) NSArray *itemArray;
+@interface AWEModernLongPressHorizontalSettingCell : UITableViewCell
+@property(nonatomic, strong) UICollectionView *collectionView;
+@property(nonatomic, strong) NSArray *dataArray;
+@property(nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
 @end
 
-// AWESettingItemModel - 设置项模型
-@interface AWESettingItemModel : NSObject
-@property (nonatomic, copy) NSString *identifier;
-@property (nonatomic, copy) NSString *title;
-@property (nonatomic, copy) NSString *detail;
-@property (nonatomic, assign) NSInteger type;
-@property (nonatomic, copy) NSString *iconImageName;
-@property (nonatomic, assign) NSInteger cellType;
-@property (nonatomic, assign) NSInteger colorStyle;
-@property (nonatomic, assign) BOOL isEnable;
-@property (nonatomic, copy) void (^cellTappedBlock)(void);
+@interface AWEModernLongPressHorizontalSettingItemCell : UICollectionViewCell
+@property(nonatomic, strong) UIView *contentView;
+@property(nonatomic, strong) UIImageView *buttonIcon;
+@property(nonatomic, strong) UILabel *buttonLabel;
+@property(nonatomic, strong) UIView *separator;
+@property(nonatomic, strong) AWELongPressPanelBaseViewModel *longPressPanelVM;
+
+- (void)updateUI:(AWELongPressPanelBaseViewModel *)viewModel;
 @end
 
-@interface AWESettingItemModel (DYYYAdditions)
-@property (nonatomic, copy) NSString *svgIconImageName;
-@property (nonatomic, assign) BOOL isSwitchOn;
-@property (nonatomic, copy) void (^switchChangedBlock)(void);
+@interface AWEModernLongPressInteractiveCell : UITableViewCell
+@property(nonatomic, strong) UICollectionView *collectionView;
+@property(nonatomic, strong) AWELongPressPanelViewGroupModel *longPressViewGroupModel;
+@property(nonatomic, strong) NSArray *dataArray;
+@property(nonatomic, assign) BOOL isAppearing;
 @end
 
-// AWESettingBaseViewModel - 设置基础模型
-@interface AWESettingBaseViewModel : NSObject
-@end
-
-// AWESettingsViewModel - 设置视图模型
-@interface AWESettingsViewModel : AWESettingBaseViewModel
-@property (nonatomic, weak) UIViewController *controllerDelegate;
-@property (nonatomic, copy) NSString *traceEnterFrom;
-@property (nonatomic, assign) NSInteger colorStyle;
-@property (nonatomic, strong) NSArray *sectionDataArray;
-- (NSArray *)sectionDataArray;
-@end
-
-// DYYYSettingViewController - 自定义设置控制器
 #ifndef DYYYVC_DEFINED
 #define DYYYVC_DEFINED
-@interface DYYYSettingViewController : UIViewController
-@end
 #endif
 
-// AWEElementStackView - 元素堆栈视图
 @interface AWEElementStackView : UIView
-@property (nonatomic, copy) NSString *accessibilityLabel;
-@property (nonatomic, assign) CGRect frame;
-@property (nonatomic, strong) NSArray *subviews;
-@property (nonatomic, assign) CGAffineTransform transform;
+@property(nonatomic, copy) NSString *accessibilityLabel;
+@property(nonatomic, assign) CGRect frame;
+@property(nonatomic, strong) NSArray *subviews;
+@property(nonatomic, assign) CGAffineTransform transform;
 @end
 
-// AWECommentImageModel - 评论图片模型
 @interface AWECommentImageModel : NSObject
-@property (nonatomic, copy) NSString *originUrl;
+@property(nonatomic, copy) NSString *originUrl;
 @end
 
-// AWECommentLongPressPanelContext - 评论长按面板上下文
 @class AWECommentModel;
-@class AWEIMStickerModel;
 @class AWECommentLongPressPanelParam;
+@class AWEIMStickerModel;
+@class AWEURLModel;
 
 @interface AWECommentLongPressPanelContext : NSObject
 - (AWECommentModel *)selectdComment;
 - (AWECommentLongPressPanelParam *)params;
 @end
 
-// AWECommentLongPressPanelParam - 评论长按面板参数
 @interface AWECommentLongPressPanelParam : NSObject
 - (AWECommentModel *)selectdComment;
 @end
 
-// AWECommentModel - 评论模型
 @interface AWECommentModel : NSObject
 - (AWEIMStickerModel *)sticker;
 - (NSString *)content;
 @end
 
-// AWEIMStickerModel - 贴纸模型
 @interface AWEIMStickerModel : NSObject
 - (AWEURLModel *)staticURLModel;
 @end
 
-// AWEUserActionSheetView - 用户操作表视图
-@interface AWEUserActionSheetView : NSObject
-- (instancetype)init;
-- (void)setActions:(NSArray *)actions;
-- (void)show;
-@end
-
-// AWEUserSheetAction - 用户操作表动作
-@interface AWEUserSheetAction : NSObject
-+ (instancetype)actionWithTitle:(NSString *)title imgName:(NSString *)imgName handler:(void (^)(void))handler;
-@end
-
-// AWEFeedTopBarContainer - 顶部栏容器
-@interface AWEFeedTopBarContainer : UIView
-@property (nonatomic, strong) UIColor *backgroundColor;
-- (void)applyDYYYTransparency;
-@end
-
-// CommentLongPressPanelSaveImageElement - 保存图片元素
 @interface _TtC33AWECommentLongPressPanelSwiftImpl37CommentLongPressPanelSaveImageElement : NSObject
 - (AWECommentLongPressPanelContext *)commentPageContext;
 @end
 
-// CommentLongPressPanelCopyElement - 复制元素
 @interface _TtC33AWECommentLongPressPanelSwiftImpl32CommentLongPressPanelCopyElement : NSObject
 - (AWECommentLongPressPanelContext *)commentPageContext;
 @end
 
-// AWEFeedProgressSlider - 进度滑块
 @interface AWEFeedProgressSlider : UIView
-@property (nonatomic, strong) UIView *leftLabelUI;
-@property (nonatomic, strong) UIView *rightLabelUI;
-@property (nonatomic) AWEPlayInteractionProgressController *progressSliderDelegate;
-@end
+@property(nonatomic, assign) float maximumValue;
+@property(nonatomic, strong) UIView *leftLabelUI;
+@property(nonatomic, strong) UIView *rightLabelUI;
+@property(nonatomic) AWEPlayInteractionProgressController *progressSliderDelegate;
 
-@interface AWEFeedProgressSlider (DYYYAdditions)
 - (void)applyCustomProgressStyle;
+- (void)applyWidthPercentToSubviews:(CGFloat)widthPercent;
 @end
 
-// AWEFeedChannelObject - Feed 频道对象
 @interface AWEFeedChannelObject : NSObject
-@property (nonatomic, copy) NSString *channelID;
-@property (nonatomic, copy) NSString *channelTitle;
+@property(nonatomic, copy) NSString *channelID;
+@property(nonatomic, copy) NSString *channelTitle;
 @end
 
-// AWEFeedChannelManager - Feed 频道管理
 @interface AWEFeedChannelManager : NSObject
 - (AWEFeedChannelObject *)getChannelWithChannelID:(NSString *)channelID;
 @end
 
-// AWEHPTopTabItemModel - 顶部标签项模型
 @interface AWEHPTopTabItemModel : NSObject
-@property (nonatomic, copy) NSString *channelID;
-@property (nonatomic, copy) NSString *channelTitle;
+@property(nonatomic, copy) NSString *channelID;
+@property(nonatomic, copy) NSString *channelTitle;
+@property(nonatomic, copy) NSString *title;
 @end
 
-// AWEFakeProgressSliderView - 伪进度滑块视图
-@interface AWEFakeProgressSliderView : UIView
-@property (nonatomic, strong) UIView *superview;
-@property (nonatomic, assign) CGRect frame;
-@property (nonatomic, strong) NSArray *subviews;
-- (void)applyCustomProgressStyle;
+@interface AWEPlayInteractionStrongifyShareContentView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-// AWEPlayInteractionDescriptionScrollView - 描述滚动视图
-@interface AWEPlayInteractionDescriptionScrollView : UIView
-@property (nonatomic, strong) UIView *superview;
-@property (nonatomic, assign) CGAffineTransform transform;
+@interface AWEAntiAddictedNoticeBarView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-// AWEPlayInteractionDescriptionLabel - 描述标签
-@interface AWEPlayInteractionDescriptionLabel : UIView
-@property (nonatomic, strong) UIView *superview;
-@property (nonatomic, assign) CGAffineTransform transform;
+@interface AWEFeedAnchorContainerView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-// AWEUserNameLabel - 用户名标签
-@interface AWEUserNameLabel : UILabel
-@property (nonatomic, strong) UIView *superview;
-@property (nonatomic, assign) CGAffineTransform transform;
+@interface AWEIMMessageTabOptPushBannerView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
 @end
 
-// AWEInnerNotificationWindow - 内部通知窗口
+@interface AWEFeedStickerContainerView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEECommerceEntryView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWETemplateTagsCommonView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AFDSkylightCellBubble : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface LOTAnimationView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWENearbySkyLightCapsuleView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEPlayInteractionCoCreatorNewInfoView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AFDCancelMuteAwemeView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEPlayDanmakuInputContainView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEPlayInteractionRelatedVideoView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEFeedRelatedSearchTipView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+@interface AWEProfileMixCollectionViewCell : UIView
+@end
+
+@interface AWEProfileTaskCardStyleListCollectionViewCell : UIView
+@end
+
+// AWEVersionUpdateManager相关接口声明
+@interface AWEVersionUpdateManager : NSObject
+@property(nonatomic, strong) id networkModule;
+@property(nonatomic, strong) id badgeModule;
+@property(nonatomic, strong) id workflow;
+- (NSString *)currentVersion;
+- (void)startVersionUpdateWorkflow:(id)arg1 completion:(id)arg2;
+- (void)workflowDidFinish:(id)arg1;
++ (id)sharedInstance;
+@end
+
+@interface AWEVersionUpdateNetworkModule : NSObject
+@end
+
+@interface AWEVersionUpdateBadgeModule : NSObject
+@end
+
+@interface AWEVersionUpdateWorkflow : NSObject
+@end
+
+@interface AWEStoryProgressSlideView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+// 隐藏好友分享私信
+@interface AFDNewFastReplyView
+@property(nonatomic, weak) UIView *superview;
+@property(nonatomic) BOOL hidden;
+@end
+
+@interface AWENewLiveSkylightViewController : UIViewController
+- (void)showSkylight:(BOOL)arg0 animated:(BOOL)arg1 actionMethod:(unsigned long long)arg2;
+- (void)updateIsSkylightShowing:(BOOL)arg0;
+@end
+
+@interface AWENearbyFullScreenViewModel : NSObject
+- (void)setShowSkyLight:(id)arg1;
+- (void)setHaveSkyLight:(id)arg1;
+@end
+
+@interface AWECorrelationItemTag : UIView
+- (void)layoutSubviews;
+@end
+
+@interface AWEPlayInteractionTemplateButtonGroup : UIView
+- (void)layoutSubviews;
+@end
+
+@interface AWEHPDiscoverFeedEntranceView : UIView
+- (void)configImage:(UIImageView *)imageView Label:(UILabel *)label position:(NSInteger)pos;
+@end
+
+@interface AWEIMCellLiveStatusContainerView : UIView
+- (void)p_initUI;
+@end
+
+@interface AWELiveSkylightCatchView : UIView
+- (void)setupUI;
+@end
+
+@interface AWEIMFansGroupTopDynamicDomainTemplateView : UIView
+- (void)layoutSubviews;
+@end
+
+@interface AWETemplateCommonView : UIView
+- (void)layoutSubviews;
+@end
+
+@interface AWEUIAlertView : UIView
+- (void)show;
+@end
+
+@interface AWETeenModeAlertView : UIView
+- (BOOL)show;
+@end
+
+@interface AWETeenModeSimpleAlertView : UIView
+- (BOOL)show;
+@end
+
+@interface AWEVideoTypeTagView : UIView
+@end
+
+@interface AWELiveStatusIndicatorView : UIView
+@end
+
+@interface AWEIMInputActionBarInteractor : UIView
+- (void)p_setupUI;
+@end
+
+@interface AWELiveFeedStatusLabel : UILabel
+@end
+
+@interface BDXWebView : UIView
+@end
+
+@interface IESLiveActivityBannnerView : UIView
+@end
+@interface AWECommentSearchAnchorView : UIView
+- (void)setHidden:(BOOL)hidden;
+- (BOOL)isHidden;
+- (void)layoutSubviews;
+@end
+
+@interface AWEPOIEntryAnchorView : UIView
+- (void)setHidden:(BOOL)hidden;
+- (BOOL)isHidden;
+- (void)layoutSubviews;
+- (void)p_processModels:(id)models withPOIName:(id)poiName;
+@end
+
+@interface AWECommentGuideLunaAnchorView : UIView
+- (void)setHidden:(BOOL)hidden;
+- (BOOL)isHidden;
+- (void)layoutSubviews;
+@end
+
+@interface AWEFeedTopBarContainer : UIView
+- (void)applyDYYYTransparency;
+@end
+
+@interface AWEHPTopBarCTAContainer : UIView
+- (void)applyDYYYTransparency;
+@end
+
+@interface ACCStickerContainerView : UIView
+@end
+
+@interface AWEUserActionSheetView : UIView
+- (instancetype)init;
+- (UIView *)containerView;
+- (void)setActions:(NSArray *)actions;
+- (void)show;
+- (void)applyBlurEffectAndWhiteText;
+- (void)setTextColorWhiteRecursivelyInView:(UIView *)view;
+@end
+
+@interface AWEUserSheetAction : NSObject
++ (instancetype)actionWithTitle:(NSString *)title imgName:(NSString *)imgName handler:(id)handler;
++ (instancetype)actionWithTitle:(NSString *)title style:(NSUInteger)style imgName:(NSString *)imgName handler:(id)handler;
+@end
+
+@interface AWEPlayInteractionDescriptionScrollView : UIScrollView
+@end
+
+@interface AWEUserNameLabel : UIView
+@end
+
+@interface AWEPlayInteractionDescriptionLabel : UILabel
+@end
+// 关注直播
+@interface AWEConcernSkylightCapsuleView : UIView
+@end
+// 直播发现
+@interface AWEFeedLiveTabRevisitControlView : UIView
+@end
+// 直播 退出清屏、投屏按钮
+@interface IESLiveButton : UIView
+@end
+// 直播右上关闭按钮
+@interface IESLiveLayoutPlaceholderView : UIView
+@end
+// 直播点歌
+@interface IESLiveKTVSongIndicatorView : UIView
+@end
+// 图片滑条
+@interface AWEStoryProgressContainerView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+- (void)layoutSubviews;
+- (void)updateIndicatorWithPageCount:(NSInteger)count;
+@end
+
+@interface AWESearchAnchorListModel : NSObject
+- (id)init;
+@end
+
+@interface AWEPlayInteractionAvatarView : UIView
+@property(nonatomic, readonly) NSArray *subviews;
+@property(nonatomic, readonly) CGRect frame;
+@end
+
+// 直播间流量提醒弹窗
+@interface AWELiveFlowAlertView : UIView
+@end
+
+// 搜索视频底部评论视图
+@interface AWECommentInputBackgroundView : UIView
+@end
+
+// 聊天视频底部快速回复视图
+@interface AWEIMFeedBottomQuickEmojiInputBar : UIView
+@end
+
+@interface DUXBadge : UIView
+@end
+
+@interface ACCEditTagStickerView : UIView
+@end
+
+@interface AWESearchFeedTagView : UIView
+@end
+
+@interface AFDRecommendToFriendTagView : UIView
+@end
+
+@interface AFDAIbumFolioView : UIView
+@end
+
+@interface AWEHPTopBarCTAItemView : UIView
+@end
+
+@interface AWEVideoPlayDanmakuContainerView : UIView
+@end
+
+// 应用内推送容器
 @interface AWEInnerNotificationWindow : UIWindow
 - (void)setupBlurEffectForNotificationView;
 - (void)applyBlurEffectToView:(UIView *)containerView;
@@ -538,302 +749,333 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (void)clearBackgroundRecursivelyInView:(UIView *)view;
 @end
 
-// LOTAnimationView - 动画视图
-@interface LOTAnimationView : UIView
+@interface AWEFakeProgressSliderView : UIView
+- (void)applyCustomProgressStyle;
 @end
 
-// AWENearbySkyLightCapsuleView - 附近天窗胶囊视图
-@interface AWENearbySkyLightCapsuleView : UIView
+// 添加 DUXContentSheet 相关声明
+@protocol IESIMContentSheetVCProtocol
+, AWEMRGlobalAlertTrackProtocol;
+@interface DUXBasicSheet : UIViewController
 @end
 
-// AWEPlayInteractionCoCreatorNewInfoView - 共同创作者信息视图
-@interface AWEPlayInteractionCoCreatorNewInfoView : UIView
+@interface AWEBinding : NSObject
 @end
 
-// AFDCancelMuteAwemeView - 取消静音视图
-@interface AFDCancelMuteAwemeView : UIView
+@interface AWESettingItemModel : NSObject
+@property(nonatomic, copy) NSString *identifier;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, copy) NSString *detail;
+@property(nonatomic, assign) NSInteger type;
+@property(nonatomic, copy) NSString *iconImageName;
+@property(nonatomic, copy) NSString *svgIconImageName;
+@property(nonatomic, assign) NSInteger cellType;
+@property(nonatomic, assign) NSInteger colorStyle;
+@property(nonatomic, assign) BOOL isEnable;
+@property(nonatomic, assign) BOOL isSwitchOn;
+@property(nonatomic, copy) void (^cellTappedBlock)(void);
+@property(nonatomic, copy) void (^switchChangedBlock)(void);
 @end
 
-// AWEPlayDanmakuInputContainView - 弹幕输入容器
-@interface AWEPlayDanmakuInputContainView : UIView
+@interface AWESettingBaseViewModel : NSObject
 @end
 
-// AWEECommerceEntryView - 电商入口视图
-@interface AWEECommerceEntryView : UIView
+@interface AWESettingBaseViewController : UIViewController
+@property(nonatomic, strong) UIView *view;
+@property(nonatomic, strong) UITableView *tableView;
+- (AWESettingBaseViewModel *)viewModel;
 @end
 
-// AWECommentSearchAnchorView - 评论搜索锚点视图
-@interface AWECommentSearchAnchorView : UIView
+@interface AWESettingsViewModel : AWESettingBaseViewModel
+@property(nonatomic, assign) NSInteger colorStyle;
+@property(nonatomic, strong) NSArray *sectionDataArray;
+@property(nonatomic, weak) id controllerDelegate;
+@property(nonatomic, strong) NSString *traceEnterFrom;
+
+- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict;
+- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict cellTapHandlers:(NSMutableDictionary *)cellTapHandlers;
+
+- (void)refreshTableView;
+- (void)updateSectionDataArray;
+- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
+- (void)updateDependentItemsForSetting:(NSString *)identifier value:(id)value;
+- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
+- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
+- (void)updateConflictingItemUIState:(NSString *)identifier withValue:(BOOL)value;
+- (NSDictionary *)settingsDependencyConfig;
 @end
 
-// AWECommentGuideLunaAnchorView - 评论引导锚点视图
-@interface AWECommentGuideLunaAnchorView : UIView
+@interface AWENavigationBar : UIView
+@property(nonatomic, strong) UILabel *titleLabel;
 @end
 
-// AWETemplateTagsCommonView - 模板标签视图
-@interface AWETemplateTagsCommonView : UIView
+@interface AWESettingSectionModel : NSObject
+@property(nonatomic, assign) NSInteger type;
+@property(nonatomic, assign) CGFloat sectionHeaderHeight;
+@property(nonatomic, copy) NSString *sectionHeaderTitle;
+@property(nonatomic, strong) NSArray *itemArray;
+@property(retain, nonatomic) NSString *identifier;
+@property(copy, nonatomic) NSString *title;
+- (id)initWithIdentifier:(id)arg1;
+- (void)setIsSelect:(BOOL)arg1;
+- (BOOL)isSelect;
+- (void)setCellTappedBlock:(id)arg1;
+- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict;
+- (AWESettingItemModel *)createSettingItem:(NSDictionary *)dict cellTapHandlers:(NSMutableDictionary *)cellTapHandlers;
+- (void)applyDependencyRulesForItem:(AWESettingItemModel *)item;
+- (void)handleConflictsAndDependenciesForSetting:(NSString *)identifier isEnabled:(BOOL)isEnabled;
+- (void)updateDependentItemsForSetting:(NSString *)identifier value:(id)value;
 @end
 
-// AFDSkylightCellBubble - 天窗单元气泡
-@interface AFDSkylightCellBubble : UIView
+@interface AWEPrivacySettingActionSheetConfig : NSObject
+@property(copy, nonatomic) NSArray *models;
+@property(copy, nonatomic) NSString *headerText;
+@property(copy, nonatomic) NSString *headerTitleText;
+@property(nonatomic) BOOL needHighLight;
+@property(nonatomic) BOOL useCardUIStyle;
+@property(nonatomic) BOOL fromHalfScreen;
+@property(retain, nonatomic) UIImage *headerLabelIcon;
+@property(nonatomic) CGFloat sheetWidth;
+@property(nonatomic) BOOL adaptIpadFromHalfVC;
 @end
 
-// AWEAntiAddictedNoticeBarView - 防沉迷通知栏
-@interface AWEAntiAddictedNoticeBarView : UIView
+@interface AWEPrivacySettingActionSheet : UIView
++ (id)sheetWithConfig:(id)arg1;
+@property(copy, nonatomic) id closeBlock;
 @end
 
-// AWEPlayInteractionStrongifyShareContentView - 分享内容视图
-@interface AWEPlayInteractionStrongifyShareContentView : UIView
+@interface DUXContentSheet : UIViewController
+- (void)showOnViewController:(id)arg1 completion:(id)arg2;
+- (instancetype)initWithRootViewController:(UIViewController *)controller withTopType:(NSInteger)topType withSheetAligment:(NSInteger)alignment;
+- (void)setAutoAlignmentCenter:(BOOL)center;
+- (void)setSheetCornerRadius:(CGFloat)radius;
+@property(retain, nonatomic) UIView *fullScreenView;
 @end
 
-// AWEPlayInteractionRelatedVideoView - 相关视频视图
-@interface AWEPlayInteractionRelatedVideoView : UIView
+@protocol AFDPrivacyHalfScreenViewControllerProtocol <NSObject>
 @end
 
-// AWEFeedRelatedSearchTipView - 相关搜索提示视图
-@interface AWEFeedRelatedSearchTipView : UIView
+@interface AWEHalfScreenBaseViewController : UIViewController
+- (void)setCornerRadius:(CGFloat)radius;
+- (void)setOnlyTopCornerClips:(BOOL)onlyTop;
 @end
 
-// AWETemplatePlayletView - 模板播放视图
-@interface AWETemplatePlayletView : UIView
+@interface AWEButton : UIButton
 @end
 
-// AWESearchEntranceView - 搜索入口视图
-@interface AWESearchEntranceView : UIView
+@interface AFDButton : UIButton
 @end
 
-// AWEStoryProgressSlideView - 故事进度滑块
-@interface AWEStoryProgressSlideView : UIView
+@interface AWEProfileToggleView : UIView
 @end
 
-// AFDNewFastReplyView - 快速回复视图
-@interface AFDNewFastReplyView : UIView
+@interface DUXAbandonedButton : UIButton
 @end
 
-// AWEFeedLiveTabRevisitControlView - 直播标签重访控制视图
-@interface AWEFeedLiveTabRevisitControlView : UIView
+@interface AFDPrivacyHalfScreenViewController : AWEHalfScreenBaseViewController <AFDPrivacyHalfScreenViewControllerProtocol>
+@property(retain, nonatomic) UILabel *titleLabel;
+@property(retain, nonatomic) UILabel *contentLabel;
+@property(retain, nonatomic) UIImageView *imageView;
+@property(copy, nonatomic) void (^rightBtnClickedBlock)(void);
+@property(copy, nonatomic) void (^leftButtonClickedBlock)(void);
+@property(retain, nonatomic) AWEButton *leftCancelButton;
+@property(retain, nonatomic) AWEButton *rightConfirmButton;
+
+- (void)configWithImageView:(UIImageView *)imageView
+                  lockImage:(UIImage *)lockImage
+           defaultLockState:(BOOL)defaultLockState
+             titleLabelText:(NSString *)titleText
+           contentLabelText:(NSString *)contentText
+       leftCancelButtonText:(NSString *)leftButtonText
+     rightConfirmButtonText:(NSString *)rightButtonText
+       rightBtnClickedBlock:(void (^)(void))rightBtnBlock
+     leftButtonClickedBlock:(void (^)(void))leftBtnBlock;
+
+- (void)setCornerRadius:(CGFloat)radius;
+- (void)setOnlyTopCornerClips:(BOOL)onlyTop;
+- (void)setUseCardUIStyle:(BOOL)arg1;
+- (void)setShouldShowToggle:(BOOL)arg1;
+- (NSUInteger)animationStyle;
+- (NSUInteger)viewStyle;
+- (void)setSlideDismissBlock:(void (^)(void))slideDismissBlock;
+- (void)setTapDismissBlock:(void (^)(void))tapDismissBlock;
+- (void)setAfterDismissBlock:(void (^)(void))afterDismissBlock;
+- (void)updateDarkModeAppearance;
 @end
 
-// IESLiveKTVSongIndicatorView - KTV歌曲指示视图
-@interface IESLiveKTVSongIndicatorView : UIView
+@interface AWELoadingAndVolumeView : UIView
 @end
 
-// AWECorrelationItemTag - 相关项标签
-@interface AWECorrelationItemTag : UIView
+@interface BDImageView : UIImageView
 @end
 
-// AWEPlayInteractionTemplateButtonGroup - 模板按钮组
-@interface AWEPlayInteractionTemplateButtonGroup : UIView
+@interface AWEIMEmoticonModel : NSObject
+- (id)valueForKey:(NSString *)key;
 @end
 
-// AWEHPDiscoverFeedEntranceView - 发现Feed入口视图
-@interface AWEHPDiscoverFeedEntranceView : UIView
+@interface AWEIMEmoticonPreviewV2 : UIView
+@property(nonatomic, strong) UIView *container;
+@property(nonatomic, strong) BDImageView *content;
+@property(nonatomic, strong) AWEIMEmoticonModel *model;
+- (void)dyyy_saveButtonTapped:(id)sender;
 @end
 
-// AWELiveFeedStatusLabel - 直播状态标签
-@interface AWELiveFeedStatusLabel : UIView
+// 设置修改顶栏标题
+@interface AWEHPTopTabItemTextContentView : UIView
+- (void)setContentText:(NSString *)text;
 @end
 
-// AWELiveStatusIndicatorView - 直播状态指示视图
-@interface AWELiveStatusIndicatorView : UIView
+// 直播间商品信息
+@interface IESECLivePluginLayoutView : UIView
 @end
 
-// AWELiveSkylightCatchView - 直播天窗捕捉视图
-@interface AWELiveSkylightCatchView : UIView
+// 直播间点赞动画
+@interface HTSLiveDiggView : UIView
 @end
 
-// AWEHPTopTabItemBadgeContentView - 顶部标签徽章内容视图
-@interface AWEHPTopTabItemBadgeContentView : UIView
-@end
-
-// AWEIMFansGroupTopDynamicDomainTemplateView - 粉丝群动态模板视图
-@interface AWEIMFansGroupTopDynamicDomainTemplateView : UIView
-@end
-
-// AWEIMInputActionBarInteractor - 输入动作栏交互
-@interface AWEIMInputActionBarInteractor : UIView
-@end
-
-// AWETemplateCommonView - 通用模板视图
-@interface AWETemplateCommonView : UIView
-@end
-
-// AWEHPTopBarCTAItemView - 顶部栏CTA项视图
-@interface AWEHPTopBarCTAItemView : UIView
-@end
-
-// ACCStickerContainerView - 贴纸容器视图
-@interface ACCStickerContainerView : UIView
-@end
-
-// BDXWebView - Web视图
-@interface BDXWebView : UIView
-@end
-
-// IESLiveActivityBannnerView - 直播活动横幅视图
-@interface IESLiveActivityBannnerView : UIView
-@end
-
-// IESLiveFeedDrawerEntranceView - 直播Feed抽屉入口视图
-@interface IESLiveFeedDrawerEntranceView : UIView
-@end
-
-// IESLiveButton - 直播按钮
-@interface IESLiveButton : UIView
-@end
-
-// AWELiveFlowAlertView - 直播流提醒视图
-@interface AWELiveFlowAlertView : UIView
-@end
-
-// AWEIMFeedBottomQuickEmojiInputBar - 底部快速表情输入栏
-@interface AWEIMFeedBottomQuickEmojiInputBar : UIView
-@end
-
-// AWEConcernSkylightCapsuleView - 关注天窗胶囊视图
-@interface AWEConcernSkylightCapsuleView : UIView
-@end
-
-// AWEProfileMixCollectionViewCell - 混合内容单元格
-@interface AWEProfileMixCollectionViewCell : UIView
-@end
-
-// AWEProfileTaskCardStyleListCollectionViewCell - 任务卡片样式单元格
-@interface AWEProfileTaskCardStyleListCollectionViewCell : UIView
-@end
-
-// AFDRecommendToFriendEntranceLabel - 推荐好友入口标签
-@interface AFDRecommendToFriendEntranceLabel : UIView
-@property (nonatomic, strong) UIView *superview;
-@property (nonatomic, assign) BOOL hidden;
-@end
-
-// UIView 分类 - 获取视图控制器
-@interface UIView (ViewControllerCategory)
-- (UIViewController *)yy_viewController;
-@end
-
-// AWENormalModeTabBar 分类 - 获取视图控制器
-@interface AWENormalModeTabBar (DYYYAdditions)
-- (UIViewController *)yy_viewController;
-@end
-
-// AWEFeedRootViewController - Feed根控制器
+// 隐藏状态栏
 @interface AWEFeedRootViewController : UIViewController
+- (BOOL)prefersStatusBarHidden;
+@end
+@interface IESLiveAudienceViewController : UIViewController
+- (BOOL)prefersStatusBarHidden;
+@end
+@interface AWEAwemeDetailTableViewController : UIViewController
+- (BOOL)prefersStatusBarHidden;
+@end
+@interface AWEFullPageFeedNewContainerViewController : UIViewController
+- (BOOL)prefersStatusBarHidden;
 @end
 
-// AWEPOIEntryAnchorView - POI入口锚点视图
-@interface AWEPOIEntryAnchorView : UIView
-- (void)p_addViews;
-- (void)setIconUrls:(id)arg1 defaultImage:(id)arg2;
-- (void)setContentSize:(CGSize)arg1;
+@interface AWEFeedUnfollowFamiliarFollowAndDislikeView : UIView
 @end
 
-// AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView - 评论面板通用头部视图
+@interface AWEDPlayerFeedPlayerViewController : UIViewController
+@property(nonatomic) UIView *contentView;
+- (void)setVideoControllerPlaybackRate:(double)arg0;
+@end
+
+// 底部热点提示框
+@interface AWENewHotSpotBottomBarView : UIView
+@property(nonatomic, strong, readonly) UIView *superview;
+@property(nonatomic, assign, getter=isHidden) BOOL hidden;
+@end
+
+// 评论区免费去看短剧
+@interface AWEShowPlayletCommentHeaderView : UIView
+- (void)setHidden:(BOOL)hidden;
+- (BOOL)isHidden;
+- (void)layoutSubviews;
+@end
+
+@interface ACCGestureResponsibleStickerView : UIView
+@end
+
+@interface AWEDemaciaChapterProgressSlider : UIView
+@end
+
+@interface AWEABTestManager : NSObject
+@property(retain, nonatomic) NSDictionary *abTestData;
+@property(retain, nonatomic) NSMutableDictionary *consistentABTestDic;
+@property(copy, nonatomic) NSDictionary *performanceReversalDic;
+- (void)setAbTestData:(id)arg1;
+- (void)_saveABTestData:(id)arg1;
+- (id)abTestData;
++ (id)sharedManager;
+@end
+
+@interface IESLiveRoomComponent : NSObject
+@end
+
+@interface HTSLiveStreamQualityFragment : IESLiveRoomComponent
+@property(nonatomic, strong) NSArray *streamQualityArray;
+- (NSArray *)getQualities;
+- (void)setResolutionWithIndex:(NSInteger)index isManual:(BOOL)manual beginChange:(void (^)(void))beginChangeBlock completion:(void (^)(void))completionBlock;
+@end
+
+// 视频播放控制处理器
+@interface AWEPlayerPlayControlHandler : NSObject
+@property (nonatomic, strong) AVAudioUnitEQ *audioEQ;
+@property (nonatomic, strong) AVAudioUnitReverb *reverb;
+@property (nonatomic, assign) BOOL noiseFilterEnabled;
+@property (nonatomic, strong) UIButton *qualityButton;
+@property (nonatomic, strong) NSArray *availableQualities;
+@property (nonatomic, assign) NSInteger currentQualityIndex;
+
+- (void)parseAvailableQualities:(AWEURLModel *)urlModel;
+- (void)addQualityButton;
+- (void)applyDefaultQuality:(AVPlayerItem *)item;
+- (void)switchToQuality:(NSInteger)index;
+- (void)showQualityOptions;
+- (void)setupNoiseFilter;
+- (void)addNoiseFilterButton;
+- (void)toggleNoiseFilter;
+- (id)player;
+@end
+
+// 视频控制视图
+@interface AWEFeedVideoControlView : UIView
+- (void)handleVideoQualityLongPress:(UILongPressGestureRecognizer *)gesture;
+@end
+
+@interface AWEMixVideoPanelMoreView : UIView
+@end
+@interface DUXPopover : UIView
+@end
+
+@interface AWESearchViewController : UIViewController
+@property(nonatomic, strong) UITabBarController *tabBarController;
+@end
+
+@interface AWEIMCommentShareUserHorizontalSectionController : UIViewController
+- (void)configCell:(id)cell index:(NSInteger)index model:(id)model;
+@end
+
+@interface AWEIMCommentShareUserHorizontalCollectionViewCell : UIView
+@end
+
+@interface AWENormalModeTabBarFeedView : UIView
+@end
+
+@interface AWENormalModeTabBarController : UIViewController
+@property(nonatomic, strong) AWENormalModeTabBar *awe_tabBar;
+- (void)handleApplicationWillEnterForeground:(NSNotification *)notification;
+@end
+
+@interface AWELeftSideBarWeatherLabel : UILabel
+@property(nonatomic, assign) BOOL userInteractionEnabled;
+@property(nonatomic, strong) UIColor *textColor;
+- (void)addGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer;
+@end
+@interface AWELeftSideBarWeatherView : UIView
+@property(nonatomic, readonly) NSArray<UIView *> *subviews;
+- (UITapGestureRecognizer *)tapGestureForDYYY;
+- (UITapGestureRecognizer *)tapGestureForSubview:(UIView *)subview;
+- (void)openDYYYSettings;
+@end
+@interface AWELeftSideBarViewController : UIViewController
+@end
+@interface AWEFeedContainerViewController : UIViewController
+@end
+
 @interface AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView : UIView
+- (void)setHidden:(BOOL)hidden;
 @end
 
-// AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView - 评论面板商品头部视图
 @interface AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView : UIView
+- (void)setHidden:(BOOL)hidden;
 @end
 
-// AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView - 评论面板模板锚点头部视图
 @interface AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView : UIView
-@end
-
-// AWESearchAnchorListModel - 搜索锚点列表模型
-@interface AWESearchAnchorListModel : NSObject
-- (void)setHideWords:(BOOL)arg1;
-- (void)setScene:(id)arg1;
-@end
-
-// AWEDiscoverFeedEntranceView - 发现Feed入口视图
-@interface AWEDiscoverFeedEntranceView : NSObject
-@end
-
-// AWEFeedStickerContainerView - Feed贴纸容器视图
-@interface AWEFeedStickerContainerView : UIView
-- (BOOL)isHidden;
 - (void)setHidden:(BOOL)hidden;
 @end
 
-// AWEPostWorkViewController - 发布作品控制器
-@interface AWEPostWorkViewController : UIViewController
-- (BOOL)isDouGuideTipViewShow;
-@end
-
-// AWEIMMessageTabOptPushBannerView - 消息标签推送横幅视图
-@interface AWEIMMessageTabOptPushBannerView : UIView
-- (instancetype)initWithFrame:(CGRect)frame;
-@end
-
-// AWEFeedAnchorContainerView - Feed锚点容器视图
-@interface AWEFeedAnchorContainerView : UIView
-- (BOOL)isHidden;
-- (void)setHidden:(BOOL)hidden;
-@end
-
-// AWEPlayInteractionUserAvatarElement - 用户头像元素
 @interface AWEPlayInteractionUserAvatarElement : UIView
+@property(nonatomic, readonly) NSArray *subviews;
+@property(nonatomic, readonly) CGRect frame;
 - (void)onFollowViewClicked:(UITapGestureRecognizer *)gesture;
 @end
 
-// AWENormalModeTabBarGeneralPlusButton - 通用加号按钮
-@interface AWENormalModeTabBarGeneralPlusButton : UIButton
-+ (id)button;
-@end
-
-// AWEVersionUpdateManager - 版本更新管理
-@interface AWEVersionUpdateManager : NSObject
-- (void)startVersionUpdateWorkflow:(id)arg1 completion:(id)arg2;
-- (id)workflow;
-- (id)badgeModule;
-@end
-
-// AFDProfileAvatarFunctionManager - 头像功能管理
-@interface AFDProfileAvatarFunctionManager : NSObject
-- (BOOL)shouldShowSaveAvatarItem;
-@end
-
-// AWECommentLongPressPanelSaveImageElement - 保存图片元素
-@interface AWECommentLongPressPanelSaveImageElement : NSObject
-- (AWECommentLongPressPanelContext *)commentPageContext;
-- (BOOL)elementShouldShow;
-- (void)elementTapped;
-@end
-
-// AWECommentLongPressPanelCopyElement - 复制元素
-@interface AWECommentLongPressPanelCopyElement : NSObject
-- (AWECommentLongPressPanelContext *)commentPageContext;
-- (void)elementTapped;
-@end
-
-// AWECommentMediaDownloadConfigLivePhoto - 直播照片下载配置
-@interface AWECommentMediaDownloadConfigLivePhoto : NSObject
-- (BOOL)needClientWaterMark;
-- (BOOL)needClientEndWaterMark;
-- (id)watermarkConfig;
-@end
-
-// AWEVideoDownloadHandler - 视频下载处理
-@interface AWEVideoDownloadHandler : NSObject
-+ (instancetype)sharedInstance;
-- (void)downloadVideoWithAwemeModel:(AWEAwemeModel *)awemeModel completion:(void(^)(NSURL *localURL, NSError *error))completion;
-- (BOOL)canDownloadVideo:(AWEAwemeModel *)awemeModel;
-@end
-
-@interface AWEModernLongPressPanelTableViewController (DYYYExtension)
-- (UIView *)findButtonWithAccessibilityLabel:(NSString *)label inView:(UIView *)view;
-- (void)refreshCurrentView;
-- (void)showVideoDebugInfo:(id)awemeModel;
-- (void)performCommentAction;
-- (void)performLikeAction;
-- (void)showSharePanel;
-@end
-
-@interface AWEModernLongPressPanelTableViewController (DYYYAdditions)
-- (void)showVideoDebugInfo:(id)awemeModel;
-- (void)extractVideoHashtags:(id)awemeModel;
-- (void)shareToThirdParty:(id)awemeModel;
-- (void)refreshCurrentView;
+@interface AWETabViewController : UIViewController
+@property (nonatomic, assign) BOOL isIncognitoModeActive;
 @end
