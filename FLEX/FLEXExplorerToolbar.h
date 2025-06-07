@@ -39,6 +39,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Toolbar item for hiding the explorer.
 @property (nonatomic, readonly) FLEXExplorerToolbarItem *closeItem;
 
+/// Toolbar item for reporting bugs.  /// 新增的Bug按钮
+@property (nonatomic, readonly) FLEXExplorerToolbarItem *bugItem;
+
 /// A view for moving the entire toolbar.
 /// Users of the toolbar can attach a pan gesture recognizer to decide how to reposition the toolbar.
 @property (nonatomic, readonly) UIView *dragHandle;

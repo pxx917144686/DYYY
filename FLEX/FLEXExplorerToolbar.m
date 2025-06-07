@@ -19,6 +19,7 @@
 @property (nonatomic, readwrite) FLEXExplorerToolbarItem *selectItem;
 @property (nonatomic, readwrite) FLEXExplorerToolbarItem *recentItem;
 @property (nonatomic, readwrite) FLEXExplorerToolbarItem *moveItem;
+@property (nonatomic, readwrite) FLEXExplorerToolbarItem *bugItem;
 @property (nonatomic, readwrite) FLEXExplorerToolbarItem *closeItem;
 @property (nonatomic, readwrite) UIView *dragHandle;
 
@@ -57,6 +58,7 @@
         self.selectItem    = [FLEXExplorerToolbarItem itemWithTitle:@"选择" image:FLEXResources.selectIcon];
         self.recentItem    = [FLEXExplorerToolbarItem itemWithTitle:@"最近" image:FLEXResources.recentIcon];
         self.moveItem      = [FLEXExplorerToolbarItem itemWithTitle:@"移动" image:FLEXResources.moveIcon sibling:self.recentItem];
+        self.bugItem       = [FLEXExplorerToolbarItem itemWithTitle:@"调试" image:FLEXResources.bugIcon];
         self.closeItem     = [FLEXExplorerToolbarItem itemWithTitle:@"关闭" image:FLEXResources.closeIcon];
 
         // Selected view box //
@@ -80,7 +82,7 @@
         [self.selectedViewDescriptionSafeAreaContainer addSubview:self.selectedViewDescriptionLabel];
         
         // toolbarItems
-        self.toolbarItems = @[_globalsItem, _hierarchyItem, _selectItem, _moveItem, _closeItem];
+        self.toolbarItems = @[_selectItem, _hierarchyItem, _recentItem, _bugItem, _globalsItem, _closeItem];
     }
 
     return self;
@@ -170,9 +172,9 @@
         [item.currentItem removeFromSuperview];
     }
     
-    // Trim to 5 items if necessary
-    if (toolbarItems.count > 5) {
-        toolbarItems = [toolbarItems subarrayWithRange:NSMakeRange(0, 5)];
+    // 将限制从5修改为6
+    if (toolbarItems.count > 6) {
+        toolbarItems = [toolbarItems subarrayWithRange:NSMakeRange(0, 6)];
     }
 
     for (FLEXExplorerToolbarItem *item in toolbarItems) {

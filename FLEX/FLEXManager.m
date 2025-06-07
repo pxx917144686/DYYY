@@ -13,6 +13,7 @@
 #import "FLEXNavigationController.h"
 #import "FLEXObjectExplorerFactory.h"
 #import "FLEXFileBrowserController.h"
+#import "FLEXManager+DoKitExtensions.h"
 
 @interface FLEXManager () <FLEXWindowEventDelegate, FLEXExplorerViewControllerDelegate>
 
@@ -42,6 +43,9 @@
     if (self) {
         _userGlobalEntries = [NSMutableArray new];
         _customContentTypeViewers = [NSMutableDictionary new];
+        
+        // 注册 DoKit 增强功能
+        [self registerDoKitEnhancements];
     }
     return self;
 }

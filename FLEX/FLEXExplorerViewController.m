@@ -21,6 +21,7 @@
 #import "FLEXWindowManagerController.h"
 #import "FLEXViewControllersViewController.h"
 #import "NSUserDefaults+FLEX.h"
+#import "FLEXBugViewController.h" 
 
 typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
     FLEXExplorerModeDefault,
@@ -410,12 +411,25 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
         NSStringFromSelector(@selector(recentButtonTapped:)):        toolbar.recentItem,
         NSStringFromSelector(@selector(moveButtonTapped:)):          toolbar.moveItem,
         NSStringFromSelector(@selector(globalsButtonTapped:)):       toolbar.globalsItem,
+        NSStringFromSelector(@selector(bugButtonTapped:)):           toolbar.bugItem,     // 添加Bug按钮动作
         NSStringFromSelector(@selector(closeButtonTapped:)):         toolbar.closeItem,
     };
     
     [actionsToItems enumerateKeysAndObjectsUsingBlock:^(NSString *sel, FLEXExplorerToolbarItem *item, BOOL *stop) {
         [item addTarget:self action:NSSelectorFromString(sel) forControlEvents:UIControlEventTouchUpInside];
     }];
+}
+
+// 添加Bug按钮点击处理方法
+- (void)bugButtonTapped:(FLEXExplorerToolbarItem *)sender {
+    // 创建Bug工具界面并展示
+    FLEXBugViewController *bugViewController = [[FLEXBugViewController alloc] init];
+    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:bugViewController];
+    
+    // 设置模态展示样式
+    navController.modalPresentationStyle = UIModalPresentationFormSheet;
+    
+    [self presentViewController:navController animated:YES completion:nil];
 }
 
 - (void)selectButtonTapped:(FLEXExplorerToolbarItem *)sender {
@@ -457,13 +471,11 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
     FLEXExplorerToolbar *toolbar = self.explorerToolbar;
     
     toolbar.selectItem.selected = self.currentMode == FLEXExplorerModeSelect;
-    
-    // 仅当选择了对象时才启用移动功能
-    BOOL hasSelectedObject = self.selectedView != nil;
-    toolbar.moveItem.enabled = hasSelectedObject;
     toolbar.moveItem.selected = self.currentMode == FLEXExplorerModeMove;
+    toolbar.moveItem.enabled = self.selectedView != nil;
+    toolbar.bugItem.enabled = YES;  // 始终启用Bug按钮
     
-    // 仅当我们有上次活动标签时才启用最近按钮
+    // 只有当我们有最近的活动标签时才启用recent按钮
     if (!self.presentedViewController) {
         toolbar.recentItem.enabled = FLEXTabList.sharedList.activeTab != nil;
     } else {

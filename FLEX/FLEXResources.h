@@ -12,6 +12,7 @@
 
 #pragma mark - FLEX Toolbar Icons
 
+@property (readonly, class) UIImage *bugIcon;
 @property (readonly, class) UIImage *closeIcon;
 @property (readonly, class) UIImage *dragHandle;
 @property (readonly, class) UIImage *globalsIcon;

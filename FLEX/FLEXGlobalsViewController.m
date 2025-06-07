@@ -26,7 +26,7 @@
 #import "UIBarButtonItem+FLEX.h"
 
 @interface FLEXGlobalsViewController ()
-/// 表视图中仅显示的部分；空部分从此数组中清除。
+// 表视图中仅显示的部分；空部分从此数组中清除。
 @property (nonatomic) NSArray<FLEXGlobalsSection *> *sections;
 /// 表视图中的所有部分，无论部分是否为空。
 @property (nonatomic, readonly) NSArray<FLEXGlobalsSection *> *allSections;
@@ -40,8 +40,6 @@
 
 + (NSString *)globalsTitleForSection:(FLEXGlobalsSectionKind)section {
     switch (section) {
-        case FLEXGlobalsSectionCustom:
-            return @"自定义添加";
         case FLEXGlobalsSectionProcessAndEvents:
             return @"进程与事件";
         case FLEXGlobalsSectionAppShortcuts:
@@ -97,14 +95,15 @@
         case FLEXGlobalsRowMainThread:
         case FLEXGlobalsRowOperationQueue:
             return [FLEXObjectExplorerFactory flex_concreteGlobalsEntry:row];
-        
-        case FLEXGlobalsRowCount: break;
+            
+        case FLEXGlobalsRowCount:
+        default:
+            @throw [NSException
+                exceptionWithName:NSInternalInconsistencyException
+                reason:@"在switch中缺少globals情况" 
+                userInfo:nil
+            ];
     }
-    
-    @throw [NSException
-        exceptionWithName:NSInternalInconsistencyException
-        reason:@"在switch中缺少globals情况" userInfo:nil
-    ];
 }
 
 + (NSArray<FLEXGlobalsSection *> *)defaultGlobalSections {
@@ -152,7 +151,7 @@
         };
 
         sections = [NSMutableArray array];
-        for (FLEXGlobalsSectionKind i = FLEXGlobalsSectionCustom + 1; i < FLEXGlobalsSectionCount; ++i) {
+        for (FLEXGlobalsSectionKind i = FLEXGlobalsSectionProcessAndEvents; i < FLEXGlobalsSectionCount; ++i) {
             NSString *title = [self globalsTitleForSection:i];
             [sections addObject:[FLEXGlobalsSection title:title rows:rowsBySection[@(i)]]];
         }
@@ -187,19 +186,22 @@
 
 - (NSArray<FLEXGlobalsSection *> *)makeSections {
     NSMutableArray<FLEXGlobalsSection *> *sections = [NSMutableArray array];
-    // 我们有自定义部分要添加吗？
-    if (FLEXManager.sharedManager.userGlobalEntries.count) {
-        NSString *title = [[self class] globalsTitleForSection:FLEXGlobalsSectionCustom];
-        FLEXGlobalsSection *custom = [FLEXGlobalsSection
-            title:title
-            rows:FLEXManager.sharedManager.userGlobalEntries
-        ];
-        [sections addObject:custom];
-    }
 
     [sections addObjectsFromArray:[self.class defaultGlobalSections]];
 
     return sections;
+}
+
+- (FLEXGlobalsEntry *)globalsEntryAtIndex:(NSInteger)index {
+    FLEXGlobalsRow row = [self globalRowAtIndex:index];
+    
+    // 直接调用类方法，避免重复代码和错误的方法名
+    return [[self class] globalsEntryForRow:row];
+}
+
+- (FLEXGlobalsRow)globalRowAtIndex:(NSInteger)index {
+    // 这里根据项目实际逻辑进行实现，简单示例:
+    return (FLEXGlobalsRow)index;
 }
 
 @end

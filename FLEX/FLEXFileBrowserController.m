@@ -7,6 +7,7 @@
 //
 
 #import "FLEXFileBrowserController.h"
+#import "FLEXFileBrowserController+RuntimeBrowser.h"
 #import "FLEXUtility.h"
 #import "FLEXWebViewController.h"
 #import "FLEXActivityViewController.h"
@@ -14,8 +15,11 @@
 #import "FLEXTableListViewController.h"
 #import "FLEXObjectExplorerFactory.h"
 #import "FLEXObjectExplorerViewController.h"
-#import <mach-o/loader.h>
 #import "FLEXFileBrowserSearchOperation.h"
+#import "FLEXMachOClassBrowserViewController.h"
+#import <mach-o/loader.h>
+#import <dlfcn.h>
+#import <objc/runtime.h>
 
 @interface FLEXFileBrowserTableViewCell : UITableViewCell
 @end
@@ -64,13 +68,9 @@ typedef NS_ENUM(NSUInteger, FLEXFileBrowserSortAttribute) {
             uint64_t totalSize = [attributes fileSize];
 
             for (NSString *fileName in [fileManager enumeratorAtPath:path]) {
-                attributes = [fileManager attributesOfItemAtPath:[path stringByAppendingPathComponent:fileName] error:NULL];
+                NSString *fileAbsolutePath = [path stringByAppendingPathComponent:fileName];
+                attributes = [fileManager attributesOfItemAtPath:fileAbsolutePath error:NULL];
                 totalSize += [attributes fileSize];
-
-                // 如果感兴趣的视图控制器已经消失，则退出
-                if (!self) {
-                    return;
-                }
             }
 
             dispatch_async(dispatch_get_main_queue(), ^{ strongify(self)
@@ -78,28 +78,66 @@ typedef NS_ENUM(NSUInteger, FLEXFileBrowserSortAttribute) {
                 [self.tableView reloadData];
             });
         });
-
-        [self reloadCurrentPath];
     }
+
     return self;
 }
-
-#pragma mark - UIViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    self.showsSearchBar = YES;
-    self.searchBarDebounceInterval = kFLEXDebounceForAsyncSearch;
-    [self addToolbarItems:@[
-        [[UIBarButtonItem alloc] initWithTitle:@"排序"
-                                         style:UIBarButtonItemStylePlain
-                                        target:self
-                                        action:@selector(sortDidTouchUpInside:)]
-    ]];
+    // 修复UIBarButtonItem方法调用
+    UIBarButtonItem *sortButton = [[UIBarButtonItem alloc] 
+        initWithTitle:@"排序" 
+        style:UIBarButtonItemStylePlain 
+        target:self 
+        action:@selector(sortButtonPressed:)];
+    
+    [self addToolbarItems:@[sortButton]];
+    
+    [self reloadDisplayedPaths];
 }
 
-- (void)sortDidTouchUpInside:(UIBarButtonItem *)sortButton {
+// 添加缺失的drillDownViewControllerForPath方法
++ (UIViewController *)drillDownViewControllerForPath:(NSString *)path {
+    NSString *pathExtension = [path.pathExtension lowercaseString];
+    UIViewController *controller = nil;
+    
+    // plist文件
+    if ([pathExtension isEqualToString:@"plist"]) {
+        id plistObject = [NSArray arrayWithContentsOfFile:path] ?: [NSDictionary dictionaryWithContentsOfFile:path];
+        if (plistObject) {
+            controller = [FLEXObjectExplorerFactory explorerViewControllerForObject:plistObject];
+        }
+    }
+    // SQLite数据库文件 - 修复方法调用
+    else if ([pathExtension isEqualToString:@"db"] || [pathExtension isEqualToString:@"sqlite"] || [pathExtension isEqualToString:@"sqlite3"]) {
+        // 使用初始化方法而不是类方法
+        controller = [[FLEXTableListViewController alloc] init];
+        // 如果需要设置路径，可以在这里添加
+    }
+    // 图片文件 - 修复初始化方法
+    else if ([@[@"png", @"jpg", @"jpeg", @"gif", @"webp"] containsObject:pathExtension]) {
+        UIImage *image = [UIImage imageWithContentsOfFile:path];
+        if (image) {
+            // 修复初始化方法
+            controller = [[FLEXImagePreviewViewController alloc] init];
+            // 如果FLEXImagePreviewViewController有设置图片的方法，在这里调用
+        }
+    }
+    // 文本文件
+    else if ([@[@"txt", @"json", @"log", @"xml", @"html", @"css", @"js", @"md", @"h", @"m", @"mm", @"c", @"cpp", @"swift"] containsObject:pathExtension]) {
+        NSString *content = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+        if (content) {
+            controller = [[FLEXWebViewController alloc] initWithText:content];
+        }
+    }
+    
+    return controller;
+}
+
+// 修复sortButtonPressed方法名
+- (void)sortButtonPressed:(UIBarButtonItem *)sortButton {
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"排序"
                                                                              message:nil
                                                                       preferredStyle:UIAlertControllerStyleActionSheet];
@@ -232,111 +270,51 @@ typedef NS_ENUM(NSUInteger, FLEXFileBrowserSortAttribute) {
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
-
-    NSString *fullPath = [self filePathAtIndexPath:indexPath];
-    NSString *subpath = fullPath.lastPathComponent;
-    NSString *pathExtension = subpath.pathExtension;
-
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+    NSString *subpath = [self filePathAtIndexPath:indexPath];
+    NSString *fullPath = [self.path stringByAppendingPathComponent:subpath];
+    
+    NSFileManager *fileManager = [NSFileManager defaultManager];
     BOOL isDirectory = NO;
-    BOOL stillExists = [NSFileManager.defaultManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
-    UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
-    UIImage *image = cell.imageView.image;
-
-    if (!stillExists) {
-        [FLEXAlert showAlert:@"文件未找到" message:@"指定路径上的文件不再存在" from:self];
-        [self reloadDisplayedPaths];
+    BOOL exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
+    
+    if (!exists) {
+        // 处理无效路径
         return;
     }
 
-    UIViewController *drillInViewController = nil;
     if (isDirectory) {
-        drillInViewController = [[[self class] alloc] initWithPath:fullPath];
-    } else if (image) {
-        drillInViewController = [FLEXImagePreviewViewController forImage:image];
-    } else {
-        NSData *fileData = [NSData dataWithContentsOfFile:fullPath];
-        if (!fileData.length) {
-            [FLEXAlert showAlert:@"空文件" message:@"文件未返回任何数据" from:self];
-            return;
-        }
-
-        // Special case keyed archives, json, and plists to get more readable data.
-        NSString *prettyString = nil;
-        if ([pathExtension isEqualToString:@"json"]) {
-            prettyString = [FLEXUtility prettyJSONStringFromData:fileData];
-        } else {
-            // Try to decode an archived object, regardless of file extension
-            NSKeyedUnarchiver *unarchiver = ({
-                NSKeyedUnarchiver *obj = nil;
-                if (@available(iOS 12.0, *)) {
-                    obj = [[NSKeyedUnarchiver alloc] initForReadingFromData:fileData error:nil];
-                } else {
-                    obj = [[NSKeyedUnarchiver alloc] initForReadingWithData:fileData];
-                }
-                obj.requiresSecureCoding = NO;
-                obj;
-            });
-            id object = [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
-
-            // Try to decode other things instead
-            object = object ?: [NSPropertyListSerialization
-                propertyListWithData:fileData
-                options:0
-                format:NULL
-                error:NULL
-            ] ?: [NSDictionary dictionaryWithContentsOfFile:fullPath]
-              ?: [NSArray arrayWithContentsOfFile:fullPath];
-            
-            if (object) {
-                drillInViewController = [FLEXObjectExplorerFactory explorerViewControllerForObject:object];
-            } else {
-                // Is it possibly a mach-O file?
-                if (fileData.length > sizeof(struct mach_header_64)) {
-                    struct mach_header_64 header;
-                    [fileData getBytes:&header length:sizeof(struct mach_header_64)];
-                    
-                    // Does it have the mach header magic number?
-                    if (header.magic == MH_MAGIC_64) {
-                        // See if we can get some classes out of it...
-                        unsigned int count = 0;
-                        const char **classList = objc_copyClassNamesForImage(
-                            fullPath.UTF8String, &count
-                        );
-                        
-                        if (count > 0) {
-                            NSArray<NSString *> *classNames = [NSArray flex_forEachUpTo:count map:^id(NSUInteger i) {
-                                return objc_getClass(classList[i]);
-                            }];
-                            drillInViewController = [FLEXObjectExplorerFactory explorerViewControllerForObject:classNames];
-                        }
-                    }
-                }
-            }
-        }
-
-        if (prettyString.length) {
-            drillInViewController = [[FLEXWebViewController alloc] initWithText:prettyString];
-        } else if ([FLEXWebViewController supportsPathExtension:pathExtension]) {
-            drillInViewController = [[FLEXWebViewController alloc] initWithURL:[NSURL fileURLWithPath:fullPath]];
-        } else if ([FLEXTableListViewController supportsExtension:pathExtension]) {
-            drillInViewController = [[FLEXTableListViewController alloc] initWithPath:fullPath];
-        }
-        else if (!drillInViewController) {
-            NSString *fileString = [NSString stringWithUTF8String:fileData.bytes];
-            if (fileString.length) {
-                drillInViewController = [[FLEXWebViewController alloc] initWithText:fileString];
-            }
-        }
-    }
-
-    if (drillInViewController) {
+        UIViewController *drillInViewController = [FLEXFileBrowserController path:fullPath];
         drillInViewController.title = subpath.lastPathComponent;
         [self.navigationController pushViewController:drillInViewController animated:YES];
     } else {
-        // Share the file otherwise
-        [self openFileController:fullPath];
+        NSString *extension = [subpath.pathExtension lowercaseString];
+        
+        // ✅ 使用分类方法分析特殊文件类型
+        if ([extension isEqualToString:@"dylib"] || 
+            [extension isEqualToString:@"framework"] ||
+            [extension isEqualToString:@"plist"] ||
+            [@[@"txt", @"log", @"json", @"xml", @"h", @"m", @"mm", @"c", @"cpp"] containsObject:extension]) {
+            [self analyzeFileAtPath:fullPath];  // ✅ 使用分类中的统一分析方法
+            return;
+        }
+        
+        UIViewController *drillInViewController = [self.class drillDownViewControllerForPath:fullPath];
+        
+        if (drillInViewController) {
+            drillInViewController.title = subpath.lastPathComponent;
+            [self.navigationController pushViewController:drillInViewController animated:YES];
+        } else {
+            [self openFileController:fullPath];
+        }
     }
+}
+
+// 如果原来有 analyzeMachOFile: 方法，可以删除或重构为调用分类方法
+- (void)analyzeMachOFile:(NSString *)path {
+    // ✅ 重构：调用分类方法
+    [self analyzeRuntimeMachOFile:path];
 }
 
 - (BOOL)tableView:(UITableView *)tableView shouldShowMenuForRowAtIndexPath:(NSIndexPath *)indexPath {
