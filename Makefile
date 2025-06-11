@@ -1,6 +1,6 @@
 # 插件：显示编译成功，显示的信息
 PACKAGE_IDENTIFIER = com.huami.dyyy
-PACKAGE_NAME = DYYY
+PACKAGE_NAME = DYYY++
 PACKAGE_VERSION = 2.1-7++
 PACKAGE_ARCHITECTURE = iphoneos-arm64 iphoneos-arm64e
 PACKAGE_REVISION = 1
@@ -11,7 +11,7 @@ PACKAGE_DESCRIPTION = DYYY （原作者：huami1314；魔改：pxx917144686）
 # 插件：编译时，引用的信息
 define Package/DYYY
   Package: com.huami.dyyy
-  Name: DYYY
+  Name: DYYY++
   Version: 2.1-7++
   Architecture: iphoneos-arm64 iphoneos-arm64e
   Author: huami <huami@example.com>
@@ -75,7 +75,6 @@ $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage
-$(TWEAK_NAME)_LDFLAGS = -lsubstrate
 $(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp  # 使用 += 
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/libwebp/include
 
