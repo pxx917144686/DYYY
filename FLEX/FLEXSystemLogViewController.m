@@ -67,11 +67,8 @@ static BOOL my_os_log_shim_enabled(void *addr) {
         FLEXNSLogHookWorks = my_os_log_shim_enabled(addr) == NO;
     }
 
-    // 所以，仅仅因为我们重新绑定了惰性加载的符号
-    // 这个函数并不意味着它会被使用。
-    // 虽然它在模拟器上似乎足够了，但是由于
-    // 某种原因，它在设备上不够用。我们需要
-    // 实际使用类似 Substrate 的东西来挂钩函数。
+    // 所以，仅仅因为重新绑定了惰性加载的符号，这个函数并不意味着它会被使用。
+    // 虽然它在模拟器上似乎足够了，但是由于某种原因，它在设备上不够用。需要实际使用类似 Substrate 的东西来挂钩函数。
 
     // 检查是否有 substrate，如果有就使用它
     void *handle = dlopen("/usr/lib/libsubstrate.dylib", RTLD_LAZY);
