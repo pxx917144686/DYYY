@@ -234,8 +234,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 标题
     UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(70, 20, moduleWidth - 110, 24)];
     titleLabel.text = module.title;
-    titleLabel.textColor = [UIColor colorWithWhite:0.1 alpha:1.0];
-    titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    titleLabel.textColor = [UIColor blackColor]; // 修改为黑色
+    titleLabel.font = [UIFont systemFontOfSize:17];
     [cardButton addSubview:titleLabel];
     
     // 副标题描述
@@ -334,7 +334,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 标题
     UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(60, 0, menuWidth - 120, cellHeight)];
     titleLabel.text = module.title;
-    titleLabel.textColor = [UIColor whiteColor];
+    titleLabel.textColor = [UIColor blackColor];
     titleLabel.font = [UIFont systemFontOfSize:17];
     [cellButton addSubview:titleLabel];
     
@@ -402,8 +402,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     if (isListView) {
         CGFloat cellHeight = 60; // 列表模式更紧凑
-        CGFloat verticalSpacing = 12;
-        return CGSizeMake(width, (cellHeight + verticalSpacing) * self.modules.count + verticalSpacing);
+        return CGSizeMake(width, cellHeight * self.modules.count);
     } else {
         CGFloat cardHeight = 90; // 卡片模式更突出
         CGFloat verticalSpacing = 16;
@@ -418,22 +417,23 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
     
     // 根据视图模式使用不同设计参数
-    CGFloat cellHeight, horizontalMargin, verticalSpacing;
+    CGFloat cellHeight, horizontalMargin;
     
     if (isListView) {
         // 列表模式
         cellHeight = 60;
         horizontalMargin = 15;
-        verticalSpacing = 12;
     } else {
         // 卡片模式
         cellHeight = 90;
         horizontalMargin = 18;
-        verticalSpacing = 16;
     }
     
+    // 修复：列表模式创建容器时不使用垂直间距，确保无缝隙
+    CGFloat yPosition = isListView ? (index * cellHeight) : (index * (cellHeight + 16) + 16);
+    
     // 创建容器视图
-    UIView *cellContainer = [[UIView alloc] initWithFrame:CGRectMake(0, index * (cellHeight + verticalSpacing) + verticalSpacing, menuWidth, cellHeight)];
+    UIView *cellContainer = [[UIView alloc] initWithFrame:CGRectMake(0, yPosition, menuWidth, cellHeight)];
     cellContainer.backgroundColor = [UIColor clearColor];
     cellContainer.tag = index + 100;
     
@@ -476,8 +476,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(60, 0, buttonWidth - 90, cellHeight)];
     titleLabel.text = module.title;
     
-    // 关键修复: 明确设置深色文本颜色，不再依赖后续切换
-    titleLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];  // 深色文本颜色
+    // 确保列表模式使用深色文本颜色
+    if (isListView) {
+        titleLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];  // 强制深色文本
+    } else {
+        titleLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];  // 深色文本颜色
+    }
+    
     titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     [cellButton addSubview:titleLabel];
     
@@ -514,7 +519,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     NSInteger buttonIndex = 0;
     NSInteger totalButtons = 1;
     
-    // 安全地获取按钮索引 - 修复类型错误
+    // 安全地获取按钮索引
     if ([button isKindOfClass:[DYYYDraggableButton class]]) {
         buttonIndex = ((DYYYDraggableButton *)button).originalIndex;
         
@@ -523,100 +528,33 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         totalButtons = moduleViews ? moduleViews.count : 1;
     }
     
-    // 只对第一个和最后一个按钮应用不同的圆角效果
     button.layer.cornerRadius = 12;
-    if (buttonIndex == 0) {
-        // 第一个按钮只保留上方圆角
-        button.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    } else if (buttonIndex == totalButtons - 1) {
-        // 最后一个按钮只保留下方圆角
-        button.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
-    } else {
-        // 中间按钮无圆角
-        button.layer.cornerRadius = 0;
-    }
+    button.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     
     // 移除单独的外部阴影，只在整体容器上应用阴影
     button.layer.shadowOpacity = 0;
     
-    // 改进：增大重叠区域，彻底消除缝隙
-    CGRect frame = button.frame;
-    frame.size.height += (buttonIndex < totalButtons - 1) ? 2 : 0; // 增加为2像素重叠
-    button.frame = frame;
-    
-    // 创建连接线效果 - 调整为精确位置和宽度
-    if (buttonIndex < totalButtons - 1) {
-        CALayer *connectionLine = [CALayer layer];
-        // 使线条完全覆盖按钮底部
-        connectionLine.frame = CGRectMake(6, button.bounds.size.height - 0.5, button.bounds.size.width - 6, 0.5);
-        connectionLine.backgroundColor = [UIColor colorWithWhite:0.9 alpha:0.8].CGColor;
-        [button.layer addSublayer:connectionLine];
-        
-        // 添加额外的连接器，确保没有缝隙
-        CALayer *gapFiller = [CALayer layer];
-        gapFiller.frame = CGRectMake(0, button.bounds.size.height - 2, button.bounds.size.width, 4);
-        gapFiller.backgroundColor = button.backgroundColor.CGColor;
-        gapFiller.zPosition = -1; // 放在最底层
-        [button.layer addSublayer:gapFiller];
-    }
-    
-    // 左侧彩色指示器 - 连续效果，扩展高度防止缝隙
+    // 左侧彩色指示器
     CALayer *colorIndicator = [CALayer layer];
-    // 为非最后一个按钮，指示器稍微延长一点
-    CGFloat extraHeight = (buttonIndex < totalButtons - 1) ? 2 : 0;
-    colorIndicator.frame = CGRectMake(0, 0, 6, button.bounds.size.height + extraHeight);
+    colorIndicator.frame = CGRectMake(0, 0, 6, button.bounds.size.height);
     colorIndicator.backgroundColor = [moduleColor colorWithAlphaComponent:0.8].CGColor;
     
-    // 只在首尾的指示器上应用相应的圆角
-    if (buttonIndex == 0) {
-        colorIndicator.cornerRadius = 3;
-        colorIndicator.maskedCorners = kCALayerMinXMinYCorner;
-    } else if (buttonIndex == totalButtons - 1) {
-        colorIndicator.cornerRadius = 3;
-        colorIndicator.maskedCorners = kCALayerMinXMaxYCorner;
-    } else {
-        colorIndicator.cornerRadius = 0;
-    }
+    // 为左侧指示条添加正确的圆角
+    colorIndicator.cornerRadius = 3; // 半径为宽度的一半
+    
+    // 只在左侧添加圆角，与按钮圆角保持一致
+    colorIndicator.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
     
     [button.layer insertSublayer:colorIndicator atIndex:2];
     
-    // 顶部高光效果 - 保持浅色渐变感
-    CAGradientLayer *topGradient = [CAGradientLayer layer];
-    topGradient.frame = button.bounds;
-    topGradient.colors = @[
-        (id)[UIColor colorWithWhite:1.0 alpha:0.4].CGColor,
-        (id)[UIColor colorWithWhite:1.0 alpha:0.0].CGColor
-    ];
-    topGradient.startPoint = CGPointMake(0.5, 0.0);
-    topGradient.endPoint = CGPointMake(0.5, 0.5);
-    
-    // 应用顶部渐变的圆角与按钮保持一致
-    topGradient.cornerRadius = button.layer.cornerRadius;
-    topGradient.maskedCorners = button.layer.maskedCorners;
-    
-    [button.layer insertSublayer:topGradient atIndex:1];
-    
-    // 底部微妙的彩色渐变
-    if (buttonIndex == totalButtons - 1) {
-        CAGradientLayer *bottomGradient = [CAGradientLayer layer];
-        bottomGradient.frame = CGRectMake(0, button.bounds.size.height - 10, button.bounds.size.width, 10);
-        bottomGradient.startPoint = CGPointMake(0, 1);
-        bottomGradient.endPoint = CGPointMake(0, 0);
-        bottomGradient.colors = @[
-            (id)[moduleColor colorWithAlphaComponent:0.05].CGColor,
-            (id)[UIColor clearColor].CGColor
-        ];
-        [button.layer insertSublayer:bottomGradient atIndex:1];
-    }
-    
-    // 浅色背景，应使用深色文本
-    UIColor *textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    // 确保文本颜色始终为深色
+    UIColor *textColor = [UIColor colorWithWhite:0.15 alpha:1.0];  // 强制深色
     
     // 获取所有标签并设置颜色
     for (UIView *subview in button.subviews) {
         if ([subview isKindOfClass:[UILabel class]]) {
             UILabel *label = (UILabel *)subview;
-            label.textColor = textColor;
+            label.textColor = textColor;  // 强制设置深色文字
         }
     }
 }
@@ -767,11 +705,9 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             view.alpha = 1;
             view.transform = CGAffineTransformIdentity;
         } completion:^(BOOL finished) {
-            // 确保颜色在动画结束后仍然正确
             for (UIView *subview in view.subviews) {
                 if ([subview isKindOfClass:[UIButton class]]) {
                     UIButton *button = (UIButton *)subview;
-                    // 再次确保所有文本标签颜色正确
                     for (UIView *labelView in button.subviews) {
                         if ([labelView isKindOfClass:[UILabel class]]) {
                             UILabel *label = (UILabel *)labelView;
@@ -985,6 +921,10 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 
 
 @interface AWEPlayInteractionViewController (DYYYAdditions)
+
+- (void)normalizeListViewFonts:(UIScrollView *)scrollView;
+- (void)updateHeaderControlsColorForBackground:(UIColor *)backgroundColor;
+- (void)updateViewIconColors:(UIView *)view withColor:(UIColor *)color;
 
 - (void)applySmartTextColorToAllMenuItems;
 - (void)safelyUpdateUI:(void (^)(void))block;
@@ -1267,7 +1207,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 获取主容器的背景色
     UIView *menuContainer = scrollView.superview;
     UIColor *backgroundColor = [UIColor clearColor];
-    BOOL isDarkMode = YES; // 默认假设深色背景
+    BOOL isDarkMode = NO; // 默认假设浅色背景
     
     if ([menuContainer isKindOfClass:[UIVisualEffectView class]]) {
         UIVisualEffectView *effectView = (UIVisualEffectView *)menuContainer;
@@ -1413,17 +1353,25 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYBlurEffectColor"];
     UIColor *blurColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : nil;
     
-    // 决定毛玻璃效果风格
+    // 决定毛玻璃效果风格和图标颜色
     UIBlurEffectStyle blurStyle = UIBlurEffectStyleLight;
+    
     if (blurColor) {
         CGFloat brightness = 0;
         [blurColor getWhite:&brightness alpha:nil];
         if (brightness < 0.5) {
-            // 深色
+            // 深色背景
             if (@available(iOS 13.0, *)) {
                 blurStyle = UIBlurEffectStyleSystemMaterialDark;
             } else {
                 blurStyle = UIBlurEffectStyleDark;
+            }
+        } else {
+            // 浅色背景
+            if (@available(iOS 13.0, *)) {
+                blurStyle = UIBlurEffectStyleSystemMaterialLight;
+            } else {
+                blurStyle = UIBlurEffectStyleLight;
             }
         }
     } else {
@@ -1477,37 +1425,18 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     CGFloat rightMargin = 20;
     CGFloat spacing = 8; // 按钮间距
     
-    // 创建调整大小按钮（最大化/恢复按钮） - 贴顶部放置
+    // 创建调整大小按钮（最大化/恢复）- 使用彩色图标
     UIButton *resizeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    resizeButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize * 3 - spacing * 2, 5, buttonSize, buttonSize); // 修复位置计算
-    resizeButton.layer.cornerRadius = buttonSize / 2;
+    resizeButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize * 3 - spacing * 2, 5, buttonSize, buttonSize);
     resizeButton.clipsToBounds = YES;
-    
-    // 添加渐变背景
-    CAGradientLayer *resizeGradient = [CAGradientLayer layer];
-    resizeGradient.frame = resizeButton.bounds;
-    resizeGradient.cornerRadius = buttonSize / 2;
-    resizeGradient.colors = @[
-        (id)[UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.9].CGColor,
-        (id)[UIColor colorWithRed:0.4 green:0.7 blue:1 alpha:0.9].CGColor
-    ];
-    resizeGradient.startPoint = CGPointMake(0, 0);
-    resizeGradient.endPoint = CGPointMake(1, 1);
-    [resizeButton.layer insertSublayer:resizeGradient atIndex:0];
+    resizeButton.backgroundColor = [UIColor clearColor];
 
-    // 单独创建图标视图，添加到按钮上方
-    UIImageView *resizeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(4, 4, buttonSize - 8, buttonSize - 8)];
+    // 创建图标视图 - 使用彩色图标而非template模式
+    UIImageView *resizeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
     resizeImageView.contentMode = UIViewContentModeScaleAspectFit;
     UIImage *resizeImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
-    resizeImageView.image = [resizeImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    resizeImageView.tintColor = [UIColor whiteColor];
+    resizeImageView.image = resizeImage; // 不使用renderingMode来保持原始颜色
     [resizeButton addSubview:resizeImageView];
-
-    // 添加阴影
-    resizeButton.layer.shadowColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.4].CGColor;
-    resizeButton.layer.shadowOffset = CGSizeMake(0, 2);
-    resizeButton.layer.shadowRadius = 4;
-    resizeButton.layer.shadowOpacity = 0.8;
 
     // 添加拖拽手势和点击事件
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(resizeMenuPan:)];
@@ -1515,81 +1444,36 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     [resizeButton addTarget:self action:@selector(customMenuButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:resizeButton];
 
-    // 在resizeButton旁边添加颜色选择按钮 - 贴顶部放置
+    // 在resizeButton旁边添加颜色选择按钮 - 使用彩色图标
     UIButton *colorPickerButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    colorPickerButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize * 2 - spacing, 5, buttonSize, buttonSize); // 修复位置计算
-    colorPickerButton.layer.cornerRadius = buttonSize / 2;
+    colorPickerButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize * 2 - spacing, 5, buttonSize, buttonSize);
+    colorPickerButton.backgroundColor = [UIColor clearColor];
     colorPickerButton.clipsToBounds = YES;
 
-    // 根据保存的颜色创建渐变背景
-    CAGradientLayer *toggleGradient = [CAGradientLayer layer];
-    toggleGradient.frame = colorPickerButton.bounds;
-    toggleGradient.cornerRadius = buttonSize / 2;
-    
-    // 使用保存的颜色或默认紫色
-    UIColor *buttonColor = blurColor ? blurColor : [UIColor colorWithRed:0.5 green:0.3 blue:1.0 alpha:0.9];
-    toggleGradient.colors = @[
-        (id)[buttonColor colorWithAlphaComponent:0.9].CGColor,
-        (id)[buttonColor colorWithAlphaComponent:0.7].CGColor
-    ];
-    
-    toggleGradient.startPoint = CGPointMake(0, 0);
-    toggleGradient.endPoint = CGPointMake(1, 1);
-    [colorPickerButton.layer insertSublayer:toggleGradient atIndex:0];
-
-    // 单独创建图标视图，添加到按钮上方
-    UIImageView *toggleImageView = [[UIImageView alloc] initWithFrame:CGRectMake(4, 4, buttonSize - 8, buttonSize - 8)];
+    // 使用彩色图标
+    UIImageView *toggleImageView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
     toggleImageView.contentMode = UIViewContentModeScaleAspectFit;
-    UIImage *toggleImage = [UIImage systemImageNamed:@"paintpalette.fill"];  // 取色器图标
-    toggleImageView.image = [toggleImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    toggleImageView.tintColor = [UIColor whiteColor];
+    UIImage *toggleImage = [UIImage systemImageNamed:@"paintpalette.fill"]; // 取色器图标
+    toggleImageView.image = toggleImage; // 不使用renderingMode来保持原始颜色
     [colorPickerButton addSubview:toggleImageView];
 
-    // 添加阴影
-    colorPickerButton.layer.shadowColor = [buttonColor colorWithAlphaComponent:0.4].CGColor;
-    colorPickerButton.layer.shadowOffset = CGSizeMake(0, 2);
-    colorPickerButton.layer.shadowRadius = 4;
-    colorPickerButton.layer.shadowOpacity = 0.8;
-
-    // 添加点击事件 - 调用颜色选择器
+    // 添加点击事件
     [colorPickerButton addTarget:self action:@selector(showBlurColorPicker:) forControlEvents:UIControlEventTouchUpInside];
-
-    // 设置按钮标签，用于识别
     colorPickerButton.tag = 200;
-
     [headerView addSubview:colorPickerButton];
 
-    // 关闭按钮 - 贴顶部放置
+    // 关闭按钮 - 使用彩色图标
     UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    closeButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize, 5, buttonSize, buttonSize); // 修复位置计算
-    closeButton.layer.cornerRadius = buttonSize / 2;
+    closeButton.frame = CGRectMake(menuWidth - rightMargin - buttonSize, 5, buttonSize, buttonSize);
+    closeButton.backgroundColor = [UIColor clearColor];
     closeButton.clipsToBounds = YES;
 
-    // 添加渐变背景
-    CAGradientLayer *closeGradient = [CAGradientLayer layer];
-    closeGradient.frame = closeButton.bounds;
-    closeGradient.cornerRadius = buttonSize / 2;
-    closeGradient.colors = @[
-        (id)[UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:0.9].CGColor,
-        (id)[UIColor colorWithRed:1.0 green:0.5 blue:0.5 alpha:0.9].CGColor
-    ];
-    closeGradient.startPoint = CGPointMake(0, 0);
-    closeGradient.endPoint = CGPointMake(1, 1);
-    [closeButton.layer insertSublayer:closeGradient atIndex:0];
-
-    // 单独创建图标视图，添加到按钮上方
-    UIImageView *closeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(4, 4, buttonSize - 8, buttonSize - 8)];
+    // 使用彩色图标
+    UIImageView *closeImageView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
     closeImageView.contentMode = UIViewContentModeScaleAspectFit;
     UIImage *closeImage = [UIImage systemImageNamed:@"xmark.circle.fill"];
-    closeImageView.image = [closeImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    closeImageView.tintColor = [UIColor whiteColor];
+    closeImageView.image = closeImage; // 不使用renderingMode来保持原始颜色
     [closeButton addSubview:closeImageView];
-
-    // 添加阴影
-    closeButton.layer.shadowColor = [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:0.4].CGColor;
-    closeButton.layer.shadowOffset = CGSizeMake(0, 2);
-    closeButton.layer.shadowRadius = 4;
-    closeButton.layer.shadowOpacity = 0.8;
 
     [closeButton addTarget:self action:@selector(dismissFluentMenuByButton:) forControlEvents:UIControlEventTouchUpInside];
     [headerView addSubview:closeButton];
@@ -1646,6 +1530,9 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
+    
+    // 添加字体规范化
+    [self normalizeListViewFonts:scrollView];
 
     // 添加手势
     UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissFluentMenu:)];
@@ -1791,12 +1678,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             frame.origin.y = overlayView.bounds.size.height - defaultHeight;
             frame.size.height = defaultHeight + safeBottom;
             
-            // 图标为向上箭头
-            if (resizeImageView) {
-                UIImage *expandImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
-                resizeImageView.image = [expandImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            }
-            
             // 启动自动隐藏计时器
             [self setupHeaderAutoHideTimer];
         } else {
@@ -1804,16 +1685,24 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             frame.origin.y = overlayView.bounds.size.height - maxHeight;
             frame.size.height = maxHeight + safeBottom;
             
-            // 图标为向下箭头
-            if (resizeImageView) {
-                UIImage *collapseImage = [UIImage systemImageNamed:@"arrow.down.circle.fill"];
-                resizeImageView.image = [collapseImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            }
-            
             // 最大化时取消自动隐藏，确保控件保持可见
             [self invalidateHeaderAutoHideTimer];
             [self showHeaderControlsWithAnimation];
         }
+        
+        // 图标变更 - 使用彩色图标
+        if (resizeImageView) {
+            UIImage *newImage;
+            if (isMaximized) {
+                // 恢复到默认大小 - 使用向上下箭头图标
+                newImage = [UIImage systemImageNamed:@"arrow.up.and.down.circle.fill"];
+            } else {
+                // 最大化 - 使用向下箭头图标
+                newImage = [UIImage systemImageNamed:@"arrow.down.circle.fill"];
+            }
+            resizeImageView.image = newImage; // 直接使用彩色图标
+        }
+        
         menuContainer.frame = frame;
         contentPanel.frame = menuContainer.bounds;
         
@@ -2175,6 +2064,9 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                                     completion:^(BOOL finished) {
                                         // 背景颜色变化后立即重新应用智能文本颜色
                                         [self applySmartTextColorToAllMenuItems];
+                                        
+                                        // 立即更新所有头部控件颜色
+                                        [self updateHeaderControlsColorForBackground:color];
                                     }];
                     
                     // 立即更新颜色选择按钮
@@ -2189,6 +2081,97 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 }
 
 %new
+- (void)updateHeaderControlsColorForBackground:(UIColor *)backgroundColor {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    if (!topVC) return;
+    
+    // 计算背景亮度决定图标颜色
+    CGFloat brightness = 0;
+    [backgroundColor getWhite:&brightness alpha:nil];
+    
+    // 如果无法用getWhite获取亮度，尝试用RGB计算
+    if (brightness == 0) {
+        CGFloat r, g, b, a;
+        if ([backgroundColor getRed:&r green:&g blue:&b alpha:&a]) {
+            brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+    }
+    
+    // 根据背景亮度选择图标颜色
+    UIColor *iconColor;
+    if (brightness > 0.7) {
+        // 浅色背景用深色图标
+        iconColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    } else if (brightness < 0.3) {
+        // 深色背景用浅色图标
+        iconColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+    } else {
+        // 中等亮度背景用对比度较高的颜色
+        iconColor = brightness > 0.5 ? [UIColor colorWithWhite:0.15 alpha:1.0] : [UIColor colorWithWhite:0.85 alpha:1.0];
+    }
+    
+    // 查找并更新所有头部控件
+    for (UIView *view in topVC.view.subviews) {
+        if (view.tag == 9527) {
+            for (UIView *subview in view.subviews) {
+                if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+                    UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
+                    for (UIView *contentView in blurView.contentView.subviews) {
+                        if (contentView.tag == 60) { // 头部视图tag
+                            [self updateViewIconColors:contentView withColor:iconColor];
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+    }
+}
+
+%new
+- (void)updateViewIconColors:(UIView *)view withColor:(UIColor *)color {
+    for (UIView *subview in view.subviews) {
+        if ([subview isKindOfClass:[UIButton class]]) {
+            UIButton *button = (UIButton *)subview;
+            
+            // 只更新按钮中明确使用模板模式的图标
+            for (UIView *buttonSubview in button.subviews) {
+                if ([buttonSubview isKindOfClass:[UIImageView class]]) {
+                    UIImageView *imageView = (UIImageView *)buttonSubview;
+                    // 检查图标是否使用了模板模式
+                    if (imageView.image && imageView.image.renderingMode == UIImageRenderingModeAlwaysTemplate) {
+                        imageView.tintColor = color;
+                    }
+                    // 不处理其他渲染模式的图像，保留其原始颜色
+                }
+            }
+            
+            // 只处理模板模式的按钮图片
+            if (button.currentImage && button.currentImage.renderingMode == UIImageRenderingModeAlwaysTemplate) {
+                button.tintColor = color;
+            }
+            
+            // 更新按钮文字颜色（如菜单按钮）
+            [button setTitleColor:color forState:UIControlStateNormal];
+        } else if ([subview isKindOfClass:[UISegmentedControl class]]) {
+            UISegmentedControl *segmentControl = (UISegmentedControl *)subview;
+            
+            // 更新段控制器的文字颜色
+            if (@available(iOS 13.0, *)) {
+                [segmentControl setTitleTextAttributes:@{NSForegroundColorAttributeName: color} forState:UIControlStateNormal];
+            } else {
+                segmentControl.tintColor = color;
+            }
+        }
+        
+        // 递归处理子视图
+        [self updateViewIconColors:subview withColor:color];
+    }
+}
+
+%new
 - (void)updateColorPickerButtonWithColor:(UIColor *)color {
     UIViewController *topVC = [DYYYManager getActiveTopController];
     for (UIView *view in topVC.view.subviews) {
@@ -2197,47 +2180,59 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                 // 找到按钮容器
                 if ([subview isKindOfClass:[UIVisualEffectView class]]) {
                     UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
-                    for (UIView *contentSubview in blurView.contentView.subviews) {
-                        if (contentSubview.tag == 60) { // headerView
-                            for (UIView *headerSubview in contentSubview.subviews) {
+                    for (UIView *contentView in blurView.contentView.subviews) {
+                        if (contentView.tag == 60) {
+                            for (UIView *headerSubview in contentView.subviews) {
                                 if ([headerSubview isKindOfClass:[UIButton class]] && headerSubview.tag == 200) { // 颜色选择按钮
                                     UIButton *colorButton = (UIButton *)headerSubview;
                                     
-                                    // 更新按钮图标颜色
-                                    for (UIView *btnSubview in colorButton.subviews) {
-                                        if ([btnSubview isKindOfClass:[UIImageView class]]) {
-                                            UIImageView *imageView = (UIImageView *)btnSubview;
-                                            imageView.tintColor = [UIColor whiteColor]; // 确保图标保持白色清晰可见
+                                    // 计算背景亮度
+                                    CGFloat brightness = 0;
+                                    [color getWhite:&brightness alpha:nil];
+                                    
+                                    // 如果无法用getWhite获取亮度，尝试用RGB计算
+                                    if (brightness == 0) {
+                                        CGFloat r, g, b, a;
+                                        if ([color getRed:&r green:&g blue:&b alpha:&a]) {
+                                            brightness = 0.299 * r + 0.587 * g + 0.114 * b;
                                         }
                                     }
                                     
-                                    // 更新渐变背景
-                                    for (CALayer *layer in colorButton.layer.sublayers) {
-                                        if ([layer isKindOfClass:[CAGradientLayer class]]) {
-                                            CAGradientLayer *gradientLayer = (CAGradientLayer *)layer;
+                                    // 更新按钮图标颜色 - 根据背景色亮度自动调整
+                                    for (UIView *btnSubview in colorButton.subviews) {
+                                        if ([btnSubview isKindOfClass:[UIImageView class]]) {
+                                            UIImageView *imageView = (UIImageView *)btnSubview;
                                             
-                                            // 动画过渡到新颜色
-                                            CABasicAnimation *colorAnimation = [CABasicAnimation animationWithKeyPath:@"colors"];
-                                            colorAnimation.fromValue = gradientLayer.colors;
-                                            colorAnimation.toValue = @[
-                                                (id)[color colorWithAlphaComponent:0.9].CGColor,
-                                                (id)[color colorWithAlphaComponent:0.7].CGColor
-                                            ];
-                                            colorAnimation.duration = 0.3;
-                                            colorAnimation.removedOnCompletion = YES;
-                                            colorAnimation.fillMode = kCAFillModeForwards;
-                                            [gradientLayer addAnimation:colorAnimation forKey:@"colorAnimation"];
-                                            
-                                            // 更新实际颜色值
-                                            gradientLayer.colors = @[
-                                                (id)[color colorWithAlphaComponent:0.9].CGColor,
-                                                (id)[color colorWithAlphaComponent:0.7].CGColor
-                                            ];
-                                            
-                                            // 更新阴影颜色
-                                            colorButton.layer.shadowColor = [color colorWithAlphaComponent:0.4].CGColor;
+                                            // 根据背景色亮度选择对比色
+                                            if (brightness > 0.7) {
+                                                // 浅色背景用深色图标
+                                                imageView.tintColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+                                            } else if (brightness < 0.3) {
+                                                // 深色背景用浅色图标
+                                                imageView.tintColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+                                            } else {
+                                                // 中等亮度背景用对比度较高的颜色
+                                                imageView.tintColor = brightness > 0.5 ? 
+                                                    [UIColor colorWithWhite:0.15 alpha:1.0] : 
+                                                    [UIColor colorWithWhite:0.85 alpha:1.0];
+                                            }
                                         }
                                     }
+                                    
+                                    // 移除原有的渐变背景，改为简单的颜色指示器
+                                    for (CALayer *layer in [colorButton.layer.sublayers copy]) {
+                                        if ([layer isKindOfClass:[CAGradientLayer class]]) {
+                                            [layer removeFromSuperlayer];
+                                        }
+                                    }
+                                    
+                                    // 添加颜色指示器 - 在按钮下方添加一个小色条
+                                    CALayer *colorIndicator = [CALayer layer];
+                                    colorIndicator.frame = CGRectMake(2, colorButton.bounds.size.height - 4, colorButton.bounds.size.width - 4, 2);
+                                    colorIndicator.backgroundColor = color.CGColor;
+                                    colorIndicator.cornerRadius = 1;
+                                    [colorButton.layer addSublayer:colorIndicator];
+                                    
                                     break;
                                 }
                             }
@@ -2332,6 +2327,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     // 重建菜单
     [self recreateMenuButtonsForViewMode:isListView];
+    
+    // 查找滚动视图
+    UIScrollView *scrollView = [self findScrollViewInTopViewController:[DYYYManager getActiveTopController]];
+    if (scrollView) {
+        // 添加字体规范化处理
+        [self normalizeListViewFonts:scrollView];
+    }
     
     // 添加智能文字颜色更新
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -5890,25 +5892,15 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
     
+    // 字体规范化处理
+    [self normalizeListViewFonts:scrollView];
+    
     // 触感反馈
     if (@available(iOS 10.0, *)) {
         UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
         [generator prepare];
         [generator impactOccurred];
     }
-    
-    // 显示提示
-    NSString *styleName;
-    switch (style) {
-        case DYYYMenuVisualStyleClassic:
-            styleName = @"原本视图";
-            break;
-        case DYYYMenuVisualStyleNeuomorphic:
-            styleName = @"新UI";
-            break;
-    }
-    
-    [DYYYManager showToast:[NSString stringWithFormat:@"已切换至%@", styleName]];
     
     // 重置自动隐藏计时器
     [self resetHeaderControlVisibility];
@@ -6190,6 +6182,65 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                                                                                                    modules:@[module]];
     tempBuilder.delegate = self;
     return [tempBuilder createNeuomorphicListItemForModule:module atIndex:index];
+}
+
+%new
+- (void)normalizeListViewFonts:(UIScrollView *)scrollView {
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 获取菜单背景视图以判断深浅色模式
+    UIView *menuContainer = scrollView.superview;
+    BOOL isDarkMode = NO;
+    
+    if ([menuContainer isKindOfClass:[UIVisualEffectView class]]) {
+        UIVisualEffectView *effectView = (UIVisualEffectView *)menuContainer;
+        UIBlurEffectStyle style = [self inferVisualEffectStyle:effectView.effect];
+        isDarkMode = (style == UIBlurEffectStyleDark);
+        
+        // 检查自定义背景色
+        for (UIView *subview in effectView.contentView.subviews) {
+            if (subview.tag == 8888) {
+                CGFloat r = 0, g = 0, b = 0, a = 0;
+                [subview.backgroundColor getRed:&r green:&g blue:&b alpha:&a];
+                CGFloat luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                isDarkMode = (luminance < 0.5);
+                break;
+            }
+        }
+    }
+    
+    // 根据深浅背景选择合适的文字颜色
+    UIColor *textColor = isDarkMode ? [UIColor whiteColor] : [UIColor blackColor];
+    
+    // 检查是否为列表模式，列表模式优先使用黑色
+    BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
+    if (isListView && !isDarkMode) {
+        textColor = [UIColor blackColor]; // 列表模式默认使用黑色
+    }
+    
+    UIFont *titleFont = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    
+    for (UIView *moduleView in moduleViews) {
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[UIButton class]]) {
+                UIButton *button = (UIButton *)subview;
+                
+                // 统一设置所有按钮内标签的字体
+                for (UIView *buttonSubview in button.subviews) {
+                    if ([buttonSubview isKindOfClass:[UILabel class]]) {
+                        UILabel *label = (UILabel *)buttonSubview;
+                        
+                        // 确保主标签字体一致
+                        if (label.frame.origin.x > 50 && label.frame.size.width > 100) {  // 这是标题标签
+                            label.font = titleFont;
+                            label.textColor = textColor; // 应用正确的文本颜色
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 %end
