@@ -745,6 +745,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEInnerNotificationWindow : UIWindow
 - (void)setupBlurEffectForNotificationView;
 - (void)applyBlurEffectToView:(UIView *)containerView;
+- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView;
+- (void)clearBackgroundRecursivelyInView:(UIView *)view exceptClass:(Class)exceptClass;
+- (void)adjustTextColorInView:(UIView *)view darkMode:(BOOL)isDarkMode;
 - (void)setLabelsColorWhiteInView:(UIView *)view;
 - (void)clearBackgroundRecursivelyInView:(UIView *)view;
 @end
@@ -1078,4 +1081,17 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface AWETabViewController : UIViewController
 @property (nonatomic, assign) BOOL isIncognitoModeActive;
+@end
+
+// 添加缺失的类声明
+@interface AWECommentInputViewSwiftImpl_CommentInputContainerView : UIView
+@end
+
+@interface AWECommentInputViewSwiftImpl_CommentInputBackgroundView : UIView
+@end
+
+@interface AWETextViewContainer : UIView
+@end
+
+@interface AWECommentInputViewSwiftImpl_CommentInputBar : UIView
 @end
