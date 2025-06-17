@@ -1,3 +1,6 @@
+![Preview](./x/xx.png)
+![Preview](./x/xxx.png)
+
 <table>
 <tr>
 <td>
@@ -80,23 +83,6 @@ Theos 中的命令以 Makefile 目标的形式实现，通过 `make <命令>` �
 | `make uninstall`             | 如果当前项目的包已安装，则在位于 `$THEOS_DEVICE_IP:$THEOS_DEVICE_PORT` 的设备上卸载该包。如果未设置 `$THEOS_DEVICE_IP`，则尝试本地卸载。 |
 
 最常用的可能是 `make xxxxxxx`，它会构建最新更改、暂存、打包并安装到配置的设备上。这是 `make package install` 的快捷方式。
-
-#### 实用命令
-| **命令**                     | **描述**                                                                 |
-|------------------------------|-------------------------------------------------------------------------|
-| `make clean package`         | 清理构建目录并重新构建项目。如果更新了头文件但未修改源文件，可能需要使用 `clean` 命令以在构建中反映更新。 |
-| `make package FINALPACKAGE=1` | 优化资源，将 plist 转换为二进制格式，并生成不含构建编号的“干净”版本包。建议在发布包时使用。 |
-| `make package FINALPACKAGE=1 STRIP=0` | 构建发布包，但不剥离符号。                                              |
-
-#### 其他命令
-| **命令**                     | **描述**                                                                 |
-|------------------------------|-------------------------------------------------------------------------|
-| `make all`                   | 与运行 `make` 相同。                                                     |
-| `make messages=yes`          | 启用构建的详细输出。在寻求帮助时提供此输出很有用。                         |
-| `make update-theos`          | 将 Theos 更新到最新提交。详见安装文档。                                   |
-| `make troubleshoot`          | 提供故障排除信息的快速链接，并将 make 输出上传到 GitHub Gist 以便分享。详见帮助文档。 |
-| `make clean-packages`        | 从 `$THEOS_PACKAGE_DIR` 中删除所有包。                                    |
-| `make show`                  | 在系统文件管理器中打开存放包的目录。                                      |
 
 
 
