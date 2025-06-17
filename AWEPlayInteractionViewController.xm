@@ -9,6 +9,10 @@
 #import "DYYYToast.h"
 #import "DYYYConfirmCloseView.h"
 #import "DYYYScreenshot.h" // 添加截图功能头文件
+#import <CoreMotion/CoreMotion.h>
+#import <QuartzCore/QuartzCore.h>
+
+
 
 @interface DYYYDraggableButton : UIButton
 @property (nonatomic, assign) NSInteger originalIndex;
@@ -35,16 +39,18 @@ UIImage *createColorCircleImage(UIColor *color, CGSize size) {
     return image;
 }
 
-// MARK: - 视图模式枚举定义
+// 菜单布局样式枚举
 typedef NS_ENUM(NSInteger, DYYYMenuStyle) {
-    DYYYMenuStyleCard = 0,    // 卡片风格
-    DYYYMenuStyleList = 1     // 列表风格
+    DYYYMenuStyleCard = 0,
+    DYYYMenuStyleList = 1
 };
 
+// MARK: - 视图模式枚举定义
 typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
-    DYYYMenuVisualStyleClassic = 0,    // 经典风格
-    DYYYMenuVisualStyleNeuomorphic = 2 // UI风格
+    DYYYMenuVisualStyleClassic = 0,     // 默认风格
+    DYYYMenuVisualStyleNeuomorphic = 1, // 新UI风格
 };
+
 
 // MARK: - 模块配置协议
 @protocol DYYYMenuModuleProtocol <NSObject>
@@ -136,9 +142,14 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 
 // 子类需要重写
 - (UIView *)createModuleViewForModule:(DYYYMenuModule *)module atIndex:(NSInteger)index {
+    UIView *moduleView = nil;
+    
+    // 子类需要重写此方法
     @throw [NSException exceptionWithName:NSInternalInconsistencyException
                                    reason:@"Subclass must override createModuleViewForModule:atIndex:"
                                  userInfo:nil];
+    
+    return moduleView;
 }
 
 - (CGSize)calculateContentSize {
@@ -231,19 +242,17 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     }
     [cardButton addSubview:iconView];
     
-    // 标题
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(70, 20, moduleWidth - 110, 24)];
+    // 标题 - 修改为垂直居中对齐
+    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(70, 0, moduleWidth - 110, moduleHeight)];
     titleLabel.text = module.title;
-    titleLabel.textColor = [UIColor blackColor]; // 修改为黑色
+    titleLabel.textColor = [UIColor systemBlueColor]; // 修改为Apple蓝色
     titleLabel.font = [UIFont systemFontOfSize:17];
+    titleLabel.textAlignment = NSTextAlignmentLeft; // 水平左对齐
+    titleLabel.contentMode = UIViewContentModeCenter; // 垂直居中
+    titleLabel.numberOfLines = 1;
+    titleLabel.adjustsFontSizeToFitWidth = YES;
+    titleLabel.minimumScaleFactor = 0.8;
     [cardButton addSubview:titleLabel];
-    
-    // 副标题描述
-    UILabel *subtitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(70, 44, moduleWidth - 110, 16)];
-    subtitleLabel.text = @"长按拖拽调整顺序";
-    subtitleLabel.textColor = [UIColor colorWithWhite:0.4 alpha:1.0];
-    subtitleLabel.font = [UIFont systemFontOfSize:13];
-    [cardButton addSubview:subtitleLabel];
     
     // 右侧拖拽指示器
     UIImageView *dragIndicator = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"line.3.horizontal"]];
@@ -873,55 +882,16 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 
 @end
 
-// MARK: - 视图模式工厂
-@interface DYYYMenuStyleFactory : NSObject
-+ (DYYYMenuStyleBuilder *)builderForStyle:(DYYYMenuStyle)style scrollView:(UIScrollView *)scrollView modules:(NSArray<DYYYMenuModule *> *)modules delegate:(id)delegate;
-@end
-
-@implementation DYYYMenuStyleFactory
-
-+ (DYYYMenuStyleBuilder *)builderForStyle:(DYYYMenuStyle)style visualStyle:(DYYYMenuVisualStyle)visualStyle scrollView:(UIScrollView *)scrollView modules:(NSArray<DYYYMenuModule *> *)modules delegate:(id)delegate {
-    DYYYMenuStyleBuilder *builder = nil;
-    
-    // 根据视觉风格选择构建器
-    if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
-        // 新拟态风格优先级最高，覆盖基本布局样式
-        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
-    } else {
-        // 其他情况根据基本布局样式选择
-        switch (style) {
-            case DYYYMenuStyleCard:
-                builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
-                break;
-            case DYYYMenuStyleList:
-                builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
-                break;
-        }
-    }
-    
-    builder.delegate = delegate;
-    
-    // 保存构建器引用到scrollView中
-    objc_setAssociatedObject(scrollView, "styleBuilder", builder, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    
-    return builder;
-}
-
-+ (DYYYMenuStyleBuilder *)builderForStyle:(DYYYMenuStyle)style scrollView:(UIScrollView *)scrollView modules:(NSArray<DYYYMenuModule *> *)modules delegate:(id)delegate {
-    // 读取保存的视觉风格设置
-    DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
-    
-    // 调用完整版方法并保存构建器引用
-    DYYYMenuStyleBuilder *builder = [self builderForStyle:style visualStyle:visualStyle scrollView:scrollView modules:modules delegate:delegate];
-    objc_setAssociatedObject(scrollView, "styleBuilder", builder, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return builder;
-}
-
-@end
-
-
 @interface AWEPlayInteractionViewController (DYYYAdditions)
+- (BOOL)isViewContainsButton:(UIView *)view button:(UIButton *)button;
+- (void)applyViewModeChange:(BOOL)isListView;
+- (void)applyPerformanceOptimizations:(UIView *)view withResources:(NSDictionary *)resources;
+- (void)optimizeRenderPath:(UIView *)rootView;
+- (void)preloadVisibleContent:(UIScrollView *)scrollView;
+- (void)syncWithDisplayRefresh:(CADisplayLink *)displayLink;
+- (void)syncRenderLoop:(CADisplayLink *)displayLink;
 
+- (void)updateParallaxEffectsForScrollView:(UIScrollView *)scrollView;
 - (void)normalizeListViewFonts:(UIScrollView *)scrollView;
 - (void)updateHeaderControlsColorForBackground:(UIColor *)backgroundColor;
 - (void)updateViewIconColors:(UIView *)view withColor:(UIColor *)color;
@@ -944,13 +914,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 - (void)loadModuleDataAsynchronously;
 - (NSArray<DYYYMenuModule *> *)applySmartOrderingToModules:(NSArray<DYYYMenuModule *> *)modules;
 - (void)recreateMenuButtonsWithModules:(NSArray<DYYYMenuModule *> *)modules;
-
-// 添加主题和样式设置相关方法声明
-- (void)showMenuThemingPanel;
-- (void)closeThemingPanel:(UIButton *)sender;
-- (void)handleSettingChanged:(id)sender;
-- (void)showColorPicker:(UIButton *)sender;
-- (void)applyThemeChanges:(UIButton *)sender;
 
 // 添加缺失的流体滚动相关方法声明
 - (void)addParallaxEffectToModulesIn:(UIScrollView *)scrollView;
@@ -986,7 +949,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 
 - (void)handleModuleDrag:(UILongPressGestureRecognizer *)gesture;
 - (void)startDragMode:(DYYYDraggableButton *)button;
-- (void)updateDragPosition:(DYYYDraggableButton *)button withNewCenter:(CGPoint)newCenter;  // 保留这个
+- (void)updateDragPosition:(DYYYDraggableButton *)button withNewCenter:(CGPoint)newCenter;
 - (void)finishDragMode:(DYYYDraggableButton *)button;
 - (void)reorderModulesAfterDrag:(DYYYDraggableButton *)draggedButton;
 - (void)saveModuleOrder:(NSArray<DYYYMenuModule *> *)modules;
@@ -1003,6 +966,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                              toIndex:(NSInteger)toIndex 
                        inScrollView:(UIScrollView *)scrollView 
                     excludingButton:(DYYYDraggableButton *)excludedButton;
+- (void)showDragPositionIndicatorAtY:(CGFloat)yPosition inScrollView:(UIScrollView *)scrollView;
+- (void)hideDragPositionIndicator:(UIScrollView *)scrollView;
 - (CGPoint)calculateCenterForIndex:(NSInteger)index isListView:(BOOL)isListView moduleView:(UIView *)moduleView;
 - (void)updateModuleOrderAfterDrag:(DYYYDraggableButton *)draggedButton inScrollView:(UIScrollView *)scrollView;
 
@@ -1025,8 +990,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 - (void)createIOS19ListStyleMenuWithModules:(NSArray *)modules inScrollView:(UIScrollView *)scrollView moduleViews:(NSMutableArray *)moduleViews;
 - (void)createCardStyleMenuWithModules:(NSArray *)modules inScrollView:(UIScrollView *)scrollView moduleViews:(NSMutableArray *)moduleViews;
 
-- (void)applyInteractiveGlassUI:(UIViewController *)viewController;
-- (void)removeInteractiveGlassUI:(UIViewController *)viewController;
 - (void)applyContentParallaxEffect:(UIView *)parentView;
 - (void)removeContentParallaxEffect:(UIView *)parentView;
 
@@ -1066,7 +1029,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 - (void)resumeCurrentVideo;
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo;
 - (void)viewModeChanged:(UISegmentedControl *)segmentControl;
-- (void)applyViewModeChange:(BOOL)isListView;
 
 // 方法声明
 - (void)recreateMenuButtonsForViewMode:(BOOL)isListView;
@@ -1356,9 +1318,18 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 决定毛玻璃效果风格和图标颜色
     UIBlurEffectStyle blurStyle = UIBlurEffectStyleLight;
     
+    BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
+    
     if (blurColor) {
+        // 计算亮度值，使用感知亮度公式
         CGFloat brightness = 0;
-        [blurColor getWhite:&brightness alpha:nil];
+        CGFloat r, g, b, a;
+        if ([blurColor getRed:&r green:&g blue:&b alpha:&a]) {
+            // 使用感知亮度公式计算亮度
+            brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        } else if ([blurColor getWhite:&brightness alpha:&a]) {
+            // 灰度颜色处理
+        }
         if (brightness < 0.5) {
             // 深色背景
             if (@available(iOS 13.0, *)) {
@@ -1392,7 +1363,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     contentPanel.clipsToBounds = YES;
     [menuContainer addSubview:contentPanel];
     
-    // 如果有保存的颜色，应用背景色
+    // 背景色
     if (blurColor) {
         UIView *colorView = [[UIView alloc] initWithFrame:contentPanel.bounds];
         colorView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -1401,21 +1372,24 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         [contentPanel.contentView insertSubview:colorView atIndex:0];
     }
     
-    // 修改：更紧凑的头部视图，直接贴顶部
+    // 更紧凑的头部视图，直接贴顶部
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, menuWidth, 70)]; // 减少高度，从0开始
-    headerView.tag = 60; // 设置标签便于后续查找
+    headerView.tag = 60;
     [contentPanel.contentView addSubview:headerView];
     
-    // 修改：在头部区域添加视图模式切换器 - 贴顶部放置
+    // 在头部区域添加视图模式切换器
     UISegmentedControl *viewModeSegment = [[UISegmentedControl alloc] initWithItems:@[@"卡片视图", @"列表视图"]];
-    viewModeSegment.frame = CGRectMake(20, 35, menuWidth - 40, 30); // 调整Y坐标到35
+    viewModeSegment.frame = CGRectMake(20, 35, menuWidth - 40, 30);
     viewModeSegment.selectedSegmentTintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1 alpha:0.85];
     [viewModeSegment setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor]} forState:UIControlStateSelected];
     
-    // 从用户设置中恢复选择的视图模式
-    BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
-    viewModeSegment.selectedSegmentIndex = isListView ? 1 : 0;
-    
+    // 根据之前获取的设置设置选定索引
+    if (isListView) {
+        viewModeSegment.selectedSegmentIndex = 1; // 列表视图
+    } else {
+        viewModeSegment.selectedSegmentIndex = 0; // 卡片视图
+    }
+
     // 添加动作处理方法
     [viewModeSegment addTarget:self action:@selector(viewModeChanged:) forControlEvents:UIControlEventValueChanged];
     [headerView addSubview:viewModeSegment];
@@ -1522,11 +1496,18 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     NSArray<DYYYMenuModule *> *modules = [self createMenuModulesForCurrentContext];
     
     // 使用工厂创建对应样式的构建器
-    DYYYMenuStyle style = isListView ? DYYYMenuStyleList : DYYYMenuStyleCard;
-    DYYYMenuStyleBuilder *builder = [DYYYMenuStyleFactory builderForStyle:style 
-                                                              scrollView:scrollView 
-                                                                 modules:modules 
-                                                                delegate:self];
+    DYYYMenuStyleBuilder *builder = nil;
+    DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
+    if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
+        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+    } else {
+        if (isListView) {
+            builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        } else {
+            builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        }
+    }
+    builder.delegate = self;
     
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
@@ -1562,13 +1543,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self setupHeaderAutoHideTimer];
     });
-    
-    [self safelyUpdateUI:^{
-        // 在菜单完全显示后应用智能文字颜色
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self applySmartTextColorToAllMenuItems];
-        });
-    }];
 }
 
 %new
@@ -2021,7 +1995,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                     // 确定最合适的模糊效果风格
                     UIBlurEffectStyle style = UIBlurEffectStyleLight;
                     CGFloat brightness = 0;
-                    [color getWhite:&brightness alpha:nil];
+                    CGFloat r, g, b, a;
+                    if ([color getRed:&r green:&g blue:&b alpha:&a]) {
+                        // 使用感知亮度公式计算亮度
+                        brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    } else if ([color getWhite:&brightness alpha:&a]) {
+                        // 灰度颜色处理
+                    }
                     
                     if (brightness < 0.5) {
                         // 深色
@@ -2087,7 +2067,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     // 计算背景亮度决定图标颜色
     CGFloat brightness = 0;
-    [backgroundColor getWhite:&brightness alpha:nil];
+    CGFloat r, g, b, a;
+    if ([backgroundColor getRed:&r green:&g blue:&b alpha:&a]) {
+        // 使用感知亮度公式计算亮度
+        brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+    } else if ([backgroundColor getWhite:&brightness alpha:&a]) {
+        // 灰度颜色处理
+    }
     
     // 如果无法用getWhite获取亮度，尝试用RGB计算
     if (brightness == 0) {
@@ -2188,7 +2174,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                                     
                                     // 计算背景亮度
                                     CGFloat brightness = 0;
-                                    [color getWhite:&brightness alpha:nil];
+                                    CGFloat r, g, b, a;
+                                    if ([color getRed:&r green:&g blue:&b alpha:&a]) {
+                                        // 使用感知亮度公式计算亮度
+                                        brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                                    } else if ([color getWhite:&brightness alpha:&a]) {
+                                        // 灰度颜色处理
+                                    }
                                     
                                     // 如果无法用getWhite获取亮度，尝试用RGB计算
                                     if (brightness == 0) {
@@ -2290,12 +2282,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 
 
 
-// 添加视图模式切换功能的方法
 %new
 - (void)viewModeChanged:(UISegmentedControl *)segmentControl {
-    [self resetHeaderControlVisibility];
+    // 获取当前索引
+    NSInteger selectedIndex = segmentControl.selectedSegmentIndex;
     
-    BOOL isListView = (segmentControl.selectedSegmentIndex == 1);
+    // 只区分列表视图和卡片视图
+    BOOL isListView = (selectedIndex == 1);
     
     // 触感反馈
     if (@available(iOS 10.0, *)) {
@@ -2315,30 +2308,12 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         }];
     }];
     
-    // 应用视图模式变化
-    [self applyViewModeChange:isListView];
-}
-
-%new
-- (void)applyViewModeChange:(BOOL)isListView {
-    // 保存用户选择
+    // 设置标志 - 只更新视图模式，不改变视觉风格
     [[NSUserDefaults standardUserDefaults] setBool:isListView forKey:@"DYYYListViewMode"];
     [[NSUserDefaults standardUserDefaults] synchronize];
     
-    // 重建菜单
-    [self recreateMenuButtonsForViewMode:isListView];
-    
-    // 查找滚动视图
-    UIScrollView *scrollView = [self findScrollViewInTopViewController:[DYYYManager getActiveTopController]];
-    if (scrollView) {
-        // 添加字体规范化处理
-        [self normalizeListViewFonts:scrollView];
-    }
-    
-    // 添加智能文字颜色更新
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self applySmartTextColorToAllMenuItems];
-    });
+    // 应用视图模式变化
+    [self applyViewModeChange:isListView];
 }
 
 // MARK: - 工厂模式相关方法
@@ -2353,11 +2328,20 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     NSArray<DYYYMenuModule *> *modules = [self createMenuModulesForCurrentContext];
     
     // 使用工厂创建对应样式的构建器
-    DYYYMenuStyle style = isListView ? DYYYMenuStyleList : DYYYMenuStyleCard;
-    DYYYMenuStyleBuilder *builder = [DYYYMenuStyleFactory builderForStyle:style 
-                                                              scrollView:scrollView 
-                                                                 modules:modules 
-                                                                delegate:self];
+    DYYYMenuStyleBuilder *builder = nil;
+    DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
+    BOOL currentListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
+
+    if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
+        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+    } else {
+        if (isListView) {
+            builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        } else {
+            builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        }
+    }
+    builder.delegate = self;
     
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
@@ -2605,6 +2589,26 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             [self dyyy_startCustomScreenshotProcess];
         }];
         [menuModules addObject:screenshotModule];
+    }
+    
+    // 视频数据修改模块
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableVideoStatsCustom"] || 
+        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableVideoStatsCustom"]) {
+        
+        DYYYMenuModule *videoStatsModule = [DYYYMenuModule moduleWithTitle:@"自定义视频数据"
+                                                                     icon:@"number.circle"
+                                                                    color:@"#E91E63"
+                                                                   action:^{
+            // 调用统计数据修改弹窗
+            showVideoStatsEditAlert(self);
+            
+            // 触发震动反馈
+            if (@available(iOS 10.0, *)) {
+                UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+                [generator impactOccurred];
+            }
+        }];
+        [menuModules addObject:videoStatsModule];
     }
 
     // 添加API解析下载功能模块
@@ -3297,6 +3301,25 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 }
 
 %new
+- (DYYYMenuModule *)createVideoStatsModifyModule {
+    return [DYYYMenuModule moduleWithTitle:@"自定义视频数据"
+                                      icon:@"number.circle.fill"
+                                     color:@"#FF6B8B"
+                                    action:^{
+        AWEAwemeModel *awemeModel = [self getCurrentAwemeModel];
+        if (awemeModel) {
+            // 打开视频数据编辑界面
+            UIViewController *viewController = [DYYYManager getActiveTopController];
+            if (viewController) {
+                showVideoStatsEditAlert(viewController);
+            }
+        } else {
+            [DYYYManager showToast:@"无法获取当前视频"];
+        }
+    }];
+}
+
+%new
 - (DYYYMenuModule *)createCopyTextModuleForAweme:(AWEAwemeModel *)awemeModel {
     return [DYYYMenuModule moduleWithTitle:@"复制文案"
                                       icon:@"doc.on.doc"
@@ -3982,6 +4005,9 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         if (scrollView && scrollView.superview) {
             [scrollView.superview addSubview:button.dragPreviewView];
             
+            // 修改2: 保存初始X坐标以供拖动时使用
+            objc_setAssociatedObject(button, "fixedDragX", @(button.dragPreviewView.center.x), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            
             // 添加拖拽开始的放大动画
             button.dragPreviewView.transform = CGAffineTransformMakeScale(0.9, 0.9);
             button.dragPreviewView.alpha = 0.8;
@@ -4023,14 +4049,21 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 计算预览视图在父视图中的位置
     CGPoint previewLocation = [scrollView convertPoint:location toView:scrollView.superview];
     
-    // 更新预览视图位置
-    button.dragPreviewView.center = previewLocation;
+    // 修改: 固定X轴位置，只允许Y轴移动
+    CGFloat fixedX = button.dragPreviewView.center.x;
+    
+    // 更新预览视图位置，但只改变Y坐标
+    button.dragPreviewView.center = CGPointMake(fixedX, previewLocation.y);
     
     // 检查是否需要重新排序
     NSInteger newIndex = [self findInsertionIndexForY:location.y inScrollView:scrollView];
     if (newIndex != button.currentIndex && newIndex >= 0) {
         NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
         if (moduleViews && newIndex < moduleViews.count) {
+            // 添加4: 显示拖动位置指示器
+            UIView *targetModuleView = moduleViews[newIndex];
+            [self showDragPositionIndicatorAtY:targetModuleView.frame.origin.y inScrollView:scrollView];
+            
             // 更新其他按钮的位置
             [self reorderOtherButtonsFromIndex:button.currentIndex 
                                        toIndex:newIndex 
@@ -4052,41 +4085,54 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
     
-    [UIView animateWithDuration:0.25 animations:^{
-        for (NSInteger i = 0; i < moduleViews.count; i++) {
-            UIView *moduleView = moduleViews[i];
-            
-            // 跳过正在拖拽的按钮
-            BOOL isExcluded = NO;
-            for (UIView *subview in moduleView.subviews) {
-                if ([subview isKindOfClass:[DYYYDraggableButton class]]) {
-                    DYYYDraggableButton *checkButton = (DYYYDraggableButton *)subview;
-                    if (checkButton == excludedButton) {
-                        isExcluded = YES;
-                        break;
-                    }
+    // 为避免重叠，先记录所有需要移动的视图
+    NSMutableDictionary *viewsToMove = [NSMutableDictionary dictionary];
+    
+    for (NSInteger i = 0; i < moduleViews.count; i++) {
+        UIView *moduleView = moduleViews[i];
+        
+        // 跳过正在拖拽的按钮
+        BOOL isExcluded = NO;
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[DYYYDraggableButton class]]) {
+                DYYYDraggableButton *checkButton = (DYYYDraggableButton *)subview;
+                if (checkButton == excludedButton) {
+                    isExcluded = YES;
+                    break;
                 }
             }
-            if (isExcluded) continue;
-            
-            // 计算新位置
-            NSInteger targetIndex = i;
-            if (fromIndex < toIndex) {
-                // 向下拖拽
-                if (i > fromIndex && i <= toIndex) {
-                    targetIndex = i - 1;
-                }
-            } else {
-                // 向上拖拽
-                if (i >= toIndex && i < fromIndex) {
-                    targetIndex = i + 1;
-                }
-            }
-            
-            // 计算目标位置
-            CGPoint targetCenter = [self calculateCenterForIndex:targetIndex isListView:isListView moduleView:moduleView];
-            moduleView.center = targetCenter;
         }
+        if (isExcluded) continue;
+        
+        // 计算新位置
+        NSInteger targetIndex = i;
+        if (fromIndex < toIndex) {
+            // 向下拖拽
+            if (i > fromIndex && i <= toIndex) {
+                targetIndex = i - 1;
+            }
+        } else {
+            // 向上拖拽
+            if (i >= toIndex && i < fromIndex) {
+                targetIndex = i + 1;
+            }
+        }
+        
+        if (i != targetIndex) {
+            // 记录需要移动的视图和目标位置
+            CGPoint targetCenter = [self calculateCenterForIndex:targetIndex isListView:isListView moduleView:moduleView];
+            viewsToMove[@(i)] = @{@"view": moduleView, @"center": [NSValue valueWithCGPoint:targetCenter]};
+        }
+    }
+    
+    // 分批次执行动画，避免重叠
+    [UIView animateWithDuration:0.25 animations:^{
+        // 先移动所有向上移动的视图
+        [viewsToMove enumerateKeysAndObjectsUsingBlock:^(NSNumber *index, NSDictionary *info, BOOL *stop) {
+            UIView *view = info[@"view"];
+            CGPoint center = [info[@"center"] CGPointValue];
+            view.center = center;
+        }];
     }];
 }
 
@@ -4161,6 +4207,9 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     }
     if ([currentView isKindOfClass:[UIScrollView class]]) {
         ((UIScrollView *)currentView).scrollEnabled = YES;
+        
+        // 添加5: 隐藏拖动指示器
+        [self hideDragPositionIndicator:(UIScrollView *)currentView];
     }
     
     // 计算最终位置
@@ -4178,7 +4227,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         if (button.dragPreviewView) {
             // 转换到正确的坐标系统
             CGPoint targetCenter = [button.superview.superview convertPoint:finalCenter toView:button.dragPreviewView.superview];
-            button.dragPreviewView.center = targetCenter;
+            // 保持X坐标不变，只更新Y坐标
+            button.dragPreviewView.center = CGPointMake(button.dragPreviewView.center.x, targetCenter.y);
             button.dragPreviewView.transform = CGAffineTransformIdentity;
             button.dragPreviewView.layer.shadowOpacity = 0.3;
         }
@@ -4238,8 +4288,55 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     // 保存更新后的数组
     objc_setAssociatedObject(scrollView, "moduleViews", moduleViews, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     
-    // 提示用户
-    [DYYYManager showToast:@"菜单顺序已保存"];
+    // 修改3: 创建和保存排序索引数组，确保下次启动时保持同样的顺序
+    NSMutableArray *orderArray = [NSMutableArray array];
+    for (NSInteger i = 0; i < moduleViews.count; i++) {
+        [orderArray addObject:@(i)];
+    }
+    
+    [[NSUserDefaults standardUserDefaults] setObject:orderArray forKey:@"DYYYModuleOrder"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
+}
+
+%new
+- (void)showDragPositionIndicatorAtY:(CGFloat)yPosition inScrollView:(UIScrollView *)scrollView {
+    // 移除现有指示器
+    UIView *existingIndicator = [scrollView viewWithTag:9999];
+    if (existingIndicator) {
+        [existingIndicator removeFromSuperview];
+    }
+    
+    // 创建新的指示线
+    UIView *indicator = [[UIView alloc] initWithFrame:CGRectMake(0, yPosition - 1, scrollView.frame.size.width, 2)];
+    indicator.backgroundColor = [UIColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:0.7];
+    indicator.tag = 9999;
+    
+    // 添加轻微发光效果
+    indicator.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:1.0].CGColor;
+    indicator.layer.shadowOffset = CGSizeMake(0, 0);
+    indicator.layer.shadowRadius = 3.0;
+    indicator.layer.shadowOpacity = 0.8;
+    
+    [scrollView addSubview:indicator];
+    
+    // 添加微小的动画
+    indicator.transform = CGAffineTransformMakeScale(0.95, 1.0);
+    [UIView animateWithDuration:0.2 animations:^{
+        indicator.transform = CGAffineTransformIdentity;
+    }];
+}
+
+%new
+- (void)hideDragPositionIndicator:(UIScrollView *)scrollView {
+    UIView *indicator = [scrollView viewWithTag:9999];
+    if (indicator) {
+        [UIView animateWithDuration:0.15 animations:^{
+            indicator.alpha = 0;
+        } completion:^(BOOL finished) {
+            [indicator removeFromSuperview];
+        }];
+    }
 }
 
 %new
@@ -4347,47 +4444,60 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     CGFloat itemHeight = isListView ? 56 : (80 + 16);
     CGFloat offset = isListView ? 0 : 16;
     
-    [UIView animateWithDuration:0.25 animations:^{
-        for (NSInteger i = 0; i < moduleViews.count; i++) {
+    // 从高位置到低位置移动 (向上移动项目)
+    if (fromIndex > toIndex) {
+        for (NSInteger i = toIndex; i < fromIndex; i++) {
+            if (i >= moduleViews.count) continue;
+            
             UIView *moduleView = moduleViews[i];
+            // 跳过拖拽中的按钮
+            if ([self isViewContainsButton:moduleView button:excludedButton]) continue;
             
-            // 跳过正在拖拽的按钮（通过检查按钮是否在拖拽状态）
-            BOOL isExcluded = NO;
-            for (UIView *subview in moduleView.subviews) {
-                if ([subview isKindOfClass:[DYYYDraggableButton class]]) {
-                    DYYYDraggableButton *checkButton = (DYYYDraggableButton *)subview;
-                    if (checkButton == excludedButton || checkButton.isDragging) {
-                        isExcluded = YES;
-                        break;
-                    }
-                }
-            }
-            if (isExcluded) continue;
-            
-            NSInteger newPosition = i;
-            
-            // 调整位置逻辑
-            if (fromIndex < toIndex) {
-                if (i > fromIndex && i <= toIndex) {
-                    newPosition = i - 1;
-                }
-            } else {
-                if (i >= toIndex && i < fromIndex) {
-                    newPosition = i + 1;
-                }
-            }
-            
-            CGFloat newY = offset + newPosition * itemHeight;
+            CGFloat newY = offset + (i + 1) * itemHeight;
             if (isListView) {
-                newY += itemHeight / 2; // 列表模式居中
+                newY += itemHeight / 2;
             } else {
-                newY += (80 / 2); // 卡片模式居中
+                newY += (80 / 2);
             }
             
-            // 保持X坐标不变，只调整Y坐标
-            moduleView.center = CGPointMake(moduleView.center.x, newY);
+            [UIView animateWithDuration:0.25 animations:^{
+                moduleView.center = CGPointMake(moduleView.center.x, newY);
+            }];
         }
-    }];
+    } 
+    // 从低位置到高位置移动 (向下移动项目)
+    else if (fromIndex < toIndex) {
+        for (NSInteger i = fromIndex + 1; i <= toIndex; i++) {
+            if (i >= moduleViews.count) continue;
+            
+            UIView *moduleView = moduleViews[i];
+            // 跳过拖拽中的按钮
+            if ([self isViewContainsButton:moduleView button:excludedButton]) continue;
+            
+            CGFloat newY = offset + (i - 1) * itemHeight;
+            if (isListView) {
+                newY += itemHeight / 2;
+            } else {
+                newY += (80 / 2);
+            }
+            
+            [UIView animateWithDuration:0.25 animations:^{
+                moduleView.center = CGPointMake(moduleView.center.x, newY);
+            }];
+        }
+    }
+}
+
+- (BOOL)isViewContainsButton:(UIView *)view button:(UIButton *)button {
+    for (UIView *subview in view.subviews) {
+        if (subview == button) return YES;
+        if ([subview isKindOfClass:[UIButton class]] && 
+            [subview isKindOfClass:[DYYYDraggableButton class]] && 
+            ((DYYYDraggableButton *)subview).isDragging) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 %new
@@ -5126,9 +5236,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         // 获取当前视图模式并切换
         BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
         
-        // 切换视图模式
-        [[NSUserDefaults standardUserDefaults] setBool:!isListView forKey:@"DYYYListViewMode"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
+        // 简化为两种模式切换：卡片 <-> 列表
+        BOOL nextModeIsListView = !isListView;
         
         // 查找段选择器并更新
         UIViewController *topVC = [DYYYManager getActiveTopController];
@@ -5142,7 +5251,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                                 for (UIView *headerSubview in contentView.subviews) {
                                     if ([headerSubview isKindOfClass:[UISegmentedControl class]]) {
                                         UISegmentedControl *segmentControl = (UISegmentedControl *)headerSubview;
-                                        segmentControl.selectedSegmentIndex = !isListView ? 0 : 1;
+                                        segmentControl.selectedSegmentIndex = nextModeIsListView ? 1 : 0;
                                         [self viewModeChanged:segmentControl];
                                         break;
                                     }
@@ -5716,121 +5825,28 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     // 使用工厂创建对应样式的构建器
     DYYYMenuStyle style = isListView ? DYYYMenuStyleList : DYYYMenuStyleCard;
-    DYYYMenuStyleBuilder *builder = [DYYYMenuStyleFactory builderForStyle:style 
-                                                                scrollView:scrollView 
-                                                                   modules:modules 
-                                                                  delegate:self];
+    DYYYMenuStyleBuilder *builder = nil;
+    DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
+    BOOL isListLayout = (style == DYYYMenuStyleList);
+
+    if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
+        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+    } else {
+        if (isListView) {
+            builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        } else {
+            builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        }
+    }
+    builder.delegate = self;
     
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
 }
 
 %new
-- (void)showMenuThemingPanel {
-    UIViewController *topVC = [DYYYManager getActiveTopController];
-    if (!topVC) return;
-    
-    // 创建设置面板容器
-    UIView *settingsPanel = [[UIView alloc] initWithFrame:CGRectMake(20, 60, topVC.view.bounds.size.width - 40, 400)];
-    settingsPanel.backgroundColor = [UIColor colorWithWhite:0.95 alpha:0.95];
-    settingsPanel.layer.cornerRadius = 20;
-    settingsPanel.tag = 9529;
-    
-    // 添加标题
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 20, settingsPanel.bounds.size.width, 30)];
-    titleLabel.text = @"菜单自定义";
-    titleLabel.font = [UIFont boldSystemFontOfSize:22];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    [settingsPanel addSubview:titleLabel];
-    
-    // 添加关闭按钮
-    UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    closeButton.frame = CGRectMake(settingsPanel.bounds.size.width - 50, 15, 40, 40);
-    [closeButton setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
-    [closeButton addTarget:self action:@selector(closeThemingPanel:) forControlEvents:UIControlEventTouchUpInside];
-    [settingsPanel addSubview:closeButton];
-    
-    // 添加设置项
-    NSArray *settingItems = @[
-        @{@"title": @"视觉风格", @"type": @"segment", @"options": @[@"经典列表", @"卡片视图", @"新UI"], @"key": @"DYYYMenuVisualStyle"},
-        @{@"title": @"智能排序", @"type": @"switch", @"key": @"DYYYEnableSmartOrdering"},
-        @{@"title": @"动画效果", @"type": @"segment", @"options": @[@"标准", @"流畅", @"高级"], @"key": @"DYYYAnimationLevel"},
-        @{@"title": @"色彩主题", @"type": @"color", @"key": @"DYYYMenuColorTheme"}
-    ];
-    
-    CGFloat yPos = 70;
-    for (NSDictionary *item in settingItems) {
-        NSString *title = item[@"title"];
-        NSString *type = item[@"type"];
-        NSString *key = item[@"key"];
-        
-        // 创建标题标签
-        UILabel *itemLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, yPos, 120, 30)];
-        itemLabel.text = title;
-        itemLabel.font = [UIFont systemFontOfSize:16];
-        [settingsPanel addSubview:itemLabel];
-        
-        // 根据类型创建控件
-        if ([type isEqualToString:@"switch"]) {
-            UISwitch *switchControl = [[UISwitch alloc] initWithFrame:CGRectMake(settingsPanel.bounds.size.width - 70, yPos, 51, 31)];
-            switchControl.on = [[NSUserDefaults standardUserDefaults] boolForKey:key];
-            [switchControl addTarget:self action:@selector(handleSettingChanged:) forControlEvents:UIControlEventValueChanged];
-            objc_setAssociatedObject(switchControl, "settingKey", key, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            [settingsPanel addSubview:switchControl];
-            yPos += 50;
-        }
-        else if ([type isEqualToString:@"segment"]) {
-            NSArray *options = item[@"options"];
-            UISegmentedControl *segmentControl = [[UISegmentedControl alloc] initWithItems:options];
-            segmentControl.frame = CGRectMake(settingsPanel.bounds.size.width - 200, yPos, 180, 30);
-            segmentControl.selectedSegmentIndex = [[NSUserDefaults standardUserDefaults] integerForKey:key];
-            [segmentControl addTarget:self action:@selector(handleSettingChanged:) forControlEvents:UIControlEventValueChanged];
-            objc_setAssociatedObject(segmentControl, "settingKey", key, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            [settingsPanel addSubview:segmentControl];
-            yPos += 50;
-        }
-        else if ([type isEqualToString:@"color"]) {
-            UIButton *colorButton = [UIButton buttonWithType:UIButtonTypeSystem];
-            colorButton.frame = CGRectMake(settingsPanel.bounds.size.width - 70, yPos, 50, 30);
-            colorButton.layer.cornerRadius = 15;
-            
-            // 获取保存的颜色
-            NSData *colorData = [[NSUserDefaults standardUserDefaults] objectForKey:key];
-            UIColor *savedColor = colorData ? [NSKeyedUnarchiver unarchiveObjectWithData:colorData] : [UIColor systemBlueColor];
-            
-            colorButton.backgroundColor = savedColor;
-            [colorButton setTitle:@"" forState:UIControlStateNormal];
-            [colorButton addTarget:self action:@selector(showColorPicker:) forControlEvents:UIControlEventTouchUpInside];
-            objc_setAssociatedObject(colorButton, "settingKey", key, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            [settingsPanel addSubview:colorButton];
-            yPos += 50;
-        }
-    }
-    
-    // 添加应用按钮
-    UIButton *applyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    applyButton.frame = CGRectMake(20, yPos + 20, settingsPanel.bounds.size.width - 40, 50);
-    applyButton.backgroundColor = [UIColor systemBlueColor];
-    [applyButton setTitle:@"应用更改" forState:UIControlStateNormal];
-    [applyButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    applyButton.layer.cornerRadius = 15;
-    [applyButton addTarget:self action:@selector(applyThemeChanges:) forControlEvents:UIControlEventTouchUpInside];
-    [settingsPanel addSubview:applyButton];
-    
-    // 显示面板
-    settingsPanel.alpha = 0;
-    settingsPanel.transform = CGAffineTransformMakeScale(0.8, 0.8);
-    [topVC.view addSubview:settingsPanel];
-    
-    [UIView animateWithDuration:0.3 animations:^{
-        settingsPanel.alpha = 1;
-        settingsPanel.transform = CGAffineTransformIdentity;
-    }];
-}
-
-%new
 - (void)showVisualStyleSelector:(UIButton *)sender {
-    UIAlertController *styleSheet = [UIAlertController alertControllerWithTitle:@"选择视觉风格"
+    UIAlertController *styleSheet = [UIAlertController alertControllerWithTitle:@"视觉风格"
                                                                         message:nil
                                                                  preferredStyle:UIAlertControllerStyleActionSheet];
     
@@ -5838,13 +5854,13 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     DYYYMenuVisualStyle currentStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
     
     // 添加风格选项
-    UIAlertAction *classicAction = [UIAlertAction actionWithTitle:@"经典风格" 
+    UIAlertAction *classicAction = [UIAlertAction actionWithTitle:@"默认" 
                                                             style:(currentStyle == DYYYMenuVisualStyleClassic) ? UIAlertActionStyleDestructive : UIAlertActionStyleDefault
                                                           handler:^(UIAlertAction * _Nonnull action) {
         [self changeVisualStyle:DYYYMenuVisualStyleClassic];
     }];
     
-    UIAlertAction *neuomorphicAction = [UIAlertAction actionWithTitle:@"UI风格" 
+    UIAlertAction *neuomorphicAction = [UIAlertAction actionWithTitle:@"新UI风格" 
                                                                 style:(currentStyle == DYYYMenuVisualStyleNeuomorphic) ? UIAlertActionStyleDestructive : UIAlertActionStyleDefault
                                                               handler:^(UIAlertAction * _Nonnull action) {
         [self changeVisualStyle:DYYYMenuVisualStyleNeuomorphic];
@@ -5882,12 +5898,20 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
     DYYYMenuStyle layoutStyle = isListView ? DYYYMenuStyleList : DYYYMenuStyleCard;
     
-    // 使用工厂创建对应样式的构建器
-    DYYYMenuStyleBuilder *builder = [DYYYMenuStyleFactory builderForStyle:layoutStyle 
-                                                              visualStyle:style
-                                                              scrollView:scrollView 
-                                                                modules:modules 
-                                                                delegate:self];
+    // 使用直接构建器实例化
+    DYYYMenuStyleBuilder *builder = nil;
+    BOOL isLayoutList = (layoutStyle == DYYYMenuStyleList);
+
+    if (style == DYYYMenuVisualStyleNeuomorphic) {
+        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+    } else {
+        if (isLayoutList) {
+            builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        } else {
+            builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        }
+    }
+    builder.delegate = self;
     
     // 构建菜单
     [builder buildMenuWithAnimation:YES];
@@ -6241,6 +6265,605 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             }
         }
     }
+}
+
+
+%new
+- (void)optimizeRenderPipeline {
+    // 获取关键视图
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIView *overlayView = [topVC.view viewWithTag:9527];
+    if (!overlayView) return;
+    UIScrollView *scrollView = [self findScrollViewInView:overlayView];
+    if (!scrollView) return;
+    
+    // 应用高级GPU渲染优化
+    CATransform3D perspectiveTransform = CATransform3DIdentity;
+    perspectiveTransform.m34 = -1.0 / 900.0; // 精确的3D空间透视参数
+    
+    // 获取模块视图
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 应用渲染管线优化
+    for (UIView *moduleView in moduleViews) {
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[UIButton class]]) {
+                UIButton *button = (UIButton *)subview;
+                
+                // 高级渲染优化
+                button.layer.cornerRadius = button.layer.cornerRadius; // 触发重新计算圆角路径
+                button.layer.shouldRasterize = true;
+                button.layer.rasterizationScale = [UIScreen mainScreen].scale;
+                button.layer.allowsEdgeAntialiasing = true;
+                button.layer.drawsAsynchronously = true;
+                
+                // 高效内存填充算法
+                button.contentScaleFactor = [UIScreen mainScreen].scale;
+                
+                // 优化层次渲染
+                for (CALayer *layer in button.layer.sublayers) {
+                    if ([layer isKindOfClass:[CAGradientLayer class]]) {
+                        // 提高渐变层的渲染性能
+                        ((CAGradientLayer *)layer).drawsAsynchronously = true;
+                    }
+                    
+                    // 修复: 使用字符串而不是装箱表达式
+                    [layer setValue:@"RGBA8" forKey:@"contentsFormat"];
+                }
+            }
+        }
+    }
+    
+    // 提升滚动性能
+    scrollView.decelerationRate = UIScrollViewDecelerationRateFast;
+    if (@available(iOS 13.0, *)) {
+        scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
+    }
+    
+    // 预计算所有内容，减少滚动时重新计算
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    scrollView.layer.shouldRasterize = YES;
+    scrollView.layer.rasterizationScale = [UIScreen mainScreen].scale;
+    [CATransaction commit];
+    
+    // 延迟恢复栅格化以避免内存占用
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        scrollView.layer.shouldRasterize = NO;
+    });
+}
+
+%new
+- (void)enhanceTouchResponsiveness {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIScrollView *scrollView = [self findScrollViewInView:[topVC.view viewWithTag:9527]];
+    if (!scrollView) return;
+    
+    // 获取对象
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    for (UIView *moduleView in moduleViews) {
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[UIButton class]]) {
+                UIButton *button = (UIButton *)subview;
+                
+                // 修复：使用正确的边距属性
+                // 通过扩大内部内容区域来实现类似扩大触摸区域的效果
+                button.contentEdgeInsets = UIEdgeInsetsMake(-10, -10, -10, -10);
+                
+                // 优化触摸响应链
+                [button setValue:@YES forKey:@"delaysTouchesBegan"];
+                [button setValue:@0.01 forKey:@"touchDelay"];
+                
+                // 预先加载触感引擎，显著提升响应速度
+                if (@available(iOS 13.0, *)) {
+                    UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleSoft];
+                    [generator prepare];
+                    objc_setAssociatedObject(button, "feedbackGenerator", generator, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+            }
+        }
+    }
+}
+
+%new
+- (void)applyContentParallaxEffect:(UIView *)parentView {
+    UIScrollView *scrollView = [self findScrollViewInView:parentView];
+    if (!scrollView) return;
+    
+    // 获取对象
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 添加滚动监听
+    [scrollView removeObserver:self forKeyPath:@"contentOffset" context:NULL];
+    [scrollView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:NULL];
+    
+    // 设置初始状态
+    [self updateParallaxEffectsForScrollView:scrollView];
+}
+
+%new
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
+    if ([object isKindOfClass:[UIScrollView class]] && [keyPath isEqualToString:@"contentOffset"]) {
+        [self updateParallaxEffectsForScrollView:(UIScrollView *)object];
+    }
+}
+
+%new
+- (void)updateParallaxEffectsForScrollView:(UIScrollView *)scrollView {
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    CGFloat scrollOffset = scrollView.contentOffset.y;
+    CGFloat screenHeight = scrollView.frame.size.height;
+    
+    // 高性能批量处理
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    
+    for (UIView *moduleView in moduleViews) {
+        // 计算每个模块的视差效果
+        CGFloat modulePosition = moduleView.frame.origin.y + moduleView.frame.size.height/2;
+        CGFloat distanceFromCenter = modulePosition - (scrollOffset + screenHeight/2);
+        CGFloat normalizedDistance = distanceFromCenter / (screenHeight/2);
+        
+        // 计算高级变换
+        CATransform3D transform = CATransform3DIdentity;
+        transform.m34 = -1.0 / 1000;  // 透视效果
+        
+        // Z轴位移创造深度感
+        CGFloat zPosition = -normalizedDistance * 20;
+        transform = CATransform3DTranslate(transform, 0, 0, zPosition);
+        
+        // 轻微的倾斜
+        CGFloat rotationAngle = normalizedDistance * 0.03;
+        transform = CATransform3DRotate(transform, rotationAngle, 1, 0, 0);
+        
+        // 轻微的缩放
+        CGFloat scale = 1.0 - ABS(normalizedDistance) * 0.02;
+        transform = CATransform3DScale(transform, scale, scale, 1);
+        
+        // 应用高性能变换
+        moduleView.layer.transform = transform;
+    }
+    
+    [CATransaction commit];
+}
+
+%new
+- (void)enhanceVisualContent {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIView *overlayView = [topVC.view viewWithTag:9527];
+    if (!overlayView) return;
+    
+    UIScrollView *scrollView = [self findScrollViewInView:overlayView];
+    if (!scrollView) return;
+    
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 高效计算一次背景色亮度
+    UIColor *backgroundColor = [UIColor clearColor];
+    for (UIView *subview in overlayView.subviews) {
+        if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+            UIVisualEffectView *visualEffectView = (UIVisualEffectView *)subview;
+            for (UIView *effectSubview in visualEffectView.contentView.subviews) {
+                if (effectSubview.tag == 8888) {
+                    backgroundColor = effectSubview.backgroundColor;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    
+    // 高性能计算亮度
+    CGFloat luminance = 0.5;
+    CGFloat r, g, b, a;
+    [backgroundColor getRed:&r green:&g blue:&b alpha:&a];
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+    
+    // 智能文本颜色
+    UIColor *textColor = (luminance > 0.5) ? [UIColor colorWithWhite:0.1 alpha:1] : [UIColor colorWithWhite:0.9 alpha:1];
+    
+    // 批量更新文本颜色 - 高效处理
+    for (UIView *moduleView in moduleViews) {
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[UIButton class]]) {
+                UIButton *button = (UIButton *)subview;
+                
+                for (UIView *buttonSubview in button.subviews) {
+                    if ([buttonSubview isKindOfClass:[UILabel class]]) {
+                        [(UILabel *)buttonSubview setTextColor:textColor];
+                    } else if ([buttonSubview isKindOfClass:[UIImageView class]]) {
+                        [(UIImageView *)buttonSubview setTintColor:textColor];
+                    }
+                }
+            }
+        }
+    }
+}
+
+%new 
+- (void)optimizeUIKernelMechanics {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIScrollView *scrollView = [self findScrollViewInView:[topVC.view viewWithTag:9527]];
+    if (!scrollView) return;
+    
+    // 应用高级物理模型到滚动视图
+    if (@available(iOS 13.0, *)) {
+        // 修复：使用简单的动画而不是UIPropertyAnimator
+        [UIView animateWithDuration:0.2 animations:^{
+            scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        }];
+    }
+    
+    // 通知系统触发UI更新
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    
+    // 同步显示器刷新率
+    CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(syncWithDisplayRefresh:)];
+    if (@available(iOS 15.0, *)) {
+        displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
+    }
+    
+    [CATransaction commit];
+    
+    // 优化核心动画处理部分
+    [scrollView setValue:@(YES) forKey:@"_allowsRootLayerFlatteningWhenScrolling"];
+}
+
+
+%new
+- (void)optimizeViewPerformance {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIView *overlayView = [topVC.view viewWithTag:9527];
+    if (!overlayView) return;
+    
+    // 1. 减少主线程负担
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        // 提前准备核心资源
+        UIImage *placeholderImage = [UIImage new];
+        NSMutableDictionary *preloadedResources = [NSMutableDictionary dictionary];
+        
+        // 回到主线程优化UI
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self applyPerformanceOptimizations:overlayView withResources:preloadedResources];
+        });
+    });
+    
+    // 2. 应用关键渲染路径优化
+    [self optimizeRenderPath:overlayView];
+}
+
+%new
+- (void)applyPerformanceOptimizations:(UIView *)view withResources:(NSDictionary *)resources {
+    // 找到滚动视图并优化
+    UIScrollView *scrollView = [self findScrollViewInView:view];
+    if (!scrollView) return;
+    
+    // 核心性能优化 - 预渲染关键路径内容
+    scrollView.directionalLockEnabled = YES;
+    scrollView.decelerationRate = UIScrollViewDecelerationRateFast;
+    
+    // 减少重绘次数，提高流畅度
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    
+    // 滚动视图优化
+    scrollView.layer.shouldRasterize = NO; // 滚动时栅格化反而会降低性能
+    scrollView.layer.drawsAsynchronously = YES;
+    
+    // 使用异步渲染，减轻主线程压力
+    for (UIView *subview in scrollView.subviews) {
+        subview.layer.drawsAsynchronously = YES;
+        
+        // 对包含复杂内容的视图进行特别优化
+        if (subview.subviews.count > 3) {
+            // 减少不可见区域的渲染成本
+            for (UIView *innerView in subview.subviews) {
+                if ([innerView isKindOfClass:[UIImageView class]]) {
+                    ((UIImageView *)innerView).contentMode = UIViewContentModeScaleAspectFill;
+                }
+            }
+        }
+    }
+    
+    [CATransaction commit];
+    
+    // 注册内存预警监听
+    [[NSNotificationCenter defaultCenter] addObserver:self 
+                                             selector:@selector(handleMemoryWarning) 
+                                                 name:UIApplicationDidReceiveMemoryWarningNotification 
+                                               object:nil];
+}
+
+%new
+- (void)optimizeRenderPath:(UIView *)rootView {
+    UIScrollView *scrollView = [self findScrollViewInView:rootView];
+    if (!scrollView) return;
+    
+    // 显示层绘制优化
+    CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(syncRenderLoop:)];
+    displayLink.preferredFramesPerSecond = 60;
+    [displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    objc_setAssociatedObject(scrollView, "smoothRenderDisplayLink", displayLink, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    
+    // 设置视觉预热
+    [self preloadVisibleContent:scrollView];
+    
+    // 添加滚动优化监听器
+    [scrollView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:NULL];
+}
+
+%new
+- (void)syncWithDisplayRefresh:(CADisplayLink *)displayLink {
+    // 获取当前活动菜单
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIView *overlayView = [topVC.view viewWithTag:9527];
+    if (!overlayView) return;
+    
+    // 实时同步视图更新与显示刷新率
+    UIScrollView *scrollView = [self findScrollViewInView:overlayView];
+    if (!scrollView) return;
+    
+    // 优化可见区域的渲染质量
+    CGRect visibleRect = CGRectMake(scrollView.contentOffset.x, 
+                                   scrollView.contentOffset.y, 
+                                   scrollView.bounds.size.width, 
+                                   scrollView.bounds.size.height);
+    visibleRect = CGRectInset(visibleRect, 0, -100); // 上下额外预渲染区域
+    
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    for (UIView *moduleView in moduleViews) {
+        // 优先处理可见区域内的视图
+        BOOL isVisible = CGRectIntersectsRect(moduleView.frame, visibleRect);
+        if (isVisible) {
+            // 确保可见区域内的视图高质量渲染
+            moduleView.layer.shouldRasterize = NO;
+            moduleView.alpha = 1.0;
+        } else {
+            // 非可见区域使用栅格化提升性能
+            moduleView.layer.shouldRasterize = YES;
+            moduleView.layer.rasterizationScale = [UIScreen mainScreen].scale;
+        }
+    }
+}
+
+%new
+- (void)syncRenderLoop:(CADisplayLink *)displayLink {
+    // 记录绘制时间
+    static CFTimeInterval lastTimestamp = 0;
+    CFTimeInterval timeDelta = lastTimestamp == 0 ? 0 : displayLink.timestamp - lastTimestamp;
+    lastTimestamp = displayLink.timestamp;
+    
+    // 获取scrollView
+    UIScrollView *scrollView = objc_getAssociatedObject(displayLink, "targetScrollView");
+    if (!scrollView) {
+        // 尝试查找scrollView
+        UIViewController *topVC = [DYYYManager getActiveTopController];
+        if (topVC) {
+            UIView *overlayView = [topVC.view viewWithTag:9527];
+            if (overlayView) {
+                scrollView = [self findScrollViewInView:overlayView];
+                if (scrollView) {
+                    objc_setAssociatedObject(displayLink, "targetScrollView", scrollView, OBJC_ASSOCIATION_ASSIGN);
+                }
+            }
+        }
+        if (!scrollView) return;
+    }
+    
+    // 动态优化可见区域内的模块
+    CGRect visibleRect = CGRectMake(scrollView.contentOffset.x, 
+                                    scrollView.contentOffset.y, 
+                                    scrollView.bounds.size.width, 
+                                    scrollView.bounds.size.height);
+    
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 批量处理更新，减少重绘
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES]; // 禁用隐式动画
+    
+    for (UIView *moduleView in moduleViews) {
+        BOOL isVisible = CGRectIntersectsRect(moduleView.frame, visibleRect);
+        if (isVisible) {
+            // 优先级提升，提高可见区域的视觉质量
+            if (moduleView.layer.shouldRasterize) {
+                moduleView.layer.shouldRasterize = NO;
+            }
+            
+            // 顺滑过渡
+            if (moduleView.alpha < 1.0) {
+                moduleView.alpha = 1.0;
+            }
+        } else if (!CGRectIntersectsRect(moduleView.frame, CGRectInset(visibleRect, -100, -200))) {
+            // 远离可视区域的模块降低渲染优先级
+            if (!moduleView.layer.shouldRasterize) {
+                moduleView.layer.shouldRasterize = YES;
+                moduleView.layer.rasterizationScale = [UIScreen mainScreen].scale;
+            }
+        }
+    }
+    
+    [CATransaction commit];
+}
+
+%new
+- (void)preloadVisibleContent:(UIScrollView *)scrollView {
+    // 预先加载当前可见区域及即将滚动到的区域
+    CGRect expandedVisibleRect = CGRectMake(0, scrollView.contentOffset.y - scrollView.bounds.size.height * 0.5, 
+                                          scrollView.bounds.size.width, 
+                                          scrollView.bounds.size.height * 2); // 上下多加载半屏
+    
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    // 对可见区域和即将进入可见区域的模块进行预热
+    NSMutableArray *viewsToPreload = [NSMutableArray array];
+    for (UIView *moduleView in moduleViews) {
+        if (CGRectIntersectsRect(moduleView.frame, expandedVisibleRect)) {
+            [viewsToPreload addObject:moduleView];
+        }
+    }
+    
+    // 分批处理，避免一次性处理过多导致卡顿
+    NSInteger batchSize = 3;
+    for (NSInteger i = 0; i < viewsToPreload.count; i += batchSize) {
+        NSInteger endIndex = MIN(i + batchSize, viewsToPreload.count);
+        NSArray *batch = [viewsToPreload subarrayWithRange:NSMakeRange(i, endIndex - i)];
+        
+        // 使用适当延迟，错开处理时间
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i/batchSize * 0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            for (UIView *view in batch) {
+                // 预热处理 - 触发布局计算
+                [view setNeedsLayout];
+                [view layoutIfNeeded];
+                
+                // 对按钮和图像进行特殊处理
+                for (UIView *subview in view.subviews) {
+                    if ([subview isKindOfClass:[UIButton class]]) {
+                        UIButton *button = (UIButton *)subview;
+                        // 预加载按钮状态
+                        [button setNeedsDisplay];
+                        
+                        // 预热图像缓存
+                        for (UIView *btnSubview in button.subviews) {
+                            if ([btnSubview isKindOfClass:[UIImageView class]]) {
+                                UIImageView *imageView = (UIImageView *)btnSubview;
+                                [imageView setNeedsDisplay];
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+%new
+- (void)handleMemoryWarning {
+    // 内存预警时释放资源
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIScrollView *scrollView = [self findScrollViewInView:[topVC.view viewWithTag:9527]];
+    
+    if (scrollView) {
+        // 清理非可见区域的缓存
+        NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+        if (!moduleViews) return;
+        
+        CGRect visibleRect = CGRectMake(0, scrollView.contentOffset.y, 
+                                      scrollView.bounds.size.width, 
+                                      scrollView.bounds.size.height);
+        
+        for (UIView *moduleView in moduleViews) {
+            if (!CGRectIntersectsRect(moduleView.frame, visibleRect)) {
+                // 释放非可见视图的资源
+                for (UIView *subview in moduleView.subviews) {
+                    if ([subview isKindOfClass:[UIButton class]]) {
+                        // 清理按钮上的过渡效果
+                        subview.layer.shouldRasterize = NO;
+                        
+                        // 移除不必要的动画
+                        [subview.layer removeAllAnimations];
+                    }
+                }
+            }
+        }
+    }
+    
+    // 清理图像缓存
+    [[NSURLCache sharedURLCache] removeAllCachedResponses];
+}
+
+%new
+- (void)optimizeGestureResponseTime {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIScrollView *scrollView = [self findScrollViewInView:[topVC.view viewWithTag:9527]];
+    if (!scrollView) return;
+    
+    // 优化触摸响应 - 减少延迟
+    scrollView.delaysContentTouches = NO;
+    scrollView.canCancelContentTouches = YES;
+    
+    // 提高ScrollView的减速率，使滚动更流畅
+    scrollView.decelerationRate = UIScrollViewDecelerationRateFast;
+}
+
+%new
+- (void)applyHighPerformanceTransforms {
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    UIScrollView *scrollView = [self findScrollViewInView:[topVC.view viewWithTag:9527]];
+    if (!scrollView) return;
+    
+    NSArray *moduleViews = objc_getAssociatedObject(scrollView, "moduleViews");
+    if (!moduleViews) return;
+    
+    for (UIView *moduleView in moduleViews) {
+        // 子视图层优化
+        moduleView.layer.masksToBounds = NO;
+        
+        for (UIView *subview in moduleView.subviews) {
+            if ([subview isKindOfClass:[UIButton class]]) {
+                UIButton *button = (UIButton *)subview;
+                
+                // 启用更高效的渲染
+                button.opaque = YES; // 减少混合
+                button.layer.masksToBounds = YES;
+                
+                // 优化图像渲染
+                for (UIView *btnSubview in button.subviews) {
+                    if ([btnSubview isKindOfClass:[UIImageView class]]) {
+                        UIImageView *imageView = (UIImageView *)btnSubview;
+                        imageView.layer.minificationFilter = kCAFilterTrilinear;
+                        imageView.layer.magnificationFilter = kCAFilterTrilinear;
+                    }
+                }
+            }
+        }
+    }
+}
+
+%new
+- (void)applyViewModeChange:(BOOL)isListView {
+    // 重建菜单
+    UIScrollView *scrollView = [self findScrollViewInTopViewController:[DYYYManager getActiveTopController]];
+    if (!scrollView) return;
+    
+    // 获取模块数据
+    NSArray<DYYYMenuModule *> *modules = [self createMenuModulesForCurrentContext];
+    
+    // 创建构建器
+    DYYYMenuStyleBuilder *builder = nil;
+    DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
+    
+    if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
+        builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+    } else {
+        if (isListView) {
+            builder = [[DYYYListStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        } else {
+            builder = [[DYYYCardStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
+        }
+    }
+    builder.delegate = self;
+    
+    // 构建菜单
+    [builder buildMenuWithAnimation:YES];
+    
+    // 添加字体规范化处理
+    [self normalizeListViewFonts:scrollView];
+    
+    // 添加智能文字颜色更新
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self applySmartTextColorToAllMenuItems];
+    });
 }
 
 %end

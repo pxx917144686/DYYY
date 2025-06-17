@@ -933,8 +933,8 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"去除App内更新" key:@"DYYYNoUpdates" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去青少年弹窗" key:@"DYYYHideteenmode" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区毛玻璃" key:@"DYYYisEnableCommentBlur" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"通知玻璃效果" key:@"DYYYEnableNotificationTransparency" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"毛玻璃透明度" key:@"DYYYCommentBlurTransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
+                [DYYYSettingItem itemWithTitle:@"通知玻璃效果" key:@"DYYYEnableNotificationTransparency" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"通知圆角半径" key:@"DYYYNotificationCornerRadius" type:DYYYSettingItemTypeTextField placeholder:@"默认12"],
                 [DYYYSettingItem itemWithTitle:@"时间标签颜色" key:@"DYYYLabelColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
                 [DYYYSettingItem itemWithTitle:@"隐藏系统顶栏" key:@"DYYYisHideStatusbar" type:DYYYSettingItemTypeSwitch],
@@ -1120,23 +1120,23 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -过滤文案" key:@"DYYYLongPressFilterTitle" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -定时关闭" key:@"DYYYLongPressTimerClose" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -制作视频" key:@"DYYYLongPressCreateVideo" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-转发日常" key:@"DYYYHidePanelDaily" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-推荐" key:@"DYYYHidePanelRecommend" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-不感兴趣" key:@"DYYYHidePanelNotInterested" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-举报" key:@"DYYYHidePanelReport" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-倍速" key:@"DYYYHidePanelSpeed" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-清屏播放" key:@"DYYYHidePanelClearScreen" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-缓存视频" key:@"DYYYHidePanelFavorite" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-稍后再看" key:@"DYYYHidePanelLater" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-投屏" key:@"DYYYHidePanelCast" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-PC打开" key:@"DYYYHidePanelOpenInPC" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-弹幕" key:@"DYYYHidePanelSubtitle" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-自动连播" key:@"DYYYHidePanelAutoPlay" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-识别图片" key:@"DYYYHidePanelSearchImage" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-听抖音" key:@"DYYYHidePanelListenDouyin" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-后台播放" key:@"DYYYHidePanelBackgroundPlay" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-双列入口" key:@"DYYYHidePanelBiserial" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏长按-定时关闭" key:@"DYYYHidePanelTimerClose" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-转发日常" key:@"DYYYHideDaily" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-推荐" key:@"DYYYHideRecommend" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-不感兴趣" key:@"DYYYHideNotInterested" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-举报" key:@"DYYYHideReport" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-倍速" key:@"DYYYHideSpeed" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-清屏播放" key:@"DYYYHideClearScreen" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-缓存视频" key:@"DYYYHideFavorite" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-稍后再看" key:@"DYYYHideLater" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-投屏" key:@"DYYYHideCast" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-PC打开" key:@"DYYYHideOpenInPC" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-弹幕" key:@"DYYYHideSubtitle" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-自动连播" key:@"DYYYHideAutoPlay" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-识别图片" key:@"DYYYHideSearchImage" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-听抖音" key:@"DYYYHideListenDouyin" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-后台播放" key:@"DYYYHideBackgroundPlay" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-双列入口" key:@"DYYYHideBiserial" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-定时关闭" key:@"DYYYHideTimerclose" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"长按面板-复制功能" key:@"DYYYCopyText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制原文本" key:@"DYYYCopyOriginalText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制分享链接" key:@"DYYYCopyShareLink" type:DYYYSettingItemTypeSwitch],
@@ -1159,11 +1159,16 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"自动勾选原图" key:@"DYYYisAutoSelectOriginalPhoto" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"视频降噪-人声增强" key:@"DYYYEnableNoiseFilter" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"无痕模式" key:@"DYYYEnableIncognitoMode" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"自定义功能总开关" key:@"DYYYEnableSocialStatsCustom" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"主页-自定义总开关" key:@"DYYYEnableSocialStatsCustom" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -粉丝数量" key:@"DYYYCustomFollowers" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"  -获赞数量" key:@"DYYYCustomLikes" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"  -关注数量" key:@"DYYYCustomFollowing" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"  -互关数量" key:@"DYYYCustomMutual" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
+                [DYYYSettingItem itemWithTitle:@"视频-自定义总开关" key:@"DYYYEnableVideoStatsCustom" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -点赞数量" key:@"DYYYVideoCustomLikes" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
+                [DYYYSettingItem itemWithTitle:@"  -评论数量" key:@"DYYYVideoCustomComments" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
+                [DYYYSettingItem itemWithTitle:@"  -收藏数量" key:@"DYYYVideoCustomCollects" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
+                [DYYYSettingItem itemWithTitle:@"  -分享数量" key:@"DYYYVideoCustomShares" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"强制自动播放（不能关闭）" key:@"DYYYisEnableAutoPlay" type:DYYYSettingItemTypeSwitch]
             ],
 
@@ -2870,7 +2875,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     }
     
     DYYYSettingItem *item = sections[indexPath.section][indexPath.row];
-    BOOL isOn = sender.isOn; // 保存用户切换后的实际值
+    BOOL isOn = sender.isOn;
     
     // 热更新功能特殊处理
     if ([item.key isEqualToString:@"DYYYABTestBlockEnabled"]) {
@@ -3145,9 +3150,13 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         }
     }
     
-    // 保存开关状态 - 使用isOn变量，不是sender.isOn，因为可能已经被上述逻辑修改
+    // 保存开关状态
     [[NSUserDefaults standardUserDefaults] setBool:isOn forKey:item.key];
     [[NSUserDefaults standardUserDefaults] synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged" object:nil userInfo:@{
+        @"key": item.key,
+        @"value": @(isOn)
+    }];
 }
 
 - (void)updateAreaMainSwitchUI:(NSInteger)section {
@@ -3392,6 +3401,12 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     }
     
     [[NSUserDefaults standardUserDefaults] synchronize];
+    
+    // 在设置值保存后添加：
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged" object:nil userInfo:@{
+        @"key": item.key,
+        @"value": textField.text ?: [NSNull null]
+    }];
     
     // 处理特殊键
     if ([item.key isEqualToString:@"DYYYCustomAlbumImage"]) {

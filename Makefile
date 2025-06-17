@@ -57,7 +57,7 @@ DYYY_FILES = DYYY.xm \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
-DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm
+DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm
 DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m
 
 # 添加 FLEX 源文件

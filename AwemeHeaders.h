@@ -305,8 +305,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWEBaseListViewController : UIViewController
-- (void)applyBlurEffectIfNeeded;
-- (UILabel *)findCommentLabel:(UIView *)view;
 @end
 
 // 隐藏视频定位
@@ -659,8 +657,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 - (UIView *)containerView;
 - (void)setActions:(NSArray *)actions;
 - (void)show;
-- (void)applyBlurEffectAndWhiteText;
-- (void)setTextColorWhiteRecursivelyInView:(UIView *)view;
 @end
 
 @interface AWEUserSheetAction : NSObject
@@ -743,13 +739,6 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 // 应用内推送容器
 @interface AWEInnerNotificationWindow : UIWindow
-- (void)setupBlurEffectForNotificationView;
-- (void)applyBlurEffectToView:(UIView *)containerView;
-- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView;
-- (void)clearBackgroundRecursivelyInView:(UIView *)view exceptClass:(Class)exceptClass;
-- (void)adjustTextColorInView:(UIView *)view darkMode:(BOOL)isDarkMode;
-- (void)setLabelsColorWhiteInView:(UIView *)view;
-- (void)clearBackgroundRecursivelyInView:(UIView *)view;
 @end
 
 @interface AWEFakeProgressSliderView : UIView
@@ -1095,3 +1084,5 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface AWECommentInputViewSwiftImpl_CommentInputBar : UIView
 @end
+
+void showVideoStatsEditAlert(UIViewController *viewController);
