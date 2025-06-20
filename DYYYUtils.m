@@ -2,6 +2,48 @@
 
 @implementation DYYYUtils
 
++ (void)showToast:(NSString *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *topVC = [self topView];
+        if (!topVC || !topVC.view) return;
+        
+        // 创建 Toast 标签
+        UILabel *toastLabel = [[UILabel alloc] init];
+        toastLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.8];
+        toastLabel.textColor = [UIColor whiteColor];
+        toastLabel.textAlignment = NSTextAlignmentCenter;
+        toastLabel.font = [UIFont systemFontOfSize:16];
+        toastLabel.text = message;
+        toastLabel.alpha = 0.0;
+        toastLabel.layer.cornerRadius = 8;
+        toastLabel.clipsToBounds = YES;
+        
+        // 计算大小和位置
+        CGSize textSize = [message sizeWithAttributes:@{NSFontAttributeName: toastLabel.font}];
+        CGFloat width = textSize.width + 32;
+        CGFloat height = textSize.height + 16;
+        CGFloat x = (topVC.view.bounds.size.width - width) / 2;
+        CGFloat y = topVC.view.bounds.size.height - height - 100;
+        
+        toastLabel.frame = CGRectMake(x, y, width, height);
+        [topVC.view addSubview:toastLabel];
+        
+        // 显示动画
+        [UIView animateWithDuration:0.3 animations:^{
+            toastLabel.alpha = 1.0;
+        } completion:^(BOOL finished) {
+            // 延迟隐藏
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [UIView animateWithDuration:0.3 animations:^{
+                    toastLabel.alpha = 0.0;
+                } completion:^(BOOL finished) {
+                    [toastLabel removeFromSuperview];
+                }];
+            });
+        }];
+    });
+}
+
 + (UIViewController *)topView {
     UIViewController *topViewController = [UIApplication sharedApplication].keyWindow.rootViewController;
     

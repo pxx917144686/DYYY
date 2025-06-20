@@ -5,10 +5,16 @@
 #import "DYYYSettingViewController.h"
 #import "DYYYManager.h"
 #import "DYYYFilterSettingsView.h"
+#import "DYYYFloatSpeedButton.h"
 #import <Photos/Photos.h>
 #import <objc/runtime.h>
 #import "DYYYBottomAlertView.h"
 #import "DYYYUtils.h"
+
+@interface UISwitch (DYYY_FuturisticEffects)
+- (void)applyFuturisticEffects;
+- (void)updateFuturisticEffectsWithState:(BOOL)isOn animated:(BOOL)animated;
+@end
 
 extern NSDictionary *dyyySettings;
 
@@ -169,6 +175,157 @@ static dispatch_once_t onceToken;
 
 @end
 
+@implementation UISwitch (DYYY_FuturisticEffects)
+
+- (void)applyFuturisticEffects {
+    // 确保只应用一次效果
+    if ([objc_getAssociatedObject(self, "DYYY_hasAppliedEffects") boolValue]) {
+        return;
+    }
+    
+    objc_setAssociatedObject(self, "DYYY_hasAppliedEffects", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    
+    // 配置主容器视图和效果
+    self.clipsToBounds = NO;
+    
+    // 1. 创建高光描边层 - 增大边框宽度和阴影
+    CALayer *glowBorderLayer = [CALayer layer];
+    glowBorderLayer.frame = CGRectInset(self.bounds, -4, -4); // 增大边框宽度
+    glowBorderLayer.cornerRadius = self.bounds.size.height / 2 + 4;
+    glowBorderLayer.shadowColor = self.isOn ? [UIColor colorWithRed:0/255.0 green:122/255.0 blue:255/255.0 alpha:1.0].CGColor : [UIColor colorWithWhite:0.8 alpha:1.0].CGColor;
+    glowBorderLayer.shadowOffset = CGSizeMake(0, 0);
+    glowBorderLayer.shadowOpacity = self.isOn ? 0.8 : 0.3; // 默认立即显示阴影
+    glowBorderLayer.shadowRadius = 5.0; // 增大阴影半径
+    glowBorderLayer.masksToBounds = NO;
+    
+    // 2. 创建玻璃效果覆盖层 - 增加透明度使效果更明显
+    UIVisualEffectView *glassEffectView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleLight]];
+    glassEffectView.frame = self.bounds;
+    glassEffectView.clipsToBounds = YES;
+    glassEffectView.layer.cornerRadius = self.bounds.size.height / 2;
+    glassEffectView.alpha = 0.18; // 增加透明度
+    glassEffectView.userInteractionEnabled = NO;
+    
+    // 3. 创建液体动画层
+    CALayer *liquidLayer = [CALayer layer];
+    liquidLayer.frame = CGRectMake(0, 0, self.bounds.size.width, self.bounds.size.height);
+    liquidLayer.masksToBounds = YES;
+    liquidLayer.cornerRadius = self.bounds.size.height / 2;
+    liquidLayer.opacity = 0.0;
+    
+    // 创建液体渐变
+    CAGradientLayer *gradientLayer = [CAGradientLayer layer];
+    gradientLayer.frame = liquidLayer.bounds;
+    gradientLayer.cornerRadius = liquidLayer.cornerRadius;
+    
+    // 设置渐变颜色基于开关状态 - 使用更明亮的颜色
+    UIColor *liquidColor = self.isOn ? 
+        [UIColor colorWithRed:20/255.0 green:142/255.0 blue:255/255.0 alpha:0.8] : // 更亮的蓝色
+        [UIColor colorWithWhite:0.85 alpha:0.8]; // 更亮的灰色
+    UIColor *transparentColor = [liquidColor colorWithAlphaComponent:0.0];
+    
+    gradientLayer.colors = @[(id)liquidColor.CGColor, (id)transparentColor.CGColor];
+    gradientLayer.startPoint = CGPointMake(0, 0.5);
+    gradientLayer.endPoint = CGPointMake(1.0, 0.5);
+    
+    [liquidLayer addSublayer:gradientLayer];
+    
+    // 存储这些层以便后续更新
+    objc_setAssociatedObject(self, "DYYY_glowBorderLayer", glowBorderLayer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(self, "DYYY_glassEffectView", glassEffectView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(self, "DYYY_liquidLayer", liquidLayer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(self, "DYYY_gradientLayer", gradientLayer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    
+    // 层级顺序很重要：高光层在底部，玻璃效果在最上层
+    [self.layer insertSublayer:glowBorderLayer atIndex:0]; // 高光层放在底部
+    [self.layer addSublayer:liquidLayer]; // 液体层在中间
+    [self addSubview:glassEffectView]; // 玻璃效果在最上层
+    
+    // 初始更新效果
+    [self updateFuturisticEffectsWithState:self.isOn animated:NO];
+    
+    // 确保监听状态变化
+    [self removeTarget:self action:@selector(futuristicSwitchValueChanged) forControlEvents:UIControlEventValueChanged];
+    [self addTarget:self action:@selector(futuristicSwitchValueChanged) forControlEvents:UIControlEventValueChanged];
+}
+
+- (void)futuristicSwitchValueChanged {
+    [self updateFuturisticEffectsWithState:self.isOn animated:YES];
+}
+
+- (void)updateFuturisticEffectsWithState:(BOOL)isOn animated:(BOOL)animated {
+    CALayer *glowBorderLayer = objc_getAssociatedObject(self, "DYYY_glowBorderLayer");
+    CALayer *liquidLayer = objc_getAssociatedObject(self, "DYYY_liquidLayer");
+    CAGradientLayer *gradientLayer = objc_getAssociatedObject(self, "DYYY_gradientLayer");
+    
+    // 准备动画
+    NSTimeInterval animDuration = animated ? 0.35 : 0.0;
+    
+    // 1. 更新高光边框颜色和不透明度
+    UIColor *glowColor = isOn ? [UIColor colorWithRed:0/255.0 green:122/255.0 blue:255/255.0 alpha:1.0] : [UIColor colorWithWhite:0.8 alpha:1.0];
+    CGFloat glowOpacity = isOn ? 0.8 : 0.3;
+    
+    if (animated) {
+        // 高光边框动画
+        CABasicAnimation *shadowColorAnimation = [CABasicAnimation animationWithKeyPath:@"shadowColor"];
+        shadowColorAnimation.toValue = (__bridge id)glowColor.CGColor;
+        shadowColorAnimation.duration = animDuration;
+        [glowBorderLayer addAnimation:shadowColorAnimation forKey:@"shadowColor"];
+        
+        CABasicAnimation *shadowOpacityAnimation = [CABasicAnimation animationWithKeyPath:@"shadowOpacity"];
+        shadowOpacityAnimation.toValue = @(glowOpacity);
+        shadowOpacityAnimation.duration = animDuration;
+        [glowBorderLayer addAnimation:shadowOpacityAnimation forKey:@"shadowOpacity"];
+    }
+    
+    glowBorderLayer.shadowColor = glowColor.CGColor;
+    glowBorderLayer.shadowOpacity = glowOpacity;
+    
+    // 2. 触发液体动画效果
+    if (animated) {
+        // 设置液体颜色
+        UIColor *liquidColor = isOn ? [UIColor colorWithRed:0/255.0 green:122/255.0 blue:255/255.0 alpha:0.7] : [UIColor colorWithWhite:0.8 alpha:0.7];
+        UIColor *transparentColor = [liquidColor colorWithAlphaComponent:0.0];
+        
+        // 更新渐变颜色
+        gradientLayer.colors = @[(id)liquidColor.CGColor, (id)transparentColor.CGColor];
+        
+        // 液体波动动画
+        [CATransaction begin];
+        [CATransaction setAnimationDuration:animDuration];
+        
+        // 显示液体层
+        liquidLayer.opacity = 1.0;
+        
+        // 液体流动动画
+        CABasicAnimation *positionAnimation = [CABasicAnimation animationWithKeyPath:@"position.x"];
+        positionAnimation.fromValue = @(isOn ? -self.bounds.size.width : self.bounds.size.width * 2);
+        positionAnimation.toValue = @(isOn ? self.bounds.size.width * 2 : -self.bounds.size.width);
+        positionAnimation.duration = animDuration * 1.5;
+        positionAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+        
+        [CATransaction setCompletionBlock:^{
+            // 完成后隐藏液体层
+            [UIView animateWithDuration:0.2 animations:^{
+                liquidLayer.opacity = 0.0;
+            }];
+        }];
+        
+        [liquidLayer addAnimation:positionAnimation forKey:@"liquidFlow"];
+        [CATransaction commit];
+        
+        // 添加脉冲效果
+        CAKeyframeAnimation *pulseAnimation = [CAKeyframeAnimation animationWithKeyPath:@"transform.scale"];
+        pulseAnimation.values = @[@1.0, @1.03, @1.0];
+        pulseAnimation.keyTimes = @[@0, @0.5, @1.0];
+        pulseAnimation.duration = animDuration;
+        pulseAnimation.timingFunctions = @[[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut],
+                                          [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut]];
+        [self.layer addAnimation:pulseAnimation forKey:@"pulse"];
+    }
+}
+
+@end
 
 @implementation DYYYImagePickerDelegate
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
@@ -1046,7 +1203,20 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"隐藏视频搜索长框" key:@"DYYYHideSearchEntrance" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"隐藏朋友关注按钮" key:@"DYYYHideFamiliar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"隐藏添加朋友" key:@"DYYYHideButton" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"隐藏扫一扫" key:@"DYYYHideScancode" type:DYYYSettingItemTypeSwitch]
+                [DYYYSettingItem itemWithTitle:@"隐藏拍照搜同款扫一扫" key:@"DYYYHideScancode" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏搜索指示条" key:@"DYYYHideSearchEntranceIndicator" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏评论搜索" key:@"DYYYHideCommentDiscover" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏评论提示" key:@"DYYYHideCommentTips" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏关注提示视图" key:@"DYYYHideFollowPromptView" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏我的按钮" key:@"DYYYHideMyButton" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏暂停关键词" key:@"DYYYHidePauseVideoRelatedWord" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏搜索引导提示框" key:@"DYYYHideGuideTipView" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏顶栏引导提示" key:@"DYYYHideFeedTabJumpGuide" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏大家都在搜" key:@"DYYYHideWords" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏观看历史搜索" key:@"DYYYHideDiscoverFeedEntry" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏短剧免费去看" key:@"DYYYHideShowPlayletComment" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏评论音乐" key:@"DYYYHideCommentMusicAnchor" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏评论定位" key:@"DYYYHidePOIEntryAnchor" type:DYYYSettingItemTypeSwitch]
             ],
             
             // 第四部分 - 移除设置
@@ -1071,10 +1241,13 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"禁用点击首页刷新" key:@"DYYYDisableHomeRefresh" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"禁用双击视频点赞" key:@"DYYYDouble" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区-双击触发" key:@"DYYYEnableDoubleOpenComment" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"评论文本复制" key:@"DYYYCommentCopyText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区-长按复制文本" key:@"DYYYEnableCommentCopyText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区-保存动态图" key:@"DYYYCommentLivePhotoNotWaterMark" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区-保存图片" key:@"DYYYCommentNotWaterMark" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区-保存表情包" key:@"DYYYFourceDownloadEmotion" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"表情预览保存" key:@"DYYYForceDownloadPreviewEmotion" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"私信表情保存" key:@"DYYYForceDownloadIMEmotion" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"视频-显示日期时间" key:@"DYYYShowDateTime" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -年-月-日 时:分" key:@"DYYYDateTimeFormat_YMDHM" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -月-日 时:分" key:@"DYYYDateTimeFormat_MDHM" type:DYYYSettingItemTypeSwitch],
@@ -1092,10 +1265,10 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"跳过开屏广告" key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
                 [DYYYSettingItem itemWithTitle:@"菜单背景颜色" key:@"DYYYBackgroundColor" type:DYYYSettingItemTypeColorPicker],
-                [DYYYSettingItem itemWithTitle:@"默认倍速" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
-                [DYYYSettingItem itemWithTitle:@"倍速按钮-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"倍速数值" key:@"DYYYSpeedSettings" type:DYYYSettingItemTypeTextField placeholder:@"英文逗号分隔"],
-                [DYYYSettingItem itemWithTitle:@"自动恢复默认倍速" key:@"DYYYAutoRestoreSpeed" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"默认倍速（如果没有倍数设置）" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
+                [DYYYSettingItem itemWithTitle:@"倍速按钮功能（重新进入APP）-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"倍速数值（强制倍数）" key:@"DYYYSpeedSettings" type:DYYYSettingItemTypeTextField placeholder:@"英文逗号分隔"],
+                [DYYYSettingItem itemWithTitle:@"下一个视频会自动恢复默认倍速" key:@"DYYYAutoRestoreSpeed" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮显示后缀" key:@"DYYYSpeedButtonShowX" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮大小" key:@"DYYYSpeedButtonSize" type:DYYYSettingItemTypeTextField placeholder:@"默认40"],
                 [DYYYSettingItem itemWithTitle:@"视频清屏隐藏-开关" key:@"DYYYEnableFloatClearButton" type:DYYYSettingItemTypeSwitch],
@@ -1149,7 +1322,8 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -分享视频" key:@"DYYYDoubleTapshowSharePanel" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -长按面板" key:@"DYYYDoubleTapshowDislikeOnVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -接口解析" key:@"DYYYDoubleInterfaceDownload" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"自动清晰度" key:@"DYYYEnableVideoHighestQuality" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"默认最高画质" key:@"DYYYEnableVideoHighestQuality" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"视频降噪增强" key:@"DYYYEnableNoiseFilter" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"默认清晰度-最高" key:@"DYYYDefaultQualityBest" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"默认清晰度-原画" key:@"DYYYDefaultQualityOriginal" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"默认清晰度-1080P" key:@"DYYYDefaultQuality1080p" type:DYYYSettingItemTypeSwitch],
@@ -1169,7 +1343,11 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -评论数量" key:@"DYYYVideoCustomComments" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"  -收藏数量" key:@"DYYYVideoCustomCollects" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
                 [DYYYSettingItem itemWithTitle:@"  -分享数量" key:@"DYYYVideoCustomShares" type:DYYYSettingItemTypeTextField placeholder:@"填写数字"],
-                [DYYYSettingItem itemWithTitle:@"强制自动播放（不能关闭）" key:@"DYYYisEnableAutoPlay" type:DYYYSettingItemTypeSwitch]
+                [DYYYSettingItem itemWithTitle:@"强制自动播放（不能关闭）" key:@"DYYYisEnableAutoPlay" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"启用深色键盘" key:@"DYYYisDarkKeyBoard" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"长按-复制视频文案" key:@"DYYYLongPressCopyTextEnabled" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"启用音乐文本复制" key:@"DYYYMusicCopyText" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"简化侧边栏" key:@"DYYYStreamlinethesidebar" type:DYYYSettingItemTypeSwitch]
             ],
 
             // 第六部分 - 图标自定义功能
@@ -1721,39 +1899,40 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 - (void)searchBar:(UISearchBar *)searchBar textDidChange:(NSString *)searchText {
     if (searchText.length == 0) {
         self.isSearching = NO;
-        self.filteredSections = self.settingSections;
-        self.filteredSectionTitles = [self.sectionTitles mutableCopy];
-        [self.expandedSections removeAllObjects];
+        self.filteredSections = nil;
+        self.filteredSectionTitles = nil;
     } else {
         self.isSearching = YES;
-        NSMutableArray *filtered = [NSMutableArray array];
-        NSMutableArray *filteredTitles = [NSMutableArray array];
+        [self filterContentForSearchText:searchText];
+    }
+    
+    [self.tableView reloadData];
+}
+
+- (void)filterContentForSearchText:(NSString *)searchText {
+    NSMutableArray *filteredSections = [NSMutableArray array];
+    NSMutableArray *filteredTitles = [NSMutableArray array];
+    
+    for (NSInteger i = 0; i < self.settingSections.count; i++) {
+        NSArray *section = self.settingSections[i];
+        NSMutableArray *filteredSection = [NSMutableArray array];
         
-        for (NSUInteger i = 0; i < self.settingSections.count; i++) {
-            NSArray<DYYYSettingItem *> *section = self.settingSections[i];
-            NSMutableArray<DYYYSettingItem *> *filteredItems = [NSMutableArray array];
-            
-            for (DYYYSettingItem *item in section) {
-                if ([item.title localizedCaseInsensitiveContainsString:searchText] || 
-                    [item.key localizedCaseInsensitiveContainsString:searchText]) {
-                    [filteredItems addObject:item];
-                }
-            }
-            
-            if (filteredItems.count > 0) {
-                [filtered addObject:filteredItems];
-                [filteredTitles addObject:self.sectionTitles[i]];
-                [self.expandedSections addObject:@(filteredTitles.count - 1)];
+        for (DYYYSettingItem *item in section) {
+            // 搜索标题或key
+            if ([item.title.lowercaseString containsString:searchText.lowercaseString] ||
+                [item.key.lowercaseString containsString:searchText.lowercaseString]) {
+                [filteredSection addObject:item];
             }
         }
         
-        self.filteredSections = filtered;
-        self.filteredSectionTitles = filteredTitles;
+        if (filteredSection.count > 0) {
+            [filteredSections addObject:filteredSection];
+            [filteredTitles addObject:self.sectionTitles[i]];
+        }
     }
     
-    if (self.tableView) {
-        [self.tableView reloadData];
-    }
+    self.filteredSections = filteredSections;
+    self.filteredSectionTitles = filteredTitles;
 }
 
 - (void)searchBarSearchButtonClicked:(UISearchBar *)searchBar {
@@ -2111,7 +2290,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         UISwitch *switchView = [[UISwitch alloc] init];
         switchView.onTintColor = [UIColor systemBlueColor];
         
-        // 处理时间属地显示开关逻辑...
+        // 重要：先设置开关状态，再应用特效
         if ([item.key hasPrefix:@"DYYYisEnableArea"] && 
             ![item.key isEqualToString:@"DYYYisEnableArea"]) {
             BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
@@ -2142,6 +2321,10 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         } else {
             [switchView setOn:[[NSUserDefaults standardUserDefaults] boolForKey:item.key]];
         }
+        
+        // 立即强制应用特效 - 确保每个开关都有效果
+        [switchView applyFuturisticEffects];
+        [switchView updateFuturisticEffectsWithState:switchView.isOn animated:NO];
         
         [switchView addTarget:self action:@selector(animatedSwitchToggled:) forControlEvents:UIControlEventValueChanged];
         switchView.tag = indexPath.section * 1000 + indexPath.row;
@@ -2285,110 +2468,71 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 // 添加热更新功能实现方法
 - (void)saveCurrentABTestData {
     NSDictionary *currentData = getCurrentABTestData();
-    if (!currentData || currentData.count == 0) {
-        [DYYYManager showToast:@"无法获取当前ABTest配置数据"];
+    if (!currentData) {
+        [DYYYManager showToast:@"获取ABTest数据失败"];
         return;
     }
     
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsDirectory = [paths firstObject];
-    NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
-    NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
+    // 保存到文档目录
+    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_config.json"];
     
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    if (![fileManager fileExistsAtPath:dyyyFolderPath]) {
-        NSError *error = nil;
-        [fileManager createDirectoryAtPath:dyyyFolderPath 
-                withIntermediateDirectories:YES 
-                                attributes:nil 
-                                    error:&error];
-        if (error) {
-            [DYYYManager showToast:[NSString stringWithFormat:@"创建DYYY目录失败: %@", error.localizedDescription]];
-            return;
-        }
-    }
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:currentData options:NSJSONWritingPrettyPrinted error:&error];
     
-    NSError *jsonError = nil;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:currentData 
-                                                        options:NSJSONWritingPrettyPrinted 
-                                                        error:&jsonError];
-    if (jsonError) {
-        [DYYYManager showToast:[NSString stringWithFormat:@"序列化JSON数据失败: %@", jsonError.localizedDescription]];
+    if (error) {
+        [DYYYManager showToast:@"序列化数据失败"];
         return;
     }
     
-    NSError *writeError = nil;
-    [jsonData writeToFile:jsonFilePath options:NSDataWritingAtomic error:&writeError];
-    if (writeError) {
-        [DYYYManager showToast:[NSString stringWithFormat:@"写入配置文件失败: %@", writeError.localizedDescription]];
-        return;
+    // 确保目录存在
+    [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
+    
+    if ([jsonData writeToFile:configPath atomically:YES]) {
+        [DYYYManager showToast:@"ABTest配置已保存"];
+    } else {
+        [DYYYManager showToast:@"保存失败"];
     }
-    
-    gFileExists = YES;
-    gFixedABTestData = [currentData copy];
-    gDataLoaded = YES;
-    
-    [DYYYManager showToast:@"当前ABTest配置已保存"];
 }
 
 - (void)loadABTestConfigFile {
-    UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json", @"public.text"] inMode:UIDocumentPickerModeImport];
-    documentPicker.allowsMultipleSelection = NO;
-
-    // 设置委托
-    DYYYBackupPickerDelegate *pickerDelegate = [[DYYYBackupPickerDelegate alloc] init];
-    pickerDelegate.completionBlock = ^(NSURL *url) {
-        NSData *jsonData = [NSData dataWithContentsOfURL:url];
-        if (!jsonData) {
-            [DYYYManager showToast:@"无法读取配置文件"];
-            return;
-        }
-
-        NSError *jsonError;
-        NSDictionary *abTestData = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&jsonError];
-        if (jsonError || ![abTestData isKindOfClass:[NSDictionary class]]) {
-            [DYYYManager showToast:@"配置文件格式错误"];
-            return;
-        }
-
-        // 保存到文件
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths firstObject];
-        NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
-        NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
-        
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        if (![fileManager fileExistsAtPath:dyyyFolderPath]) {
-            NSError *error = nil;
-            [fileManager createDirectoryAtPath:dyyyFolderPath 
-                    withIntermediateDirectories:YES 
-                                    attributes:nil 
-                                        error:&error];
-            if (error) {
-                [DYYYManager showToast:[NSString stringWithFormat:@"创建DYYY目录失败: %@", error.localizedDescription]];
-                return;
-            }
-        }
-        
-        NSError *writeError = nil;
-        [jsonData writeToFile:jsonFilePath options:NSDataWritingAtomic error:&writeError];
-        if (writeError) {
-            [DYYYManager showToast:[NSString stringWithFormat:@"写入配置文件失败: %@", writeError.localizedDescription]];
-            return;
-        }
-        
-        gFileExists = YES;
-        gFixedABTestData = [abTestData copy];
-        gDataLoaded = YES;
-        
-        [DYYYManager showToast:@"ABTest配置文件已导入"];
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json"] inMode:UIDocumentPickerModeImport];
+    picker.delegate = self.restorePickerDelegate;
+    picker.allowsMultipleSelection = NO;
+    
+    self.restorePickerDelegate.completionBlock = ^(NSURL *url) {
+        [self processABTestConfigFile:url];
     };
+    
+    [self presentViewController:picker animated:YES completion:nil];
+}
 
-    static char kDYYYABTestPickerDelegateKey;
-    documentPicker.delegate = pickerDelegate;
-    objc_setAssociatedObject(documentPicker, &kDYYYABTestPickerDelegateKey, pickerDelegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
-    [self presentViewController:documentPicker animated:YES completion:nil];
+- (void)processABTestConfigFile:(NSURL *)url {
+    NSError *error;
+    NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
+    
+    if (error) {
+        [DYYYManager showToast:@"读取文件失败"];
+        return;
+    }
+    
+    NSDictionary *configData = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+    
+    if (error) {
+        [DYYYManager showToast:@"解析JSON失败"];
+        return;
+    }
+    
+    // 应用ABTest配置
+    Class AWEABTestManagerClass = NSClassFromString(@"AWEABTestManager");
+    if (AWEABTestManagerClass) {
+        id manager = [AWEABTestManagerClass performSelector:@selector(sharedManager)];
+        if ([manager respondsToSelector:@selector(setAbTestData:)]) {
+            [manager performSelector:@selector(setAbTestData:) withObject:configData];
+            [DYYYManager showToast:@"ABTest配置已应用"];
+        }
+    }
 }
 
 - (void)deleteABTestConfigFile {
@@ -2431,10 +2575,34 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 - (UIImage *)iconImageForSettingItem:(DYYYSettingItem *)item {
     NSString *iconName;
     
+    // 为新增功能添加图标
+    if ([item.key isEqualToString:@"DYYYEnableVideoHighestQuality"]) {
+        iconName = @"4k.tv.fill";
+    } else if ([item.key isEqualToString:@"DYYYEnableNoiseFilter"]) {
+        iconName = @"waveform.path.ecg";
+    } else if ([item.key isEqualToString:@"DYYYisEnableAutoPlay"]) {
+        iconName = @"play.circle.fill";
+    } else if ([item.key isEqualToString:@"DYYYisEnableModern"]) {
+        iconName = @"rectangle.3.group.fill";
+    } else if ([item.key isEqualToString:@"DYYYEnableSaveAvatar"]) {
+        iconName = @"person.crop.circle.badge.plus";
+    } else if ([item.key containsString:@"Comment"] && [item.key containsString:@"NotWaterMark"]) {
+        iconName = @"bubble.left.and.bubble.right.fill";
+    } else if ([item.key isEqualToString:@"DYYYFourceDownloadEmotion"]) {
+        iconName = @"face.smiling.inverse";
+    } 
     // 为彩色取色器添加特殊处理
-    if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
+    else if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
         iconName = @"paintpalette.fill";
     } 
+    // 为侧栏简化功能添加特殊处理
+    else if ([item.key isEqualToString:@"DYYYStreamlinethesidebar"]) {
+        iconName = @"sidebar.left";
+    }
+    // 为深色键盘功能添加特殊处理
+    else if ([item.key isEqualToString:@"DYYYisDarkKeyBoard"]) {
+        iconName = @"keyboard";
+    }
     // 其他根据设置项的key选择合适的图标...
     else if ([item.key containsString:@"Danmu"] || [item.key containsString:@"弹幕"]) {
         iconName = @"text.bubble.fill";
@@ -2478,6 +2646,8 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         iconName = @"bell.fill";
     } else if ([item.key containsString:@"Copy"] || [item.key containsString:@"复制"]) {
         iconName = @"doc.on.doc.fill";
+    } else if ([item.key containsString:@"Emotion"] || [item.key containsString:@"表情"]) {
+        iconName = @"face.smiling.fill";
     } else if ([item.key containsString:@"Text"] || [item.key containsString:@"文本"]) {
         iconName = @"text.alignleft";
     } else if ([item.key containsString:@"Location"] || [item.key containsString:@"位置"] || [item.key containsString:@"属地"]) {
@@ -2541,9 +2711,13 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 
 // 根据设置项返回颜色
 - (UIColor *)colorForSettingItem:(DYYYSettingItem *)item {
-    // 为取色器设置特殊颜色
+    // 为取色器和特定功能设置特殊颜色
     if ([item.key isEqualToString:@"DYYYBackgroundColor"]) {
         return [UIColor systemPinkColor];
+    } else if ([item.key isEqualToString:@"DYYYStreamlinethesidebar"]) {
+        return [UIColor systemIndigoColor];
+    } else if ([item.key isEqualToString:@"DYYYisDarkKeyBoard"]) {
+        return [UIColor systemGrayColor];
     }
     
     // 根据设置项类型返回不同颜色
@@ -2553,6 +2727,10 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         return [UIColor systemGreenColor];
     } else if ([item.key containsString:@"Color"] || [item.key containsString:@"颜色"]) {
         return [UIColor systemPurpleColor];
+    } else if ([item.key containsString:@"Copy"] || [item.key containsString:@"复制"]) {
+        return [UIColor systemTealColor];
+    } else if ([item.key containsString:@"Emotion"] || [item.key containsString:@"表情"]) {
+        return [UIColor systemYellowColor];
     } else if ([item.key containsString:@"Double"] || [item.key containsString:@"双击"]) {
         return [UIColor systemOrangeColor];
     } else if ([item.key containsString:@"Download"] || [item.key containsString:@"下载"]) {
@@ -2573,6 +2751,8 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 
 // 微软风格UISwitch动画，联动卡片
 - (void)animatedSwitchToggled:(UISwitch *)sender {
+    [sender applyFuturisticEffects];
+    [sender updateFuturisticEffectsWithState:sender.isOn animated:YES];
     UITableViewCell *cell = (UITableViewCell *)sender.superview.superview;
     UIView *card = [cell.contentView viewWithTag:8888];
     // 卡片和switch联动弹跳+高光
@@ -2671,35 +2851,9 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         return;
     }
     
-    // 添加对图标自定义项的处理
+    // 处理图标自定义项
     if ([item.key hasPrefix:@"DYYYIcon"]) {
-        NSString *saveFilename = nil;
-        if ([item.key isEqualToString:@"DYYYIconLikeBefore"]) {
-            saveFilename = @"like_before.png";
-        } else if ([item.key isEqualToString:@"DYYYIconLikeAfter"]) {
-            saveFilename = @"like_after.png";
-        } else if ([item.key isEqualToString:@"DYYYIconComment"]) {
-            saveFilename = @"comment.png";
-        } else if ([item.key isEqualToString:@"DYYYIconUnfavorite"]) {
-            saveFilename = @"unfavorite.png";
-        } else if ([item.key isEqualToString:@"DYYYIconFavorite"]) {
-            saveFilename = @"favorite.png";
-        } else if ([item.key isEqualToString:@"DYYYIconShare"]) {
-            saveFilename = @"share.png";
-        }
-        
-        if (saveFilename) {
-            // 处理图标自定义
-            NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-            NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
-            NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
-            
-            BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
-            UIImage *previewImage = fileExists ? [UIImage imageWithContentsOfFile:imagePath] : nil;
-            
-            // 显示选项对话框
-            [self showIconOptionsDialogWithTitle:item.title previewImage:previewImage saveFilename:saveFilename];
-        }
+        [self handleIconSelection:item];
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         return;
     }
@@ -2745,6 +2899,39 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         } cancelBlock:nil];
     }
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+}
+
+- (void)handleIconSelection:(DYYYSettingItem *)item {
+    NSString *saveFilename = nil;
+    
+    // 映射图标类型到文件名
+    if ([item.key isEqualToString:@"DYYYIconLikeBefore"]) {
+        saveFilename = @"like_before.png";
+    } else if ([item.key isEqualToString:@"DYYYIconLikeAfter"]) {
+        saveFilename = @"like_after.png";
+    } else if ([item.key isEqualToString:@"DYYYIconComment"]) {
+        saveFilename = @"comment.png";
+    } else if ([item.key isEqualToString:@"DYYYIconUnfavorite"]) {
+        saveFilename = @"unfavorite.png";
+    } else if ([item.key isEqualToString:@"DYYYIconFavorite"]) {
+        saveFilename = @"favorite.png";
+    } else if ([item.key isEqualToString:@"DYYYIconShare"]) {
+        saveFilename = @"share.png";
+    }
+    
+    if (saveFilename) {
+        // 获取图标路径
+        NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+        NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
+        
+        // 检查是否已有自定义图标
+        BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
+        UIImage *previewImage = fileExists ? [UIImage imageWithContentsOfFile:imagePath] : nil;
+        
+        // 显示图标选项对话框
+        [self showIconOptionsDialogWithTitle:item.title previewImage:previewImage saveFilename:saveFilename];
+    }
 }
 
 // 添加这个辅助方法
@@ -2864,299 +3051,169 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 #pragma mark - Actions
 
 - (void)switchToggled:(UISwitch *)sender {
-    // 触发触觉反馈
-    [self.feedbackGenerator impactOccurred];
-    [self.feedbackGenerator prepare];
+    NSInteger section = sender.tag / 1000;
+    NSInteger row = sender.tag % 1000;
+    NSArray *currentSection = self.isSearching ? self.filteredSections[section] : self.settingSections[section];
+    DYYYSettingItem *item = currentSection[row];
     
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:sender.tag % 1000 inSection:sender.tag / 1000];
-    NSArray<NSArray<DYYYSettingItem *> *> *sections = self.isSearching ? self.filteredSections : self.settingSections;
-    if (indexPath.section >= sections.count || indexPath.row >= sections[indexPath.section].count) {
-        return;
-    }
-    
-    DYYYSettingItem *item = sections[indexPath.section][indexPath.row];
-    BOOL isOn = sender.isOn;
-    
-    // 热更新功能特殊处理
-    if ([item.key isEqualToString:@"DYYYABTestBlockEnabled"]) {
-        [self handleABTestBlockEnabled:isOn];
-        return;
-    } else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
-        [self handleABTestPatchEnabled:isOn];
-        return;
-    } else if ([item.key isEqualToString:@"SaveCurrentABTestData"]) {
-        if (isOn) {
-            [self saveCurrentABTestData];
-            // 重置开关状态
-            sender.on = NO;
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-        return;
-    } else if ([item.key isEqualToString:@"LoadABTestConfigFile"]) {
-        if (isOn) {
-            [self loadABTestConfigFile];
-            // 重置开关状态
-            sender.on = NO;
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-        return;
-    } else if ([item.key isEqualToString:@"DeleteABTestConfigFile"]) {
-        if (isOn) {
-            [self deleteABTestConfigFile];
-            // 重置开关状态
-            sender.on = NO;
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-        return;
-    }
-    
-    // 处理时间属地显示开关逻辑...
-    if ([item.key hasPrefix:@"DYYYisEnableArea"] && 
-        ![item.key isEqualToString:@"DYYYisEnableArea"]) {
-        BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
-        sender.enabled = parentEnabled;
-        
-        BOOL isAreaSubSwitch = [item.key isEqualToString:@"DYYYisEnableAreaProvince"] ||
-                              [item.key isEqualToString:@"DYYYisEnableAreaCity"] ||
-                              [item.key isEqualToString:@"DYYYisEnableAreaDistrict"] ||
-                              [item.key isEqualToString:@"DYYYisEnableAreaStreet"];
-        
-        if (isAreaSubSwitch && !parentEnabled) {
-            // 如果父开关关闭，子开关不能打开
-            sender.on = NO;
-            isOn = NO;
-            [DYYYManager showToast:@"请先开启「时间属地显示-开关」"];
-            return;
-        }
-    }
-    
-    // 检查双击操作开关的父子关系
-    if ([item.key isEqualToString:@"DYYYDoubleTapDownload"] ||
-        [item.key isEqualToString:@"DYYYEnableImageToVideo"] || 
-        [item.key isEqualToString:@"DYYYDoubleTapDownloadAudio"] ||        
-        [item.key isEqualToString:@"DYYYDoubleTapCopyDesc"] ||
-        [item.key isEqualToString:@"DYYYDoubleTapComment"] ||
-        [item.key isEqualToString:@"DYYYDoubleTapLike"] ||
-        [item.key isEqualToString:@"DYYYDoubleTapshowSharePanel"] ||
-        [item.key isEqualToString:@"DYYYDoubleTapshowDislikeOnVideo"] ||
-        [item.key isEqualToString:@"DYYYDoubleInterfaceDownload"]) {
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableDoubleOpenAlertController"]) {
-            // 如果父级开关关闭，则不允许打开子级设置
-            sender.on = NO;
-            isOn = NO;
-            [DYYYManager showToast:@"请先开启「双击操作-开关」"];
-            return;
-        }
-    }
-
-    // 双击操作-开关关闭时，关闭所有子开关
-    if ([item.key isEqualToString:@"DYYYEnableDoubleOpenAlertController"] && !isOn) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapDownload"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYEnableImageToVideo"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapDownloadAudio"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapCopyDesc"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapComment"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapLike"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapshowSharePanel"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleTapshowDislikeOnVideo"]; 
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDoubleInterfaceDownload"];        
-        // 刷新界面，更新所有子开关状态
-        [self updateSubswitchesForSection:indexPath.section parentKey:@"DYYYEnableDoubleOpenAlertController"];
-    }
-    
-    // 检查长按下载功能的父子开关关系
-    if ([item.key isEqualToString:@"DYYYLongPressSaveVideo"] ||
-        [item.key isEqualToString:@"DYYYEnableFLEX"] || 
-        [item.key isEqualToString:@"DYYYLongPressSaveCover"] || 
-        [item.key isEqualToString:@"DYYYLongPressSaveAudio"] ||        
-        [item.key isEqualToString:@"DYYYLongPressSaveCurrentImage"] ||
-        [item.key isEqualToString:@"DYYYLongPressSaveAllImages"] ||
-        [item.key isEqualToString:@"DYYYLongPressCopyText"] ||
-        [item.key isEqualToString:@"DYYYLongPressCopyLink"] ||
-        [item.key isEqualToString:@"DYYYLongPressApiDownload"] ||
-        [item.key isEqualToString:@"DYYYLongPressFilterUser"] ||
-        [item.key isEqualToString:@"DYYYLongPressFilterTitle"] ||
-        [item.key isEqualToString:@"DYYYLongPressTimerClose"] ||
-        [item.key isEqualToString:@"DYYYLongPressCreateVideo"]) {
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressDownload"]) {
-            // 如果父级开关关闭，则不允许打开子级设置
-            sender.on = NO;
-            isOn = NO;
-            [DYYYManager showToast:@"请先开启「长按功能-开关」"];
-            return;
-        }
-    }
-    
-    // 检查复制文案功能的父子开关关系
-    if ([item.key isEqualToString:@"DYYYCopyOriginalText"] || 
-        [item.key isEqualToString:@"DYYYCopyShareLink"]) {
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYCopyText"]) {
-            // 如果父级开关关闭，则不允许打开子级设置
-            sender.on = NO;
-            isOn = NO;
-            [DYYYManager showToast:@"请先开启「复制文案功能」"];
-            return;
-        }
-    }
-    
-    // 长按下载功能主开关关闭时，关闭所有子开关
-    if ([item.key isEqualToString:@"DYYYLongPressDownload"] && !isOn) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressSaveVideo"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYEnableFLEX"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressSaveCover"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressSaveAudio"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressSaveCurrentImage"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressSaveAllImages"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressCopyText"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressCopyLink"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressApiDownload"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressFilterUser"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressFilterTitle"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressTimerClose"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYLongPressCreateVideo"];
-        
-        // 刷新界面，更新所有子开关状态
-        [self updateSubswitchesForSection:indexPath.section parentKey:@"DYYYLongPressDownload"];
-    }
-    // 复制文案功能主开关关闭时，关闭所有子开关
-    else if ([item.key isEqualToString:@"DYYYCopyText"] && !isOn) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCopyOriginalText"];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYCopyShareLink"];
-        
-        // 刷新界面，更新所有子开关状态
-        [self updateSubswitchesForSection:indexPath.section parentKey:@"DYYYCopyText"];
-    }
-    
-    // 处理日期时间格式开关组
-    if ([item.key isEqualToString:@"DYYYShowDateTime"]) {
-        // 主开关操作 - 所有子开关跟随主开关状态
-        BOOL mainEnabled = isOn;
-        [[NSUserDefaults standardUserDefaults] setBool:mainEnabled forKey:@"DYYYShowDateTime"];
-        
-        // 如果主开关关闭，关闭所有子开关
-        if (!mainEnabled) {
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMDHM"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_MDHM"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_HMS"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_HM"];
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMD"];
-            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
-        } 
-        // 如果主开关打开，默认启用第一个格式
-        else if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"] && 
-                ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"] && 
-                ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"] && 
-                ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"] && 
-                ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"]) {
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYDateTimeFormat_YMDHM"];
-            [[NSUserDefaults standardUserDefaults] setObject:@"yyyy-MM-dd HH:mm" forKey:@"DYYYDateTimeFormat"];
-        }
-        
-        // 更新UI中所有子开关的状态
-        [self updateDateTimeFormatSubSwitchesUI:indexPath.section enabled:mainEnabled];
-    } 
-    // 处理日期时间格式子开关操作
-    else if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
-            // 如果父级开关关闭，则不允许打开子级设置
-            sender.on = NO;
-            isOn = NO;
-            [DYYYManager showToast:@"请先开启「视频-显示日期时间」"];
-            return;
-        }
-        
-        // 当任何子开关打开时
-        if (isOn) {
-            // 确保主开关打开
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYShowDateTime"];
-            
-            // 关闭其他格式子开关，设置当前格式为默认
-            NSString *formatValue = @"";
-            if ([item.key isEqualToString:@"DYYYDateTimeFormat_YMDHM"]) {
-                formatValue = @"yyyy-MM-dd HH:mm";
-                [self updateDateTimeFormatExclusiveSwitch:indexPath.section currentKey:item.key];
-            } 
-            else if ([item.key isEqualToString:@"DYYYDateTimeFormat_MDHM"]) {
-                formatValue = @"MM-dd HH:mm";
-                [self updateDateTimeFormatExclusiveSwitch:indexPath.section currentKey:item.key];
-            }
-            else if ([item.key isEqualToString:@"DYYYDateTimeFormat_HMS"]) {
-                formatValue = @"HH:mm:ss";
-                [self updateDateTimeFormatExclusiveSwitch:indexPath.section currentKey:item.key];
-            }
-            else if ([item.key isEqualToString:@"DYYYDateTimeFormat_HM"]) {
-                formatValue = @"HH:mm";
-                [self updateDateTimeFormatExclusiveSwitch:indexPath.section currentKey:item.key];
-            }
-            else if ([item.key isEqualToString:@"DYYYDateTimeFormat_YMD"]) {
-                formatValue = @"yyyy-MM-dd";
-                [self updateDateTimeFormatExclusiveSwitch:indexPath.section currentKey:item.key];
-            }
-            
-            // 更新DateTimeFormat
-            if (formatValue.length > 0) {
-                [[NSUserDefaults standardUserDefaults] setObject:formatValue forKey:@"DYYYDateTimeFormat"];
-            }
-            
-            // 更新UI中主开关的状态
-            [self updateDateTimeFormatMainSwitchUI:indexPath.section];
-        } 
-        // 当任何子开关关闭时
-        else {
-            // 将当前子开关设置为关闭
-            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-            
-            // 检查是否所有子开关都已关闭
-            BOOL anyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"] || 
-                              [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"];
-            
-            // 如果所有子开关都关闭，也关闭主开关并清除格式
-            if (!anyEnabled) {
-                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
-                [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
-                // 使用section变量而非indexPath.section
-                for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-                    [self updateDateTimeFormatMainSwitchUI:section];
-                }
-            }
-        }
-    }
-    
-    // 在switchToggled:方法中添加对进度条设置项的特殊处理
-    if ([item.key isEqualToString:@"DYYYisShowScheduleDisplay"]) {
-        // 当进度显示开关关闭时，提示用户进度样式设置将失效
-        if (!isOn && [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYScheduleStyle"]) {
-            // 显示提示
-            [DYYYManager showToast:@"进度样式设置将在显示进度时生效"];
-        }
-        
-        // 刷新UI中的进度样式设置项状态
-        for (NSInteger section = 0; section < self.settingSections.count; section++) {
-            NSArray *items = self.settingSections[section];
-            for (NSInteger row = 0; row < items.count; row++) {
-                DYYYSettingItem *currentItem = items[row];
-                if ([currentItem.key isEqualToString:@"DYYYScheduleStyle"]) {
-                    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-                    [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
-                    break;
-                }
-            }
-        }
-    }
-    
-    // 保存开关状态
-    [[NSUserDefaults standardUserDefaults] setBool:isOn forKey:item.key];
+    // 保存设置值
+    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:item.key];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged" object:nil userInfo:@{
-        @"key": item.key,
-        @"value": @(isOn)
-    }];
+    
+    // 特定功能处理 - 确保菜单开关能控制功能
+    if ([item.key isEqualToString:@"DYYYStreamlinethesidebar"]) {
+        [DYYYManager showToast:sender.isOn ? @"侧栏简化已启用，重新打开侧栏生效" : @"侧栏简化已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYisDarkKeyBoard"]) {
+        [DYYYManager showToast:sender.isOn ? @"深色键盘已启用" : @"深色键盘已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYEnableVideoHighestQuality"]) {
+        [DYYYManager showToast:sender.isOn ? @"默认最高画质已启用" : @"默认最高画质已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYEnableNoiseFilter"]) {
+        [DYYYManager showToast:sender.isOn ? @"视频降噪增强已启用" : @"视频降噪增强已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYisEnableAutoPlay"]) {
+        [DYYYManager showToast:sender.isOn ? @"自动播放已启用，重启应用生效" : @"自动播放已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYisEnableModern"]) {
+        [DYYYManager showToast:sender.isOn ? @"现代面板已启用" : @"现代面板已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYEnableSaveAvatar"]) {
+        [DYYYManager showToast:sender.isOn ? @"保存头像功能已启用" : @"保存头像功能已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYCommentLivePhotoNotWaterMark"]) {
+        [DYYYManager showToast:sender.isOn ? @"评论动图保存已启用" : @"评论动图保存已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYCommentNotWaterMark"]) {
+        [DYYYManager showToast:sender.isOn ? @"评论图片保存已启用" : @"评论图片保存已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYFourceDownloadEmotion"]) {
+        [DYYYManager showToast:sender.isOn ? @"强制下载表情已启用，重启应用生效" : @"强制下载表情已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYfollowTips"]) {
+        [DYYYManager showToast:sender.isOn ? @"关注二次确认已启用" : @"关注二次确认已关闭"];
+    }
+    else if ([item.key isEqualToString:@"DYYYcollectTips"]) {
+        [DYYYManager showToast:sender.isOn ? @"收藏二次确认已启用" : @"收藏二次确认已关闭"];
+    }
+    // 隐藏功能的处理
+    else if ([item.key isEqualToString:@"DYYYHideGuideTipView"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏搜索引导提示框" : @"已显示搜索引导提示框"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHideFeedTabJumpGuide"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏顶栏引导提示" : @"已显示顶栏引导提示"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHideWords"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏大家都在搜" : @"已显示大家都在搜"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHideShowPlayletComment"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏短剧免费去看" : @"已显示短剧免费去看"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHideCommentMusicAnchor"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏评论音乐" : @"已显示评论音乐"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHidePOIEntryAnchor"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏评论定位" : @"已显示评论定位"];
+    }
+    else if ([item.key isEqualToString:@"DYYYHideCommentSearchAnchor"]) {
+        [DYYYManager showToast:sender.isOn ? @"已隐藏评论搜索" : @"已显示评论搜索"];
+    }
+    // ABTest热更新功能
+    else if ([item.key isEqualToString:@"DYYYABTestBlockEnabled"]) {
+        [self handleABTestBlockEnabled:sender.isOn];
+    }
+    else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
+        [self handleABTestPatchEnabled:sender.isOn];
+    }
+    
+    // 处理开关依赖关系
+    [self updateSwitchDependencies:item.key isEnabled:sender.isOn section:section];
+    
+    // 触觉反馈
+    [self.feedbackGenerator impactOccurred];
+}
+
+// 开关依赖关系处理方法
+- (void)updateSwitchDependencies:(NSString *)key isEnabled:(BOOL)enabled section:(NSInteger)section {
+    // 处理清屏功能子选项
+    if ([key isEqualToString:@"DYYYEnableFloatClearButton"]) {
+        [self updateClearButtonSubSwitchesUI:section enabled:enabled];
+    }
+    // 处理长按功能子选项
+    else if ([key isEqualToString:@"DYYYLongPressDownload"]) {
+        [self updateLongPressSubSwitchesUI:section enabled:enabled];
+    }
+    // 处理时间属地显示的子选项
+    else if ([key isEqualToString:@"DYYYisEnableArea"]) {
+        [self updateAreaSubSwitchesUI:section enabled:enabled];
+    }
+    // 处理视频显示日期时间的子选项
+    else if ([key isEqualToString:@"DYYYShowDateTime"]) {
+        [self updateDateTimeFormatSubSwitchesUI:section enabled:enabled];
+    }
+    // 处理主页自定义总开关
+    else if ([key isEqualToString:@"DYYYEnableSocialStatsCustom"]) {
+        [self updateSubswitchesForSection:section parentKey:key];
+    }
+    // 处理视频自定义总开关
+    else if ([key isEqualToString:@"DYYYEnableVideoStatsCustom"]) {
+        [self updateSubswitchesForSection:section parentKey:key];
+    }
+}
+
+- (void)updateClearButtonSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
+    NSArray<NSString *> *subKeys = @[
+        @"DYYYHideDanmaku",
+        @"DYYYEnabshijianjindu", 
+        @"DYYYHideTimeProgress",
+        @"DYYYHideSlider",
+        @"DYYYHideTabBar",
+        @"DYYYHideSpeed"
+    ];
+    
+    [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled];
+}
+
+- (void)updateLongPressSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
+    NSArray<NSString *> *subKeys = @[
+        @"DYYYLongPressSaveVideo",
+        @"DYYYLongPressSaveAudio",
+        @"DYYYEnableFLEX",
+        @"DYYYLongPressSaveCurrentImage",
+        @"DYYYLongPressSaveAllImages",
+        @"DYYYLongPressCopyLink",
+        @"DYYYLongPressApiDownload",
+        @"DYYYLongPressFilterUser",
+        @"DYYYLongPressFilterTitle",
+        @"DYYYLongPressTimerClose",
+        @"DYYYLongPressCreateVideo"
+    ];
+    
+    [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled];
+}
+
+- (void)updateSubSwitchesInSection:(NSInteger)section withKeys:(NSArray<NSString *> *)keys enabled:(BOOL)enabled {
+    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
+    
+    for (NSUInteger row = 0; row < sectionItems.count; row++) {
+        DYYYSettingItem *item = sectionItems[row];
+        
+        if ([keys containsObject:item.key]) {
+            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
+            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
+            
+            if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
+                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
+                subSwitch.enabled = enabled;
+                subSwitch.alpha = enabled ? 1.0 : 0.5;
+                if (!enabled) {
+                    subSwitch.on = NO;
+                    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
+                }
+            }
+        }
+    }
 }
 
 - (void)updateAreaMainSwitchUI:(NSInteger)section {
@@ -3391,12 +3448,33 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     if ([item.key isEqualToString:@"DYYYInterfaceDownload"]) {
         NSString *text = [textField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
         if (text.length == 0) {
-            textField.text = @"https://api.qsy.ink/api/douyin?url=";
-            [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?url=" forKey:item.key];
+            textField.text = @"https://api.qsy.ink/api/douyin?key=DYYY&url=";
+            [[NSUserDefaults standardUserDefaults] setObject:@"https://api.qsy.ink/api/douyin?key=DYYY&url=" forKey:item.key];
         } else {
             [[NSUserDefaults standardUserDefaults] setObject:textField.text forKey:item.key];
         }
-    } else {
+    } 
+    // 倍速数值设置的特殊处理
+    else if ([item.key isEqualToString:@"DYYYSpeedSettings"]) {
+        NSString *speedConfig = textField.text;
+        if (speedConfig.length == 0) {
+            speedConfig = @"1.0,1.25,1.5,2.0";
+            textField.text = speedConfig;
+        }
+        [[NSUserDefaults standardUserDefaults] setObject:speedConfig forKey:item.key];
+        [DYYYManager showToast:@"倍速选项已更新"];
+    }
+    // 倍速按钮大小的特殊处理
+    else if ([item.key isEqualToString:@"DYYYSpeedButtonSize"]) {
+        NSString *sizeStr = textField.text;
+        if (sizeStr.length == 0 || [sizeStr floatValue] <= 0) {
+            sizeStr = @"40";
+            textField.text = sizeStr;
+        }
+        [[NSUserDefaults standardUserDefaults] setObject:sizeStr forKey:item.key];
+        [DYYYManager showToast:@"倍速按钮大小已更新"];
+    } 
+    else {
         [[NSUserDefaults standardUserDefaults] setObject:textField.text forKey:item.key];
     }
     

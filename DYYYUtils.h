@@ -5,6 +5,12 @@ NS_ASSUME_NONNULL_BEGIN
 @interface DYYYUtils : NSObject
 
 /**
+ * 显示 Toast 消息
+ * @param message 要显示的消息内容
+ */
++ (void)showToast:(NSString *)message;
+
+/**
  * 获取当前显示的顶层视图控制器
  * @return 顶层视图控制器
  */

@@ -45,10 +45,10 @@ include $(THEOS)/makefiles/common.mk
 # 插件名称
 TWEAK_NAME = DYYY
 
-# 源代码文件 
+# 源代码文件
 DYYY_FILES = DYYY.xm \
-            DYYYFloatClearButton.xm \
             DYYYFloatSpeedButton.xm \
+            DYYYFloatClearButton.xm \
             AWEPlayInteractionViewController.xm \
             AWEModernLongPressPanelTableViewController.xm \
             CityManager.m \
@@ -57,7 +57,7 @@ DYYY_FILES = DYYY.xm \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
-DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm
+DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm AWEPlayerPlayControlHandler.xm AWEPlayInteractionProgressController.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm
 DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m
 
 # 添加 FLEX 源文件
@@ -75,20 +75,19 @@ $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage
-$(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp  # 使用 += 
+$(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/libwebp/include
 
 # FLEX 库和头文件路径
 $(TWEAK_NAME)_LIBRARIES = 
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS)/include
-$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX # 添加 FLEX 头文件路径
-
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX
 
 # 编译标志
-$(TWEAK_NAME)_CFLAGS += -Wno-everything  # 禁用所有警告
-$(TWEAK_NAME)_CFLAGS += -Wno-incomplete-implementation  # 禁用特定警告
-$(TWEAK_NAME)_CFLAGS += -Wno-protocol  # 禁用协议警告
+$(TWEAK_NAME)_CFLAGS += -Wno-everything
+$(TWEAK_NAME)_CFLAGS += -Wno-incomplete-implementation
+$(TWEAK_NAME)_CFLAGS += -Wno-protocol
 
 # 预处理变量
 $(TWEAK_NAME)_CFLAGS += -DDOKIT_FULL_BUILD=1

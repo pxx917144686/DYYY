@@ -11,8 +11,11 @@
 #import "DYYYScreenshot.h" // 添加截图功能头文件
 #import <CoreMotion/CoreMotion.h>
 #import <QuartzCore/QuartzCore.h>
+#import "DYYYFloatSpeedButton.h" 
 
-
+// 外部符号声明
+extern FloatingSpeedButton *speedButton;
+extern BOOL isFloatSpeedButtonEnabled;
 
 @interface DYYYDraggableButton : UIButton
 @property (nonatomic, assign) NSInteger originalIndex;
