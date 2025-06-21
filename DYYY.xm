@@ -550,19 +550,22 @@ static NSLock *downloadCountLock = nil;
 
 %hook AWEFeedTableView
 - (void)layoutSubviews {
-	%orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-		if (self.superview) {
-			CGFloat currentDifference = self.superview.frame.size.height - self.frame.size.height;
-			if (currentDifference > 0 && currentDifference != tabHeight) {
-				tabHeight = currentDifference;
-			}
-		}
-
-		CGRect frame = self.frame;
-		frame.size.height = self.superview.frame.size.height;
-		self.frame = frame;
-	}
+    %orig;
+    // 添加安全检查，防止循环调用和nil检查
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] && 
+        !objc_getAssociatedObject(self, "alreadyAdjusted") && 
+        self.superview != nil) {
+        
+        // 使用GCD延迟执行，避免卡UI线程
+        dispatch_async(dispatch_get_main_queue(), ^{
+            CGRect frame = self.frame;
+            if (frame.size.height < self.superview.frame.size.height) { // 避免无限增大
+                frame.size.height = self.superview.frame.size.height;
+                self.frame = frame;
+                objc_setAssociatedObject(self, "alreadyAdjusted", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+        });
+    }
 }
 %end
 
@@ -2103,49 +2106,51 @@ static NSLock *downloadCountLock = nil;
 
 %hook AWEFeedProgressSlider
 
-// layoutSubviews 保持不变
 - (void)layoutSubviews {
 	%orig;
 	[self applyCustomProgressStyle];
 }
 
 %new
-
 - (void)applyCustomProgressStyle {
 	NSString *scheduleStyle = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYScheduleStyle"];
 	UIView *parentView = self.superview;
+	if (!parentView) return;
 
-	if (!parentView)
-		return;
+	// 获取进度条的frame
+	CGRect sliderFrame = self.frame;
+
+	// 获取标签
+	UILabel *leftLabel = [parentView viewWithTag:10001];
+	UILabel *rightLabel = [parentView viewWithTag:10002];
+
+	// 统一高度
+	CGFloat labelHeight = 15.0;
+	CGFloat sliderCenterY = CGRectGetMidY(sliderFrame);
 
 	if ([scheduleStyle isEqualToString:@"进度条两侧左右"]) {
-		// 尝试获取标签
-		UILabel *leftLabel = [parentView viewWithTag:10001];
-		UILabel *rightLabel = [parentView viewWithTag:10002];
-
 		if (leftLabel && rightLabel) {
+			// 让label和slider垂直居中
+			CGFloat labelY = sliderCenterY - labelHeight / 2.0;
+			leftLabel.center = CGPointMake(leftLabel.center.x, labelY + labelHeight/2.0);
+			rightLabel.center = CGPointMake(rightLabel.center.x, labelY + labelHeight/2.0);
+
+			// 进度条起点紧跟左label，终点紧贴右label
 			CGFloat padding = 5.0;
-			CGFloat sliderY = self.frame.origin.y;
-			CGFloat sliderHeight = self.frame.size.height;
-			CGFloat sliderX = leftLabel.frame.origin.x + leftLabel.frame.size.width + padding;
-			CGFloat sliderWidth = rightLabel.frame.origin.x - padding - sliderX;
-
-			if (sliderWidth < 0)
-				sliderWidth = 0;
-
-			self.frame = CGRectMake(sliderX, sliderY, sliderWidth, sliderHeight);
+			CGFloat sliderX = CGRectGetMaxX(leftLabel.frame) + padding;
+			CGFloat sliderWidth = CGRectGetMinX(rightLabel.frame) - padding - sliderX;
+			if (sliderWidth < 0) sliderWidth = 0;
+			self.frame = CGRectMake(sliderX, sliderFrame.origin.y, sliderWidth, sliderFrame.size.height);
 		} else {
+			// fallback: 居中显示
 			CGFloat fallbackWidthPercent = 0.80;
 			CGFloat parentWidth = parentView.bounds.size.width;
 			CGFloat fallbackWidth = parentWidth * fallbackWidthPercent;
 			CGFloat fallbackX = (parentWidth - fallbackWidth) / 2.0;
-			// 使用 self.frame 获取当前 Y 和 Height (通常由 %orig 设置)
-			CGFloat currentY = self.frame.origin.y;
-			CGFloat currentHeight = self.frame.size.height;
-			// 应用回退 frame
-			self.frame = CGRectMake(fallbackX, currentY, fallbackWidth, currentHeight);
+			self.frame = CGRectMake(fallbackX, sliderFrame.origin.y, fallbackWidth, sliderFrame.size.height);
 		}
 	} else {
+		// 其他样式可按需扩展
 	}
 }
 
@@ -2171,14 +2176,13 @@ static CGFloat rightLabelRightMargin = -1;
 
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisShowScheduleDisplay"]) {
 		UIView *parentView = self.superview;
-		if (!parentView)
-			return;
+		if (!parentView) return;
 
 		[[parentView viewWithTag:10001] removeFromSuperview];
 		[[parentView viewWithTag:10002] removeFromSuperview];
 
-		CGRect sliderOriginalFrameInParent = [self convertRect:self.bounds toView:parentView];
 		CGRect sliderFrame = self.frame;
+		CGFloat sliderCenterY = CGRectGetMidY(sliderFrame);
 
 		CGFloat verticalOffset = -12.5;
 		NSString *offsetValueString = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYTimelineVerticalPosition"];
@@ -2204,9 +2208,10 @@ static CGFloat rightLabelRightMargin = -1;
 			}
 		}
 
-		CGFloat labelYPosition = sliderOriginalFrameInParent.origin.y + verticalOffset;
 		CGFloat labelHeight = 15.0;
 		UIFont *labelFont = [UIFont systemFontOfSize:8];
+
+		CGFloat labelY = sliderCenterY - labelHeight / 2.0 + verticalOffset;
 
 		if (!showRemainingTime && !showCompleteTime) {
 			UILabel *leftLabel = [[UILabel alloc] init];
@@ -2220,14 +2225,13 @@ static CGFloat rightLabelRightMargin = -1;
 				leftLabel.text = [NSString stringWithFormat:@"00:00/%@", durationFormatted];
 			else
 				leftLabel.text = @"00:00";
-
 			[leftLabel sizeToFit];
 
 			if (leftLabelLeftMargin == -1) {
-				leftLabelLeftMargin = sliderFrame.origin.x;
+				leftLabelLeftMargin = sliderFrame.origin.x - leftLabel.frame.size.width - 5.0;
+				if (leftLabelLeftMargin < 0) leftLabelLeftMargin = 0;
 			}
-
-			leftLabel.frame = CGRectMake(leftLabelLeftMargin, labelYPosition, leftLabel.frame.size.width, labelHeight);
+			leftLabel.frame = CGRectMake(leftLabelLeftMargin, labelY, leftLabel.frame.size.width, labelHeight);
 			[parentView addSubview:leftLabel];
 		}
 
@@ -2243,14 +2247,14 @@ static CGFloat rightLabelRightMargin = -1;
 				rightLabel.text = [NSString stringWithFormat:@"00:00/%@", durationFormatted];
 			else
 				rightLabel.text = durationFormatted;
-
 			[rightLabel sizeToFit];
 
 			if (rightLabelRightMargin == -1) {
-				rightLabelRightMargin = sliderFrame.origin.x + sliderFrame.size.width - rightLabel.frame.size.width;
+				rightLabelRightMargin = CGRectGetMaxX(sliderFrame) + 5.0;
+				if (rightLabelRightMargin + rightLabel.frame.size.width > parentView.bounds.size.width)
+					rightLabelRightMargin = parentView.bounds.size.width - rightLabel.frame.size.width;
 			}
-
-			rightLabel.frame = CGRectMake(rightLabelRightMargin, labelYPosition, rightLabel.frame.size.width, labelHeight);
+			rightLabel.frame = CGRectMake(rightLabelRightMargin, labelY, rightLabel.frame.size.width, labelHeight);
 			[parentView addSubview:rightLabel];
 		}
 

@@ -765,6 +765,39 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     
     // 初始化热更新数据
     loadFixedABTestData();
+
+    [self ensureCustomAlbumSizeDefault];
+}
+
+- (void)ensureCustomAlbumSizeDefault {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL large = [defaults objectForKey:@"DYYYCustomAlbumSizeLarge"] ? [defaults boolForKey:@"DYYYCustomAlbumSizeLarge"] : NO;
+    BOOL medium = [defaults objectForKey:@"DYYYCustomAlbumSizeMedium"] ? [defaults boolForKey:@"DYYYCustomAlbumSizeMedium"] : NO;
+    BOOL small = [defaults objectForKey:@"DYYYCustomAlbumSizeSmall"] ? [defaults boolForKey:@"DYYYCustomAlbumSizeSmall"] : NO;
+
+    // 如果都没设置过，默认“中”为YES，其它NO
+    if (!large && !medium && !small) {
+        [defaults setBool:NO forKey:@"DYYYCustomAlbumSizeLarge"];
+        [defaults setBool:YES forKey:@"DYYYCustomAlbumSizeMedium"];
+        [defaults setBool:NO forKey:@"DYYYCustomAlbumSizeSmall"];
+        [defaults synchronize];
+    } else {
+        // 保证互斥：如果有多个为YES，只保留第一个为YES
+        NSArray *keys = @[@"DYYYCustomAlbumSizeLarge", @"DYYYCustomAlbumSizeMedium", @"DYYYCustomAlbumSizeSmall"];
+        NSMutableArray *onKeys = [NSMutableArray array];
+        for (NSString *key in keys) {
+            if ([defaults boolForKey:key]) {
+                [onKeys addObject:key];
+            }
+        }
+        if (onKeys.count > 1) {
+            // 只保留第一个为YES，其它设为NO
+            for (NSInteger i = 1; i < onKeys.count; i++) {
+                [defaults setBool:NO forKey:onKeys[i]];
+            }
+            [defaults synchronize];
+        }
+    }
 }
 
 - (void)backButtonTapped:(id)sender {
@@ -1085,8 +1118,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"推荐过滤低赞" key:@"DYYYfilterLowLikes" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐过滤文案" key:@"DYYYfilterKeywords" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐视频时限" key:@"DYYYfiltertimelimit" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭，单位为天"],
-                [DYYYSettingItem itemWithTitle:@"启用首页净化" key:@"DYYYisEnablePure" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"启用首页全屏" key:@"DYYYisEnableFullScreen" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"首页全屏+透明" key:@"DYYYisEnableFullScreen" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去除App内更新" key:@"DYYYNoUpdates" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去青少年弹窗" key:@"DYYYHideteenmode" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"评论区毛玻璃" key:@"DYYYisEnableCommentBlur" type:DYYYSettingItemTypeSwitch],
@@ -1101,7 +1133,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
             
             // 第二部分 - 界面设置
             @[
-                [DYYYSettingItem itemWithTitle:@"设置顶栏透明" key:@"DYYYtopbartransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
+                [DYYYSettingItem itemWithTitle:@"设置顶栏文字透明" key:@"DYYYtopbartransparent" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
                 [DYYYSettingItem itemWithTitle:@"设置全局透明" key:@"DYYYGlobalTransparency" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
                 [DYYYSettingItem itemWithTitle:@"首页头像透明" key:@"DYYYAvatarViewTransparency" type:DYYYSettingItemTypeTextField placeholder:@"0-1小数"],
                 [DYYYSettingItem itemWithTitle:@"右侧栏缩放度" key:@"DYYYElementScale" type:DYYYSettingItemTypeTextField placeholder:@"不填默认"],
@@ -1262,17 +1294,20 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -街道或小区" key:@"DYYYisEnableAreaStreet" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"链接解析API" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不设置，默认"],
                 [DYYYSettingItem itemWithTitle:@"弹出-清晰度选项" key:@"DYYYShowAllVideoQuality" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"跳过开屏广告" key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"拦截广告（开屏、信息流、启动视频）"  key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
                 [DYYYSettingItem itemWithTitle:@"菜单背景颜色" key:@"DYYYBackgroundColor" type:DYYYSettingItemTypeColorPicker],
                 [DYYYSettingItem itemWithTitle:@"默认倍速（如果没有倍数设置）" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
-                [DYYYSettingItem itemWithTitle:@"倍速按钮功能（重新进入APP）-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"倍速按钮功能-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速数值（强制倍数）" key:@"DYYYSpeedSettings" type:DYYYSettingItemTypeTextField placeholder:@"英文逗号分隔"],
                 [DYYYSettingItem itemWithTitle:@"下一个视频会自动恢复默认倍速" key:@"DYYYAutoRestoreSpeed" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮显示后缀" key:@"DYYYSpeedButtonShowX" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮大小" key:@"DYYYSpeedButtonSize" type:DYYYSettingItemTypeTextField placeholder:@"默认40"],
                 [DYYYSettingItem itemWithTitle:@"视频清屏隐藏-开关" key:@"DYYYEnableFloatClearButton" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"  -清屏按钮大小" key:@"DYYYEnableFloatClearButtonSize" type:DYYYSettingItemTypeTextField placeholder:@"默认40"],
+                [DYYYSettingItem itemWithTitle:@"  -按钮大" key:@"DYYYCustomAlbumSizeLarge" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -按钮中" key:@"DYYYCustomAlbumSizeMedium" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -按钮小" key:@"DYYYCustomAlbumSizeSmall" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -按钮自定义" key:@"DYYYEnableFloatClearButtonSize" type:DYYYSettingItemTypeTextField placeholder:@"默认40"],
                 [DYYYSettingItem itemWithTitle:@"图标更换-开关" key:@"DYYYEnableCustomAlbum" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -本地相册" key:@"DYYYCustomAlbumImage" type:DYYYSettingItemTypeTextField placeholder:@"点击选择图片"],
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏弹幕" key:@"DYYYHideDanmaku" type:DYYYSettingItemTypeSwitch],
@@ -2254,32 +2289,33 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         // 创建显示当前选择的按钮
         UIButton *styleButton = [UIButton buttonWithType:UIButtonTypeSystem];
         styleButton.frame = CGRectMake(0, 0, 120, 30);
-        
+
         // 获取当前选中的样式
         NSString *currentStyle = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYScheduleStyle"];
         BOOL displayEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisShowScheduleDisplay"];
-        
+
         if (currentStyle.length == 0) {
             [styleButton setTitle:@"默认" forState:UIControlStateNormal];
         } else {
-            // 直接显示样式值或提取简短名称
             NSString *displayValue = currentStyle;
             if ([currentStyle containsString:@"-"]) {
                 displayValue = [currentStyle componentsSeparatedByString:@"-"].lastObject;
             }
             [styleButton setTitle:displayValue forState:UIControlStateNormal];
         }
-        
+
         // 设置按钮状态
         styleButton.enabled = displayEnabled;
         styleButton.alpha = displayEnabled ? 1.0 : 0.5;
-        
+
         // 添加提示文本
         if (!displayEnabled) {
             cell.detailTextLabel.text = @"需先开启显示进度时长";
             cell.detailTextLabel.textColor = [UIColor systemRedColor];
+        } else {
+            cell.detailTextLabel.text = nil;
         }
-        
+
         [styleButton addTarget:self action:@selector(showScheduleStylePicker) forControlEvents:UIControlEventTouchUpInside];
         cell.accessoryView = styleButton;
         return cell;
@@ -2874,12 +2910,40 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     }
     
     if (item.type == DYYYSettingItemTypeCustomPicker && [item.key isEqualToString:@"DYYYScheduleStyle"]) {
-        // 确保进度显示已开启
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisShowScheduleDisplay"]) {
             [DYYYManager showToast:@"请先开启\"显示进度时长\"选项"];
             return;
         }
-        [self showScheduleStylePicker];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选择进度条样式"
+                                                                       message:nil
+                                                                preferredStyle:UIAlertControllerStyleActionSheet];
+        NSArray *styles = @[
+            @{@"title": @"进度条右侧剩余", @"value": @"进度条右侧剩余"},
+            @{@"title": @"进度条右侧完整", @"value": @"进度条右侧完整"},
+            @{@"title": @"进度条左侧剩余", @"value": @"进度条左侧剩余"},
+            @{@"title": @"进度条左侧完整", @"value": @"进度条左侧完整"},
+            @{@"title": @"进度条两侧左右", @"value": @"进度条两侧左右"}
+        ];
+        for (NSDictionary *style in styles) {
+            UIAlertAction *action = [UIAlertAction actionWithTitle:style[@"title"]
+                                                             style:UIAlertActionStyleDefault
+                                                           handler:^(UIAlertAction * _Nonnull action) {
+                [[NSUserDefaults standardUserDefaults] setObject:style[@"value"] forKey:@"DYYYScheduleStyle"];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+                [self.tableView reloadData];
+            }];
+            [alert addAction:action];
+        }
+        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
+        [alert addAction:cancelAction];
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            UITableViewCell *selectedCell = [self.tableView cellForRowAtIndexPath:indexPath];
+            alert.popoverPresentationController.sourceView = selectedCell;
+            alert.popoverPresentationController.sourceRect = selectedCell.bounds;
+        }
+        [self presentViewController:alert animated:YES completion:nil];
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        return;
     }
     
     if (item.type == DYYYSettingItemTypeSpeedPicker) {
@@ -3055,11 +3119,46 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     NSInteger row = sender.tag % 1000;
     NSArray *currentSection = self.isSearching ? self.filteredSections[section] : self.settingSections[section];
     DYYYSettingItem *item = currentSection[row];
-    
+
     // 保存设置值
     [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:item.key];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    
+
+    // 互斥逻辑：按钮大/中/小只能选一个
+    if (([item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"] ||
+         [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
+         [item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"]) && sender.isOn) {
+        [self updateMutuallyExclusiveSwitches:section excludingItemKey:item.key];
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:item.key];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+
+    // 只在总开关从关闭变为打开时，自动打开所有子开关
+    if ([item.key isEqualToString:@"DYYYEnableFloatClearButton"] && sender.isOn) {
+        NSArray<NSString *> *subKeys = @[
+            @"DYYYHideDanmaku",
+            @"DYYYEnabshijianjindu",
+            @"DYYYHideTimeProgress",
+            @"DYYYHideSlider",
+            @"DYYYHideTabBar",
+            @"DYYYHideSpeed"
+        ];
+        NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
+        for (NSUInteger r = 0; r < sectionItems.count; r++) {
+            DYYYSettingItem *subItem = sectionItems[r];
+            if ([subKeys containsObject:subItem.key]) {
+                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:subItem.key];
+                NSIndexPath *cellPath = [NSIndexPath indexPathForRow:r inSection:section];
+                UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
+                if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
+                    subSwitch.on = YES;
+                }
+            }
+        }
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+
     // 特定功能处理 - 确保菜单开关能控制功能
     if ([item.key isEqualToString:@"DYYYStreamlinethesidebar"]) {
         [DYYYManager showToast:sender.isOn ? @"侧栏简化已启用，重新打开侧栏生效" : @"侧栏简化已关闭"];
@@ -3126,10 +3225,55 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
         [self handleABTestPatchEnabled:sender.isOn];
     }
-    
+
+    // 进度时长依赖处理
+    if ([item.key isEqualToString:@"DYYYisShowScheduleDisplay"]) {
+        // 关闭时，清空样式设置
+        if (!sender.isOn) {
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYScheduleStyle"];
+        }
+        // 刷新相关cell
+        for (NSInteger s = 0; s < self.settingSections.count; s++) {
+            NSArray *items = self.settingSections[s];
+            for (NSInteger r = 0; r < items.count; r++) {
+                DYYYSettingItem *subItem = items[r];
+                if ([subItem.key isEqualToString:@"DYYYScheduleStyle"]) {
+                    NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
+                    [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
+                }
+            }
+        }
+    }
+
     // 处理开关依赖关系
     [self updateSwitchDependencies:item.key isEnabled:sender.isOn section:section];
-    
+
+    // 主动发送设置变更通知，确保清屏按钮、隐藏功能、倍速按钮等立即响应
+    NSArray *floatButtonKeys = @[
+        // 清屏相关
+        @"DYYYEnableFloatClearButton",
+        @"DYYYEnableFloatClearButtonSize",
+        @"DYYYCustomAlbumSizeLarge",
+        @"DYYYCustomAlbumSizeMedium",
+        @"DYYYCustomAlbumSizeSmall",
+        @"DYYYCustomAlbumImagePath",
+        @"DYYYEnableCustomAlbum",
+        @"DYYYHideTabBar",
+        @"DYYYHideDanmaku",
+        @"DYYYHideSlider",
+        @"DYYYHideChapter",
+        // 倍速相关
+        @"DYYYEnableFloatSpeedButton",
+        @"DYYYSpeedSettings",
+        @"DYYYSpeedButtonShowX",
+        @"DYYYSpeedButtonSize"
+    ];
+    if ([floatButtonKeys containsObject:item.key] || [item.key hasPrefix:@"DYYYHide"]) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged"
+                                                            object:nil
+                                                          userInfo:@{@"key": item.key, @"value": @(sender.isOn)}];
+    }
+
     // 触觉反馈
     [self.feedbackGenerator impactOccurred];
 }
@@ -3264,26 +3408,25 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
 
 - (void)updateMutuallyExclusiveSwitches:(NSInteger)section excludingItemKey:(NSString *)excludedKey {
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     for (NSUInteger row = 0; row < sectionItems.count; row++) {
         DYYYSettingItem *item = sectionItems[row];
-        
-        // 只处理自定义相册尺寸相关的开关
-        if (([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] || 
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] || 
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"]) && 
+        if (([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] ||
+             [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
+             [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"]) &&
             ![item.key isEqualToString:excludedKey]) {
-            
-            // 查找并更新cell的开关状态
+            // UI
             NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
             UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
             if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
                 UISwitch *cellSwitch = (UISwitch *)cell.accessoryView;
                 cellSwitch.on = NO;
             }
+            // 数据
+            [defaults setBool:NO forKey:item.key];
         }
     }
+    [defaults synchronize];
 }
 
 - (void)updateAllSubswitchesForSection:(NSInteger)section {
@@ -3739,6 +3882,9 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
             [DYYYManager showToast:[NSString stringWithFormat:@"已重置: %@", item.title]];
             NSLog(@"DYYY: Reset %@", item.key);
         }];
+        
+        // 重置操作到弹出菜单
+        [alert addAction:resetAction];
         
         UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
         [alert addAction:cancelAction];

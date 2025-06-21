@@ -42,6 +42,11 @@
 @class DYYYBottomAlertView;
 @class DYYYToast;
 
+// 自定义分类声明
+@interface AWELongPressPanelViewGroupModel (DYYY)
+@property (nonatomic, assign) BOOL isDYYYCustomGroup;
+@end
+
 @interface AWEModernLongPressPanelTableViewController (DYYY_FLEX)
 - (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel;
 - (NSArray *)applyOriginalArrayFilters:(NSArray *)originalArray;
@@ -49,11 +54,154 @@
 - (AWELongPressPanelViewGroupModel *)createCustomGroup:(NSArray<AWELongPressPanelBaseViewModel *> *)buttons;
 @end
 
+// 颜色选择器声明
+@interface AWEModernLongPressPanelTableViewController (DYYY_ColorPicker)
+- (void)showColorPicker;
+- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController;
+- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)viewController;
+@end
+
+@interface AWEModernLongPressPanelTableViewController (DYYY_ColorPicker_Declare)
+- (void)refreshPanelColor;
+@end
+
+// 属性声明
 %hook AWELongPressPanelViewGroupModel
 %property(nonatomic, assign) BOOL isDYYYCustomGroup;
 %end
 
+// 功能组
+%group ColorPickerGroup
+
 %hook AWEModernLongPressPanelTableViewController
+
+%new
+- (void)refreshPanelColor {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYPanelUseCustomColor"] ||
+        ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableColorPicker"]) {
+        return;
+    }
+    // 延迟执行，确保UI层级已加载
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        CGFloat red = [defaults floatForKey:@"DYYYPanelColorRed"];
+        CGFloat green = [defaults floatForKey:@"DYYYPanelColorGreen"];
+        CGFloat blue = [defaults floatForKey:@"DYYYPanelColorBlue"];
+        CGFloat alpha = [defaults floatForKey:@"DYYYPanelColorAlpha"];
+        alpha = MAX(alpha, 0.1);
+        UIColor *customColor = [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
+        UIView *panelView = self.view;
+        if (!panelView) return;
+        for (UIView *subview in panelView.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+                UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
+                // 移除旧的颜色覆盖层
+                for (UIView *overlay in blurView.contentView.subviews) {
+                    if (overlay.tag == 9999) {
+                        [overlay removeFromSuperview];
+                    }
+                }
+                // 添加新的颜色覆盖层
+                UIView *colorOverlay = [[UIView alloc] initWithFrame:blurView.bounds];
+                colorOverlay.tag = 9999;
+                colorOverlay.backgroundColor = customColor;
+                colorOverlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                [blurView.contentView addSubview:colorOverlay];
+                [blurView.contentView bringSubviewToFront:colorOverlay];
+                break;
+            }
+        }
+    });
+}
+
+// 显示系统原生颜色选择器
+%new
+- (void)showColorPicker {
+    if (@available(iOS 14.0, *)) {
+        // 获取当前保存的颜色（如果有）
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        CGFloat red = [defaults floatForKey:@"DYYYPanelColorRed"] ?: 0.0;
+        CGFloat green = [defaults floatForKey:@"DYYYPanelColorGreen"] ?: 0.0;
+        CGFloat blue = [defaults floatForKey:@"DYYYPanelColorBlue"] ?: 0.0;
+        CGFloat alpha = [defaults floatForKey:@"DYYYPanelColorAlpha"] ?: 1.0;
+        
+        UIColor *selectedColor = [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
+        
+        // 创建系统原生颜色选择器
+        UIColorPickerViewController *colorPicker = [[UIColorPickerViewController alloc] init];
+        // 手动设置代理而不是通过协议声明
+        [colorPicker setValue:self forKey:@"delegate"];
+        colorPicker.selectedColor = selectedColor;
+        colorPicker.supportsAlpha = YES; // 支持透明度调整
+        
+        // 显示颜色选择器
+        UIViewController *topVC = [DYYYManager getActiveTopController];
+        [topVC presentViewController:colorPicker animated:YES completion:nil];
+    } else {
+        // iOS 14以下版本提示
+        [DYYYManager showToast:@"需要iOS 14以上系统才能使用此功能"];
+    }
+}
+
+// 颜色选择器代理方法 - 完成选择颜色
+%new
+- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController {
+    if (@available(iOS 14.0, *)) {
+        UIColor *selectedColor = viewController.selectedColor;
+        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+        [selectedColor getRed:&red green:&green blue:&blue alpha:&alpha];
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setFloat:red forKey:@"DYYYPanelColorRed"];
+        [defaults setFloat:green forKey:@"DYYYPanelColorGreen"];
+        [defaults setFloat:blue forKey:@"DYYYPanelColorBlue"];
+        [defaults setFloat:alpha forKey:@"DYYYPanelColorAlpha"];
+        [defaults setBool:YES forKey:@"DYYYPanelUseCustomColor"];
+        [defaults synchronize];
+        [DYYYManager showToast:@"已保存颜色设置"];
+        // 通知所有面板刷新颜色
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYPanelColorChanged" object:nil];
+        [self refreshPanelColor];
+    }
+}
+
+// 颜色选择器代理方法 - 正在选择颜色
+%new
+- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)viewController {
+    if (@available(iOS 14.0, *)) {
+        UIColor *selectedColor = viewController.selectedColor;
+        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+        [selectedColor getRed:&red green:&green blue:&blue alpha:&alpha];
+        alpha = MAX(alpha, 0.1);
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setFloat:red forKey:@"DYYYPanelColorRed"];
+        [defaults setFloat:green forKey:@"DYYYPanelColorGreen"];
+        [defaults setFloat:blue forKey:@"DYYYPanelColorBlue"];
+        [defaults setFloat:alpha forKey:@"DYYYPanelColorAlpha"];
+        [defaults setBool:YES forKey:@"DYYYPanelUseCustomColor"];
+        [defaults synchronize];
+        // 通知所有面板刷新颜色
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYPanelColorChanged" object:nil];
+        [self refreshPanelColor];
+    }
+}
+
+- (void)viewDidLoad {
+    %orig;
+    // 只添加一次监听
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(dyyy_handlePanelColorChanged)
+                                                     name:@"DYYYPanelColorChanged"
+                                                   object:nil];
+    });
+}
+
+%new
+- (void)dyyy_handlePanelColorChanged {
+    // 实时刷新颜色
+    [self refreshPanelColor];
+}
 
 %new
 - (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {    
@@ -92,10 +240,13 @@
     BOOL enableTimerClose = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressTimerClose"];
     BOOL enableCreateVideo = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressCreateVideo"];
     BOOL enableFLEX = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFLEX"];
+    // 添加颜色选择器开关检查
+    BOOL enableColorPicker = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableColorPicker"];
 
     // 检查是否有任何功能启用
-    hasAnyFeatureEnabled = enableSaveVideo || enableSaveCover || enableSaveAudio || enableSaveCurrentImage || enableSaveAllImages || enableCopyText || enableCopyLink || enableApiDownload ||
-                   enableFilterUser || enableFilterKeyword || enableTimerClose || enableCreateVideo || enableFLEX;
+    hasAnyFeatureEnabled = enableSaveVideo || enableSaveCover || enableSaveAudio || enableSaveCurrentImage || enableSaveAllImages || 
+                           enableCopyText || enableCopyLink || enableApiDownload || enableFilterUser || enableFilterKeyword || 
+                           enableTimerClose || enableCreateVideo || enableFLEX || enableColorPicker;
 
     // 获取需要隐藏的按钮设置
     BOOL hideDaily = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideDaily"];
@@ -587,7 +738,7 @@
         copyText.action = ^{
           NSString *descText = [self.awemeModel valueForKey:@"descriptionString"];
           [[UIPasteboard generalPasteboard] setString:descText];
-          [DYYYToast showSuccessToastWithMessage:@"文案已复制"];
+          [DYYYManager showToast:@"文案已复制"];
           AWELongPressPanelManager *panelManager = [%c(AWELongPressPanelManager) shareInstance];
           [panelManager dismissWithAnimation:YES completion:nil];
         };
@@ -605,7 +756,7 @@
           NSString *shareLink = [self.awemeModel valueForKey:@"shareURL"];
           NSString *cleanedURL = cleanShareURL(shareLink);
           [[UIPasteboard generalPasteboard] setString:cleanedURL];
-          [DYYYToast showSuccessToastWithMessage:@"分享链接已复制"];
+          [DYYYManager showToast:@"分享链接已复制"];
           AWELongPressPanelManager *panelManager = [%c(AWELongPressPanelManager) shareInstance];
           [panelManager dismissWithAnimation:YES completion:nil];
         };
@@ -817,6 +968,24 @@
         };
         [viewModels addObject:flexViewModel];
     }
+    
+    // 添加面板颜色选择器
+    if (enableColorPicker) {
+        AWELongPressPanelBaseViewModel *colorPickerViewModel = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
+        colorPickerViewModel.awemeModel = self.awemeModel;
+        colorPickerViewModel.actionType = 699; // 自定义操作类型
+        colorPickerViewModel.duxIconName = @"ic_xiaoxihuazhonghua_outlined";
+        colorPickerViewModel.describeString = @"面板颜色";
+        colorPickerViewModel.action = ^{
+            // 关闭长按面板
+            AWELongPressPanelManager *panelManager = [%c(AWELongPressPanelManager) shareInstance];
+            [panelManager dismissWithAnimation:YES completion:^{
+                // 显示iOS原生颜色选择器
+                [self showColorPicker];
+            }];
+        };
+        [viewModels addObject:colorPickerViewModel];
+    }
 
     // 创建自定义组
     NSMutableArray *customGroups = [NSMutableArray array];
@@ -875,6 +1044,67 @@
     [resultArray addObjectsFromArray:modifiedOriginalGroups];
 
     return resultArray;
+}
+
+// 应用自定义颜色设置
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    
+    // 检查是否开启颜色设置且有自定义颜色
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYPanelUseCustomColor"] &&
+        [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableColorPicker"]) {
+        
+        // 获取保存的颜色值
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        CGFloat red = [defaults floatForKey:@"DYYYPanelColorRed"];
+        CGFloat green = [defaults floatForKey:@"DYYYPanelColorGreen"];
+        CGFloat blue = [defaults floatForKey:@"DYYYPanelColorBlue"];
+        CGFloat alpha = [defaults floatForKey:@"DYYYPanelColorAlpha"];
+        
+        // 确保alpha不为0，至少有一点透明度
+        alpha = MAX(alpha, 0.1);
+        
+        // 创建颜色
+        UIColor *customColor = [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
+        
+        // 添加日志用于调试
+        NSLog(@"DYYY: viewWillAppear应用颜色 - R:%.2f G:%.2f B:%.2f A:%.2f", red, green, blue, alpha);
+        
+        // 应用颜色到背景
+        UIView *panelView = self.view;
+        if (!panelView) {
+            NSLog(@"DYYY: 面板视图为空");
+            return;
+        }
+        
+        // 查找视觉效果视图
+        for (UIView *subview in panelView.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]]) {
+                UIVisualEffectView *blurView = (UIVisualEffectView *)subview;
+                NSLog(@"DYYY: 找到模糊效果视图");
+                
+                // 清除旧的颜色视图
+                for (UIView *overlayView in blurView.contentView.subviews) {
+                    if (overlayView.tag == 9999) {
+                        [overlayView removeFromSuperview];
+                        NSLog(@"DYYY: 移除旧的颜色覆盖层");
+                    }
+                }
+                
+                // 添加颜色覆盖层
+                UIView *colorOverlay = [[UIView alloc] initWithFrame:blurView.bounds];
+                colorOverlay.tag = 9999;
+                colorOverlay.backgroundColor = customColor;
+                colorOverlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                [blurView.contentView addSubview:colorOverlay];
+                
+                // 确保覆盖层在最前面
+                [blurView.contentView bringSubviewToFront:colorOverlay];
+                NSLog(@"DYYY: 添加新的颜色覆盖层");
+                break;
+            }
+        }
+    }
 }
 
 %new
@@ -1026,6 +1256,8 @@
     
     return modifiedArray;
 }
+
+%end
 
 %end
 
@@ -1197,8 +1429,16 @@
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYLongPressSaveVideo"];
     }
     
+    // 添加颜色选择器默认值
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableColorPicker"] == nil) {
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYEnableColorPicker"];
+    }
+    
     // 初始化默认的钩子组
     %init(_ungrouped);
+    
+    // 初始化颜色选择器钩子组
+    %init(ColorPickerGroup);
     
     // 检查评论面板类 - 先尝试第一个类名，不存在时再尝试备用类名
     Class ownerClass = objc_getClass("AWECommentLongPressPanelSwiftImpl.CommentLongPressPanelNormalSectionViewModel");
@@ -1210,14 +1450,9 @@
     // 只在找到可用的类时初始化过滤器组
     if (ownerClass) {
         NSLog(@"DYYY: 成功找到评论面板类: %@", NSStringFromClass(ownerClass));
-        %init(DYYYFilterSetterGroup, HOOK_TARGET_OWNER_CLASS = ownerClass);
+        // 使用正确的方式初始化
+        %init(DYYYFilterSetterGroup, HOOK_TARGET_OWNER_CLASS=ownerClass);
     } else {
         NSLog(@"DYYY: 未找到任何评论面板类，无法初始化过滤器组");
-    }
-    
-    // 确保用户设置已接受
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYUserAgreementAccepted"]) {
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYUserAgreementAccepted"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
     }
 }

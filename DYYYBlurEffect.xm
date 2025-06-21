@@ -8,44 +8,24 @@ static UIButton *speedButton = nil;
 // 添加 tabHeight 变量声明
 static CGFloat tabHeight = 0;
 
-// 获取标签栏高度的函数
+// 更精准的标签栏高度计算（每次都重新计算，不缓存）
 static CGFloat getTabBarHeight(void) {
-    static CGFloat cachedHeight = 0;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIWindow *keyWindow = nil;
-        if (@available(iOS 13.0, *)) {
-            NSSet *connectedScenes = [UIApplication sharedApplication].connectedScenes;
-            for (UIScene *scene in connectedScenes) {
-                if ([scene isKindOfClass:[UIWindowScene class]]) {
-                    UIWindowScene *windowScene = (UIWindowScene *)scene;
-                    for (UIWindow *window in windowScene.windows) {
-                        if (window.isKeyWindow) {
-                            keyWindow = window;
-                            break;
-                        }
-                    }
-                    if (keyWindow) break;
+    // 不再缓存，每次都重新计算
+    CGFloat measuredHeight = 83.0;
+    UIWindow *keyWindow = [DYYYManager getActiveWindow];
+    if (keyWindow) {
+        for (UIView *subview in keyWindow.rootViewController.view.subviews) {
+            if ([NSStringFromClass([subview class]) containsString:@"TabBar"]) {
+                CGFloat h = subview.frame.size.height;
+                if (h > 30 && h < 120) {
+                    measuredHeight = h;
                 }
+                break;
             }
-        } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            keyWindow = [UIApplication sharedApplication].keyWindow;
-#pragma clang diagnostic pop
         }
-        
-        if (@available(iOS 11.0, *)) {
-            cachedHeight = keyWindow.safeAreaInsets.bottom;
-        }
-        if (cachedHeight == 0) {
-            cachedHeight = 49.0; // 默认标签栏高度
-        }
-        
-        // 更新全局变量
-        tabHeight = cachedHeight;
-    });
-    return cachedHeight;
+    }
+    tabHeight = measuredHeight;
+    return measuredHeight;
 }
 
 // 初始化 tabHeight
@@ -57,6 +37,7 @@ static void initializeTabHeight(void) {
 static void DYYYUpdateBlurEffectForTraitCollection(UIView *view, UITraitCollection *traitCollection);
 static void DYYYOptimizeBlurViewPerformance(UIVisualEffectView *blurView);
 static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparency, BOOL isDarkMode);
+static void DYYYRemoveBlurViewsWithTag(UIView *view, NSInteger tag);
 
 @interface AWEBaseListViewController (DYYYBlurEffect)
 - (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency;
@@ -299,23 +280,19 @@ static UIVisualEffectView *DYYYCreateBlurEffectView(UIView *containerView, float
 // 应用毛玻璃效果的统一接口
 static void DYYYApplyBlurEffect(UIView *view, float transparency) {
     if (!view) return;
-    
-    // 移除已存在的毛玻璃效果
-    for (UIView *subview in view.subviews) {
-        if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 9999) {
-            [subview removeFromSuperview];
+    @try {
+        DYYYRemoveBlurViewsWithTag(view, 9999);
+        view.backgroundColor = [UIColor clearColor];
+        BOOL isDarkMode = [DYYYManager isDarkMode];
+        UIVisualEffectView *blurEffectView = DYYYCreateBlurEffectView(view, transparency, isDarkMode);
+        if (blurEffectView) {
+            DYYYOptimizeBlurViewPerformance(blurEffectView);
+            [view insertSubview:blurEffectView atIndex:0];
+            DYYYEnhanceTextForBlurEffect(view, transparency, isDarkMode);
         }
+    } @catch (__unused NSException *e) {
+        // 防止插入异常导致界面卡死
     }
-    
-    // 设置背景透明
-    view.backgroundColor = [UIColor clearColor];
-    
-    // 创建并应用毛玻璃效果
-    BOOL isDarkMode = [DYYYManager isDarkMode];
-    UIVisualEffectView *blurEffectView = DYYYCreateBlurEffectView(view, transparency, isDarkMode);
-    
-    // 插入到视图层次底部
-    [view insertSubview:blurEffectView atIndex:0];
 }
 
 // MARK: - 递归设置子视图透明背景的工具函数
@@ -430,28 +407,95 @@ static void DYYYOptimizeBlurViewPerformance(UIVisualEffectView *blurView) {
 
 // MARK: - 统一的更新处理接口
 static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparency, BOOL isDarkMode) {
-    // 移除现有效果
-    for (UIView *subview in containerView.subviews) {
-        if ([subview isKindOfClass:[UIVisualEffectView class]] && (subview.tag == 9999 || subview.tag == 999)) {
-            [subview removeFromSuperview];
-        }
-    }
-    
+    // 统一调用安全移除
+    DYYYRemoveBlurViewsWithTag(containerView, 9999);
+    DYYYRemoveBlurViewsWithTag(containerView, 999);
+
     // 创建新效果
     UIVisualEffectView *blurView = DYYYCreateBlurEffectView(containerView, transparency, isDarkMode);
-    
+
     // 应用性能优化
     DYYYOptimizeBlurViewPerformance(blurView);
-    
+
     // 插入视图
     [containerView insertSubview:blurView atIndex:0];
-    
+
     // 提升文本可读性
     DYYYEnhanceTextForBlurEffect(containerView, transparency, isDarkMode);
 }
 
+// 安全遍历和移除子视图，防止数组越界和野指针
+static void DYYYRemoveBlurViewsWithTag(UIView *view, NSInteger tag) {
+    if (!view) return;
+    NSArray *subviewsCopy = [view.subviews copy];
+    for (UIView *subview in subviewsCopy) {
+        if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == tag) {
+            @try {
+                [subview removeFromSuperview];
+            } @catch (__unused NSException *e) {
+                // 防止野指针崩溃
+            }
+        }
+    }
+}
 
+static void DYYYSetViewsTransparentWithDepth(UIView *view, BOOL skipSpecialViews, int depth) {
+    if (!view || depth > 10) return; // 限制最大递归深度
+    if (skipSpecialViews) {
+        if ([view isKindOfClass:[UIImageView class]] ||
+            [view isKindOfClass:[UILabel class]] ||
+            [view isKindOfClass:[UIButton class]] ||
+            [view isKindOfClass:[UIVisualEffectView class]]) {
+            return;
+        }
+    }
+    view.backgroundColor = [UIColor clearColor];
+    for (UIView *subview in view.subviews) {
+        DYYYSetViewsTransparentWithDepth(subview, skipSpecialViews, depth + 1);
+    }
+}
 
+static float DYYYGetUserTransparencySafe(NSString *key, float defaultValue) {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    float result = defaultValue;
+    if ([value respondsToSelector:@selector(floatValue)]) {
+        result = [value floatValue];
+    }
+    if (result <= 0 || result > 1) result = defaultValue;
+    return result;
+}
+
+// 智能判断是否为“评论输入相关视图”而不是手动字符串匹配
+static BOOL DYYYIsCommentInputRelatedView(UIView *view) {
+    if (!view) return NO;
+    static NSArray *patterns = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        patterns = @[@"CommentInput", @"CommentBar", @"CommentPanel", @"CommentContainer"];
+    });
+    NSString *className = NSStringFromClass([view class]);
+    for (NSString *pattern in patterns) {
+        if ([className containsString:pattern]) return YES;
+    }
+    return NO;
+}
+
+// 智能判断是否为“弹幕”相关视图
+static BOOL DYYYIsDanmuLabel(UIView *view) {
+    if (![view isKindOfClass:[UILabel class]]) return NO;
+    UILabel *label = (UILabel *)view;
+    return [label.text containsString:@"弹幕"];
+}
+
+// 智能判断是否为“白色背景”视图
+static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
+    if (!view || !view.backgroundColor) return NO;
+    CGFloat r=0,g=0,b=0,a=0;
+    if ([view.backgroundColor getRed:&r green:&g blue:&b alpha:&a]) {
+        return (r > 0.95 && g > 0.95 && b > 0.95 && a > 0.1);
+    }
+    return NO;
+}
 
 // 为 AWEUserActionSheetView 添加毛玻璃效果
 %hook AWEUserActionSheetView
@@ -723,23 +767,42 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 
 - (void)viewDidLayoutSubviews {
     %orig;
-    [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    if ([self respondsToSelector:@selector(dyyyApplyBlurEffect)]) {
+        [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    }
 }
-
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    if ([self respondsToSelector:@selector(dyyyApplyBlurEffect)]) {
+        [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    }
 }
-
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    if ([self respondsToSelector:@selector(dyyyApplyBlurEffect)]) {
+        [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    }
 }
 
 %end
 
 // MARK: - 评论输入框毛玻璃效果
 %hook AWECommentInputViewSwiftImpl_CommentInputContainerView
+
+- (void)didMoveToWindow {
+    %orig;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dyyySettingChanged:) name:@"DYYYSettingChanged" object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYSettingChanged" object:nil];
+    %orig;
+}
+
+%new
+- (void)dyyySettingChanged:(NSNotification *)note {
+    [self setNeedsLayout];
+}
 
 %new
 - (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency {
@@ -814,50 +877,82 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 
 - (void)layoutSubviews {
     %orig;
-    
+
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+        // 优先处理评论输入相关视图的毛玻璃和弹幕逻辑
+        for (UIView *subview in self.subviews) {
+            if (DYYYIsCommentInputRelatedView(subview)) {
+                BOOL containsDanmu = NO;
+                for (UIView *innerSubview in subview.subviews) {
+                    if (DYYYIsDanmuLabel(innerSubview)) {
+                        containsDanmu = YES;
+                        break;
+                    }
+                }
+                if (containsDanmu) {
+                    // 弹幕相关处理（可根据需要自定义）
+                    // 这里可插入弹幕专用的背景或样式
+                } else {
+                    for (UIView *innerSubview in subview.subviews) {
+                        if ([innerSubview isKindOfClass:[UIView class]]) {
+                            if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBarTransparent"]) {
+                                if (DYYYIsWhiteBackgroundView(innerSubview)) {
+                                    float userTransparency = DYYYGetUserTransparency(@"DYYYCommentBlurTransparent", 0.95);
+                                    DYYYAddCustomViewToParent(innerSubview, userTransparency);
+                                }
+                            } else {
+                                float userTransparency = DYYYGetUserTransparency(@"DYYYCommentBlurTransparent", 0.95);
+                                DYYYAddCustomViewToParent(innerSubview, userTransparency);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // 使用与评论区相同的透明度配置
         float userTransparency = DYYYGetUserTransparency(@"DYYYCommentBlurTransparent", 0.5);
-        
+
         BOOL isDarkMode = [DYYYManager isDarkMode];
         UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
-        
+
         // 移除已有的毛玻璃效果
         for (UIView *subview in self.subviews) {
             if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 999) {
                 [subview removeFromSuperview];
             }
         }
-        
+
         // 设置背景为透明
         self.backgroundColor = [UIColor clearColor];
-        
+
         // 创建并添加毛玻璃效果
         UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
         UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
         blurEffectView.frame = self.bounds;
         blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         blurEffectView.tag = 999;
-        
+
         // 添加覆盖层
         UIView *overlayView = [[UIView alloc] initWithFrame:self.bounds];
         overlayView.userInteractionEnabled = NO;
         overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         [blurEffectView.contentView addSubview:overlayView];
-        
+
         // 使用共享配置函数确保一致性
         DYYYConfigureSharedBlurAppearance(blurEffectView, userTransparency, isDarkMode);
-        
+
         // 插入到视图层次最底部
         [self insertSubview:blurEffectView atIndex:0];
-        
+
         // 确保内容控件和文本保持可见
         for (UIView *subview in self.subviews) {
             if (![subview isKindOfClass:[UIVisualEffectView class]]) {
                 [subview setBackgroundColor:[UIColor clearColor]];
             }
         }
-        
+
         // 应用文本增强处理
         [self adjustTextVisibilityForBlurEffect:self transparency:userTransparency];
     }
@@ -943,171 +1038,186 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 // MARK: - UIView毛玻璃处理
 %hook UIView
 - (void)layoutSubviews {
-	%orig;
+    @try {
+        %orig;
 
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-		if (self.frame.size.height == tabHeight && tabHeight > 0) {
-			UIViewController *vc = [self firstAvailableUIViewController];
-			if ([vc isKindOfClass:NSClassFromString(@"AWEMixVideoPanelDetailTableViewController")] || [vc isKindOfClass:NSClassFromString(@"AWECommentInputViewController")]) {
-				self.backgroundColor = [UIColor clearColor];
-			}
-		}
-	}
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+            if (self.frame.size.height == tabHeight && tabHeight > 0) {
+                UIViewController *vc = [self firstAvailableUIViewController];
+                if ([vc isKindOfClass:NSClassFromString(@"AWEMixVideoPanelDetailTableViewController")] || [vc isKindOfClass:NSClassFromString(@"AWECommentInputViewController")]) {
+                    self.backgroundColor = [UIColor clearColor];
+                }
+            }
+        }
 
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
-		for (UIView *subview in self.subviews) {
-			if ([subview isKindOfClass:NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer")]) {
-				BOOL containsDanmu = NO;
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+            for (UIView *subview in self.subviews) {
+                if ([subview isKindOfClass:NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer")]) {
+                    BOOL containsDanmu = NO;
 
-				for (UIView *innerSubview in subview.subviews) {
-					if ([innerSubview isKindOfClass:[UILabel class]] && [((UILabel *)innerSubview).text containsString:@"弹幕"]) {
-						containsDanmu = YES;
-						break;
-					}
-				}
-				if (containsDanmu) {
-					UIView *parentView = subview.superview;
-					for (UIView *innerSubview in parentView.subviews) {
-						if ([innerSubview isKindOfClass:[UIView class]]) {
-                            // 确保视图索引有效，避免崩溃
-							[innerSubview.subviews[0] removeFromSuperview];
+                    for (UIView *innerSubview in subview.subviews) {
+                        if ([innerSubview isKindOfClass:[UILabel class]] && [((UILabel *)innerSubview).text containsString:@"弹幕"]) {
+                            containsDanmu = YES;
+                            break;
+                        }
+                    }
+                    if (containsDanmu) {
+                        UIView *parentView = subview.superview;
+                        for (UIView *innerSubview in parentView.subviews) {
+                            if ([innerSubview isKindOfClass:[UIView class]]) {
+                                // 确保视图索引有效，避免崩溃
+                                // 防止数组越界和野指针
+                                if (innerSubview.subviews.count > 0) {
+                                    UIView *firstSubview = innerSubview.subviews.firstObject;
+                                    if (firstSubview) {
+                                        [firstSubview removeFromSuperview];
+                                    }
+                                }
 
-							UIView *whiteBackgroundView = [[UIView alloc] initWithFrame:innerSubview.bounds];
-							whiteBackgroundView.backgroundColor = [UIColor whiteColor];
-							whiteBackgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-							[innerSubview addSubview:whiteBackgroundView];
-							break;
-						}
-					}
-				} else {
-					for (UIView *innerSubview in subview.subviews) {
-						if ([innerSubview isKindOfClass:[UIView class]]) {
-							if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBarTransparent"]) {
-								// 检查背景颜色
-								UIColor *bgColor = innerSubview.backgroundColor;
-								if (bgColor) {
-									CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-									BOOL isWhite = NO;
+                                UIView *whiteBackgroundView = [[UIView alloc] initWithFrame:innerSubview.bounds];
+                                whiteBackgroundView.backgroundColor = [UIColor whiteColor];
+                                whiteBackgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                                [innerSubview addSubview:whiteBackgroundView];
+                                break;
+                            }
+                        }
+                    } else {
+                        for (UIView *innerSubview in subview.subviews) {
+                            if ([innerSubview isKindOfClass:[UIView class]]) {
+                                if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBarTransparent"]) {
+                                    // 检查背景颜色
+                                    UIColor *bgColor = innerSubview.backgroundColor;
+                                    if (bgColor) {
+                                        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+                                        BOOL isWhite = NO;
 
-									if ([bgColor getRed:&red green:&green blue:&blue alpha:&alpha]) {
-										isWhite = (red > 0.95 && green > 0.95 && blue > 0.95);
-										// 如果背景是透明的，则不处理
-										if (alpha < 0.1) {
-											break;
-										}
-									}
+                                        if ([bgColor getRed:&red green:&green blue:&blue alpha:&alpha]) {
+                                            isWhite = (red > 0.95 && green > 0.95 && blue > 0.95);
+                                            // 如果背景是透明的，则不处理
+                                            if (alpha < 0.1) {
+                                                break;
+                                            }
+                                        }
 
-									// 只有当背景是白色时才应用毛玻璃效果
-									if (isWhite) {
-										float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"]
-										    floatValue];
-										if (userTransparency <= 0 || userTransparency > 1) {
-											userTransparency = 0.95;
-										}
-										DYYYAddCustomViewToParent(innerSubview, userTransparency);
-									}
-								}
-							} else {
-								float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-								if (userTransparency <= 0 || userTransparency > 1) {
-									userTransparency = 0.95;
-								}
-								DYYYAddCustomViewToParent(innerSubview, userTransparency);
-							}
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] || [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+                                        // 只有当背景是白色时才应用毛玻璃效果
+                                        if (isWhite) {
+                                            float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"]
+                                                floatValue];
+                                            if (userTransparency <= 0 || userTransparency > 1) {
+                                                userTransparency = 0.95;
+                                            }
+                                            DYYYAddCustomViewToParent(innerSubview, userTransparency);
+                                        }
+                                    }
+                                } else {
+                                    float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+                                    if (userTransparency <= 0 || userTransparency > 1) {
+                                        userTransparency = 0.95;
+                                    }
+                                    DYYYAddCustomViewToParent(innerSubview, userTransparency);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] || [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
 
-		UIViewController *vc = [self firstAvailableUIViewController];
-		if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
-			BOOL shouldHideSubview = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] ||
-						 [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"];
+            UIViewController *vc = [self firstAvailableUIViewController];
+            if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
+                BOOL shouldHideSubview = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] ||
+                             [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"];
 
-			if (shouldHideSubview) {
-				for (UIView *subview in self.subviews) {
-					if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
-						subview.hidden = YES;
-					}
-				}
-			}
-		}
-	}
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
-		NSString *className = NSStringFromClass([self class]);
-		if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
-			for (UIView *subview in self.subviews) {
-				if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor) {
-					CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-					[subview.backgroundColor getRed:&red green:&green blue:&blue alpha:&alpha];
+                if (shouldHideSubview) {
+                    for (UIView *subview in self.subviews) {
+                        if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
+                            subview.hidden = YES;
+                        }
+                    }
+                }
+            }
+        }
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+            NSString *className = NSStringFromClass([self class]);
+            if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
+                for (UIView *subview in self.subviews) {
+                    if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor) {
+                        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+                        [subview.backgroundColor getRed:&red green:&green blue:&blue alpha:&alpha];
 
-					if ((red == 22 / 255.0 && green == 22 / 255.0 && blue == 22 / 255.0) || (red == 1.0 && green == 1.0 && blue == 1.0)) {
-						float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
-						if (userTransparency <= 0 || userTransparency > 1) {
-							userTransparency = 0.95;
-						}
-						DYYYAddCustomViewToParent(subview, userTransparency);
-					}
-				}
-			}
-		}
-	}
+                        if ((red == 22 / 255.0 && green == 22 / 255.0 && blue == 22 / 255.0) || (red == 1.0 && green == 1.0 && blue == 1.0)) {
+                            float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+                            if (userTransparency <= 0 || userTransparency > 1) {
+                                userTransparency = 0.95;
+                            }
+                            DYYYAddCustomViewToParent(subview, userTransparency);
+                        }
+                    }
+                }
+            }
+        }
+    } @catch (__unused NSException *e) {
+        // 防止崩溃
+    }
 }
 
 - (void)setFrame:(CGRect)frame {
-	if (![NSThread isMainThread]) {
-		dispatch_async(dispatch_get_main_queue(), ^{
-		  [self setFrame:frame];
-		});
-		return;
-	}
+    static void *DYYYFrameKey = &DYYYFrameKey;
+    if (objc_getAssociatedObject(self, DYYYFrameKey)) {
+        @try { %orig(frame); } @catch (__unused NSException *e) {}
+        return;
+    }
+    objc_setAssociatedObject(self, DYYYFrameKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    @try {
+        BOOL enableBlur = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"];
+        BOOL enableFS = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"];
+        BOOL hideAvatar = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenAvatarList"];
 
-	BOOL enableBlur = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"];
-	BOOL enableFS = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"];
-	BOOL hideAvatar = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenAvatarList"];
+        Class SkylightListViewClass = NSClassFromString(@"AWEIMSkylightListView");
+        if (hideAvatar && SkylightListViewClass && [self isKindOfClass:SkylightListViewClass]) {
+            frame = CGRectZero;
+            %orig(frame);
+            return;
+        }
 
-	Class SkylightListViewClass = NSClassFromString(@"AWEIMSkylightListView");
-	if (hideAvatar && SkylightListViewClass && [self isKindOfClass:SkylightListViewClass]) {
-		frame = CGRectZero;
-		%orig(frame);
-		return;
-	}
+        UIViewController *vc = [self firstAvailableUIViewController];
+        Class DetailVCClass = NSClassFromString(@"AWEMixVideoPanelDetailTableViewController");
+        Class PlayVCClass1 = NSClassFromString(@"AWEAwemePlayVideoViewController");
+        Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
 
-	UIViewController *vc = [self firstAvailableUIViewController];
-	Class DetailVCClass = NSClassFromString(@"AWEMixVideoPanelDetailTableViewController");
-	Class PlayVCClass1 = NSClassFromString(@"AWEAwemePlayVideoViewController");
-	Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
+        BOOL isDetailVC = (DetailVCClass && [vc isKindOfClass:DetailVCClass]);
+        BOOL isPlayVC = ((PlayVCClass1 && [vc isKindOfClass:PlayVCClass1]) || (PlayVCClass2 && [vc isKindOfClass:PlayVCClass2]));
 
-	BOOL isDetailVC = (DetailVCClass && [vc isKindOfClass:DetailVCClass]);
-	BOOL isPlayVC = ((PlayVCClass1 && [vc isKindOfClass:PlayVCClass1]) || (PlayVCClass2 && [vc isKindOfClass:PlayVCClass2]));
+        if (isPlayVC && enableBlur) {
+            if (frame.origin.x != 0) {
+                return;
+            }
+        }
 
-	if (isPlayVC && enableBlur) {
-		if (frame.origin.x != 0) {
-			return;
-		}
-	}
+        if (isPlayVC && enableFS) {
+            if (frame.origin.x != 0 && frame.origin.y != 0) {
+                %orig(frame);
+                return;
+            }
+            CGRect superF = self.superview.frame;
+            if (CGRectGetHeight(superF) > 0 && CGRectGetHeight(frame) > 0 && CGRectGetHeight(frame) < CGRectGetHeight(superF)) {
+                CGFloat diff = CGRectGetHeight(superF) - CGRectGetHeight(frame);
+                if (fabs(diff - tabHeight) < 1.0) {
+                    frame.size.height = CGRectGetHeight(superF);
+                }
+            }
+            %orig(frame);
+            return;
+        }
 
-	if (isPlayVC && enableFS) {
-		if (frame.origin.x != 0 && frame.origin.y != 0) {
-			%orig(frame);
-			return;
-		}
-		CGRect superF = self.superview.frame;
-		if (CGRectGetHeight(superF) > 0 && CGRectGetHeight(frame) > 0 && CGRectGetHeight(frame) < CGRectGetHeight(superF)) {
-			CGFloat diff = CGRectGetHeight(superF) - CGRectGetHeight(frame);
-			if (fabs(diff - tabHeight) < 1.0) {
-				frame.size.height = CGRectGetHeight(superF);
-			}
-		}
-		%orig(frame);
-		return;
-	}
-
-	%orig(frame);
+        %orig(frame);
+    } @catch (__unused NSException *e) {
+        // 防止崩溃
+    } @finally {
+        objc_setAssociatedObject(self, DYYYFrameKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 %end
@@ -1178,19 +1288,15 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
     // 检查功能是否启用
     if (!DYYYIsFunctionEnabled(kDYYYNotificationEnabledKey)) return;
 
-    // 移除现有的毛玻璃效果
-    for (UIView *subview in containerView.subviews) {
-        if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 999) {
-            [subview removeFromSuperview];
-        }
-    }
+    // 统一调用安全移除
+    DYYYRemoveBlurViewsWithTag(containerView, 999);
 
     // 设置容器视图为透明
     containerView.backgroundColor = [UIColor clearColor];
 
     // 获取用户设置的圆角半径
     float cornerRadius = DYYYGetUserTransparency(kDYYYNotificationCornerRadiusKey, 12.0);
-    
+
     // 应用圆角
     containerView.layer.cornerRadius = cornerRadius;
     containerView.layer.masksToBounds = YES;
@@ -1202,7 +1308,7 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
     } else {
         isDarkMode = [DYYYManager isDarkMode];
     }
-    
+
     // 创建毛玻璃效果
     UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
     UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
@@ -1235,7 +1341,7 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 
     // 递归设置子视图背景透明
     [self clearBackgroundRecursivelyInView:containerView exceptClass:[UIVisualEffectView class]];
-    
+
     // 应用文本增强处理
     [self adjustTextVisibilityForBlurEffect:containerView transparency:transparency];
 }
@@ -1325,52 +1431,56 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 
 %hook AWEFeedContainerContentView
 - (void)setAlpha:(CGFloat)alpha {
-	// 纯净模式功能
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnablePure"]) {
-		%orig(0.0);
+    // 纯净模式功能
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnablePure"]) {
+        %orig(0.0);
 
-		static dispatch_source_t timer = nil;
-		static int attempts = 0;
+        static dispatch_source_t timer = nil;
+        static int attempts = 0;
 
-		if (timer) {
-			dispatch_source_cancel(timer);
-			timer = nil;
-		}
+        if (timer) {
+            dispatch_source_cancel(timer);
+            timer = nil;
+        }
 
-		void (^tryFindAndSetPureMode)(void) = ^{
-		  UIWindow *keyWindow = [DYYYManager getActiveWindow];
+        void (^tryFindAndSetPureMode)(void) = ^{
+          UIWindow *keyWindow = [DYYYManager getActiveWindow];
 
-		  if (keyWindow && keyWindow.rootViewController) {
-			  UIViewController *feedVC = [self findViewController:keyWindow.rootViewController ofClass:NSClassFromString(@"AWEFeedTableViewController")];
-			  if (feedVC) {
-				  [feedVC setValue:@YES forKey:@"pureMode"];
-				  if (timer) {
-					  dispatch_source_cancel(timer);
-					  timer = nil;
-				  }
-				  attempts = 0;
-				  return;
-			  }
-		  }
+          if (keyWindow && keyWindow.rootViewController) {
+              UIViewController *feedVC = [self findViewController:keyWindow.rootViewController ofClass:NSClassFromString(@"AWEFeedTableViewController")];
+              if (feedVC) {
+                  @try {
+                      [feedVC setValue:@YES forKey:@"pureMode"];
+                  } @catch (__unused NSException *e) {
+                      // 防止KVC崩溃
+                  }
+                  if (timer) {
+                      dispatch_source_cancel(timer);
+                      timer = nil;
+                  }
+                  attempts = 0;
+                  return;
+              }
+          }
 
-		  attempts++;
-		  if (attempts >= 10) {
-			  if (timer) {
-				  dispatch_source_cancel(timer);
-				  timer = nil;
-			  }
-			  attempts = 0;
-		  }
-		};
+          attempts++;
+          if (attempts >= 10) {
+              if (timer) {
+                  dispatch_source_cancel(timer);
+                  timer = nil;
+              }
+              attempts = 0;
+          }
+        };
 
-		timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-		dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC, 0);
-		dispatch_source_set_event_handler(timer, tryFindAndSetPureMode);
-		dispatch_resume(timer);
+        timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+        dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC, 0);
+        dispatch_source_set_event_handler(timer, tryFindAndSetPureMode);
+        dispatch_resume(timer);
 
-		tryFindAndSetPureMode();
-		return;
-	}
+        tryFindAndSetPureMode();
+        return;
+    }
 
 	// 原来的透明度设置逻辑，保持不变
 	NSString *transparentValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYtopbartransparent"];
@@ -1406,80 +1516,39 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 
 // 全局透明方法
 %hook AWEPlayInteractionViewController
-
-- (UIView *)view {
-	UIView *originalView = %orig;
-
-	NSString *transparentValue = [[NSUserDefaults standardUserDefaults] stringForKey:@"DYYYGlobalTransparency"];
-	if (transparentValue.length > 0) {
-		CGFloat alphaValue = transparentValue.floatValue;
-		if (alphaValue >= 0.0 && alphaValue <= 1.0) {
-			for (UIView *subview in originalView.subviews) {
-				if (subview.tag != DYYY_IGNORE_GLOBAL_ALPHA_TAG) {
-					if (subview.alpha > 0) {
-						subview.alpha = alphaValue;
-					}
-				}
-			}
-		}
-	}
-
-	return originalView;
-}
-
-- (void)onVideoPlayerViewDoubleClicked:(id)arg1 {
-	BOOL isSwitchOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDouble"];
-	if (!isSwitchOn) {
-		%orig;
-	}
-}
-
 - (void)viewDidLayoutSubviews {
-	%orig; // 执行原始方法实现
-
-	// 检查父视图控制器链，如果发现是远程Feed控制器则不做处理直接返回
-	UIViewController *parentVC = self.parentViewController;
-	while (parentVC) {
-		if ([parentVC isKindOfClass:%c(AFDPlayRemoteFeedTableViewController)]) {
-			return;
-		}
-		parentVC = parentVC.parentViewController;
-	}
-
-	// 检查是否开启了全屏模式
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-		NSString *currentReferString = self.referString; // 获取当前引用字符串
-		CGRect frame = self.view.frame;
-
-		// 根据不同的引用来源调整视图高度
-		if ([currentReferString isEqualToString:@"general_search"]) {
-			// 通用搜索场景：使用父视图完整高度
-			frame.size.height = self.view.superview.frame.size.height;
-		} else if ([currentReferString isEqualToString:@"chat"] || currentReferString == nil) {
-			// 聊天场景或引用为空：使用父视图完整高度
-			frame.size.height = self.view.superview.frame.size.height;
-		} else if ([currentReferString isEqualToString:@"search_result"] || currentReferString == nil) {
-			// 搜索结果场景或引用为空：使用父视图完整高度
-			frame.size.height = self.view.superview.frame.size.height;
-		} else if ([currentReferString isEqualToString:@"close_friends_moment"] || currentReferString == nil) {
-			// 好友动态场景或引用为空：使用父视图完整高度
-			frame.size.height = self.view.superview.frame.size.height;
-		} else if ([currentReferString isEqualToString:@"offline_mode"] || currentReferString == nil) {
-			// 离线模式场景或引用为空：使用父视图完整高度
-			frame.size.height = self.view.superview.frame.size.height;
-		} else if ([currentReferString isEqualToString:@"others_homepage"] || currentReferString == nil) {
-			// 其他用户主页场景或引用为空：从父视图高度减去底部栏高度
-			frame.size.height = self.view.superview.frame.size.height - tabHeight;
-		} else {
-			// 其他所有情况：从父视图高度减去底部栏高度
-			frame.size.height = self.view.superview.frame.size.height - tabHeight;
-		}
-
-		// 应用调整后的frame
-		self.view.frame = frame;
-	}
+    %orig;
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+        // 恢复 frame
+        if (self.view.superview) {
+            CGRect frame = self.view.superview.bounds;
+            self.view.frame = frame;
+        }
+        return;
+    }
+    static BOOL isAdjusting = NO;
+    if (isAdjusting) return;
+    isAdjusting = YES;
+    @try {
+        CGRect frame = self.view.frame;
+        CGRect originalFrame = frame;
+        CGFloat superviewHeight = self.view.superview ? self.view.superview.frame.size.height : 0;
+        if (superviewHeight < 50 || superviewHeight > 2000) {
+            isAdjusting = NO;
+            return;
+        }
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+            frame.size.height = superviewHeight - 83;
+            if (frame.size.height > originalFrame.size.height && 
+                frame.size.height < superviewHeight * 1.1) {
+                self.view.frame = frame;
+            }
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"[DYYY] 全屏模式调整异常: %@", exception);
+    }
+    isAdjusting = NO;
 }
-
 %end
 
 
@@ -1513,6 +1582,39 @@ static void DYYYUpdateBlurEffectForView(UIView *containerView, float transparenc
 			}
 		}
 	}
+}
+
+%end
+
+
+%hook AWEBaseListViewController
+
+- (void)viewDidLoad {
+    %orig;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dyyySettingChanged:) name:@"DYYYSettingChanged" object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYSettingChanged" object:nil];
+    %orig;
+}
+
+%new
+- (void)dyyySettingChanged:(NSNotification *)note {
+    // 重新计算 tabHeight
+    getTabBarHeight();
+    // 强制刷新所有窗口和主视图
+    for (UIWindow *window in [UIApplication sharedApplication].windows) {
+        [window setNeedsLayout];
+        [window layoutIfNeeded];
+        [window.rootViewController.view setNeedsLayout];
+        [window.rootViewController.view layoutIfNeeded];
+        // 递归刷新所有子 viewController
+        for (UIViewController *vc in window.rootViewController.childViewControllers) {
+            [vc.view setNeedsLayout];
+            [vc.view layoutIfNeeded];
+        }
+    }
 }
 
 %end

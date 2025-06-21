@@ -783,7 +783,7 @@ void updateSpeedButtonVisibility() {
 
 %end
 
-// 添加设置变化处理函数
+// 设置变化处理函数
 static void handleSettingChanged(NSNotification *notification) {
     NSDictionary *userInfo = notification.userInfo;
     NSString *key = userInfo[@"key"];
@@ -808,6 +808,17 @@ static void handleSettingChanged(NSNotification *notification) {
     else if ([key isEqualToString:@"DYYYSpeedSettings"]) {
         // 倍速数值变化时更新UI
         updateSpeedButtonUI();
+        
+        // 立即应用新的倍速设置到当前视频 - 添加这段代码使设置变更立即生效
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // 如果当前正在播放视频，立即应用新的倍速
+            applyCurrentSpeedToVideo();
+            
+            // 显示提示信息告知用户倍速已更新
+            float currentSpeed = getCurrentSpeed();
+            NSString *message = [NSString stringWithFormat:@"倍速已更新为 %.2fx", currentSpeed];
+            [DYYYUtils showToast:message];
+        });
     }
     else if ([key isEqualToString:@"DYYYSpeedButtonShowX"]) {
         // 显示后缀变化
@@ -836,17 +847,33 @@ static void handleSettingChanged(NSNotification *notification) {
             });
         }
     }
+    // 处理倍速索引直接变化的情况
+    else if ([key isEqualToString:@"DYYYCurrentSpeedIndex"]) {
+        // 更新按钮UI
+        updateSpeedButtonUI();
+        
+        // 立即应用新的倍速设置
+        dispatch_async(dispatch_get_main_queue(), ^{
+            applyCurrentSpeedToVideo();
+            
+            // 显示新倍速提示
+            float currentSpeed = getCurrentSpeed();
+            NSString *message = [NSString stringWithFormat:@"倍速已更新为 %.2fx", currentSpeed];
+            [DYYYUtils showToast:message];
+        });
+    }
 }
 
 %ctor {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
     
-    // 监听设置变化
-    [[NSNotificationCenter defaultCenter] addObserver:[NSNotificationCenter defaultCenter] 
-                                               selector:@selector(handleSettingChanged:) 
-                                                   name:@"DYYYSettingChanged" 
-                                                 object:nil];
-    
+    // 监听设置变化，使用block方式
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"DYYYSettingChanged"
+                                                      object:nil
+                                                       queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        handleSettingChanged(note);
+    }];
     %init;
 }
