@@ -418,14 +418,19 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWEFeedProgressSlider : UIView
+@property(nonatomic, assign) float value;
 @property(nonatomic, assign) float maximumValue;
 @property(nonatomic, strong) UIView *leftLabelUI;
 @property(nonatomic, strong) UIView *rightLabelUI;
 @property(nonatomic) AWEPlayInteractionProgressController *progressSliderDelegate;
-
 - (void)applyCustomProgressStyle;
 - (void)applyWidthPercentToSubviews:(CGFloat)widthPercent;
 @end
+
+@interface AWEFeedProgressSlider (DYYYClassMethod)
++ (void)dyyy_refreshAllSlidersInView:(UIView *)view;
+@end
+
 
 @interface AWEFeedChannelObject : NSObject
 @property(nonatomic, copy) NSString *channelID;

@@ -1286,7 +1286,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -时:分:秒" key:@"DYYYDateTimeFormat_HMS" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -时:分" key:@"DYYYDateTimeFormat_HM" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -年-月-日" key:@"DYYYDateTimeFormat_YMD" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"属地前缀" key:@"DYYYLocationPrefix" type:DYYYSettingItemTypeTextField placeholder:@"IP : "],
+                [DYYYSettingItem itemWithTitle:@"属地前缀" key:@"DYYYLocationPrefix" type:DYYYSettingItemTypeTextField placeholder:@"可以自定义修改 "],
                 [DYYYSettingItem itemWithTitle:@"时间属地显示-开关" key:@"DYYYisEnableArea" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -省级" key:@"DYYYisEnableAreaProvince" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -城市" key:@"DYYYisEnableAreaCity" type:DYYYSettingItemTypeSwitch],
@@ -1295,7 +1295,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"链接解析API" key:@"DYYYInterfaceDownload" type:DYYYSettingItemTypeTextField placeholder:@"不设置，默认"],
                 [DYYYSettingItem itemWithTitle:@"弹出-清晰度选项" key:@"DYYYShowAllVideoQuality" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"拦截广告（开屏、信息流、启动视频）"  key:@"DYYYNoAds" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"pxx917144686"],
+                [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"可以自定义修改"],
                 [DYYYSettingItem itemWithTitle:@"菜单背景颜色" key:@"DYYYBackgroundColor" type:DYYYSettingItemTypeColorPicker],
                 [DYYYSettingItem itemWithTitle:@"默认倍速（如果没有倍数设置）" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮功能-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
@@ -2368,11 +2368,25 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     } else if (item.type == DYYYSettingItemTypeTextField) {
         // 文本输入类型
         if ([item.key isEqualToString:@"DYYYCustomAlbumImage"]) {
+            NSString *imagePath = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCustomAlbumImagePath"];
+            BOOL fileExists = imagePath && [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
+            if (fileExists) {
+            // 显示图片预览按钮
+            UIButton *previewButton = [UIButton buttonWithType:UIButtonTypeCustom];
+            previewButton.frame = CGRectMake(0, 0, 40, 40);
+            previewButton.layer.cornerRadius = 8;
+            previewButton.clipsToBounds = YES;
+            UIImage *img = [UIImage imageWithContentsOfFile:imagePath];
+            [previewButton setImage:img forState:UIControlStateNormal];
+            [previewButton addTarget:self action:@selector(showImagePickerForCustomAlbum) forControlEvents:UIControlEventTouchUpInside];
+            accessoryView = previewButton;
+            } else {
             UIButton *chooseButton = [UIButton buttonWithType:UIButtonTypeSystem];
             [chooseButton setTitle:@"选择图片" forState:UIControlStateNormal];
             [chooseButton addTarget:self action:@selector(showImagePickerForCustomAlbum) forControlEvents:UIControlEventTouchUpInside];
             chooseButton.frame = CGRectMake(0, 0, 80, 30);
             accessoryView = chooseButton;
+            }
         } else {
             // 关键：加宽文本框宽度，避免被遮挡
             UITextField *textField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 160, 30)];

@@ -2488,7 +2488,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                         [DYYYManager downloadMedia:imageURL mediaType:MediaTypeImage completion:^(BOOL success){
                             dispatch_async(dispatch_get_main_queue(), ^{
                                 if (success) {
-                                    [DYYYManager showToast:@"图片已保存到相册"];
                                 } else {
                                     [DYYYManager showToast:@"图片保存失败"];
                                 }
@@ -2510,7 +2509,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                     NSURL *url = [NSURL URLWithString:videoModel.h264URL.originURLList.firstObject];
                     [DYYYManager downloadMedia:url mediaType:MediaTypeVideo completion:^(BOOL success){
                         if (success) {
-                            [DYYYManager showToast:@"视频已保存到相册"];
                         }
                     }];
                 }
@@ -2573,7 +2571,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                 NSURL *url = [NSURL URLWithString:musicModel.playURL.originURLList.firstObject];
                 [DYYYManager downloadMedia:url mediaType:MediaTypeAudio completion:^(BOOL success){
                     if (success) {
-                        [DYYYManager showToast:@"音频已保存"];
                     }
                 }];
             }
@@ -2643,7 +2640,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             NSString *descText = [awemeModel valueForKey:@"descriptionString"];
             if (descText && descText.length > 0) {
                 [[UIPasteboard generalPasteboard] setString:descText];
-                [DYYYManager showToast:@"文案已复制到剪贴板"];
             } else {
                 [DYYYManager showToast:@"没有可复制的文案"];
             }
@@ -2914,7 +2910,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     } else {
         // 尝试通过通知或其他方式触发评论
         [[NSNotificationCenter defaultCenter] postNotificationName:@"AWECommentPanelShow" object:nil];
-        [DYYYManager showToast:@"正在打开评论..."];
     }
 }
 
@@ -2934,7 +2929,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             [generator impactOccurred];
         }
         
-        [DYYYManager showToast:@"点赞操作已执行"];
     } else {
         [DYYYManager showToast:@"未找到点赞按钮"];
     }
@@ -2948,7 +2942,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     if (shareButton && [shareButton respondsToSelector:@selector(sendActionsForControlEvents:)]) {
         [(UIButton *)shareButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-        [DYYYManager showToast:@"正在打开分享面板..."];
     } else {
         // 备用方案：获取分享链接
         AWEAwemeModel *awemeModel = [self getCurrentAwemeModel];
@@ -2956,7 +2949,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             NSString *shareURL = [awemeModel valueForKey:@"shareURL"];
             if (shareURL) {
                 [[UIPasteboard generalPasteboard] setString:shareURL];
-                [DYYYManager showToast:@"分享链接已复制到剪贴板"];
             } else {
                 [DYYYManager showToast:@"无法获取分享链接"];
             }
@@ -2972,7 +2964,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     if (moreButton && [moreButton respondsToSelector:@selector(sendActionsForControlEvents:)]) {
         [(UIButton *)moreButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-        [DYYYManager showToast:@"正在打开操作面板..."];
     } else {
         [DYYYManager showToast:@"未找到操作面板按钮"];
     }
@@ -3023,7 +3014,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     UIAlertAction *copyAction = [UIAlertAction actionWithTitle:@"复制信息" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [[UIPasteboard generalPasteboard] setString:info];
-        [DYYYManager showToast:@"视频信息已复制"];
     }];
     
     UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleCancel handler:nil];
