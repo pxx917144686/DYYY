@@ -1529,10 +1529,22 @@ void showVideoStatsEditAlert(UIViewController *viewController) {
 }
 
 - (NSNumber *)diggCount {
-    if (videoStatsEnabled && cachedVideoLikesNumber) {
-        return cachedVideoLikesNumber;
+    @try {
+        if (!videoStatsEnabled) {
+            return %orig;
+        }
+        
+        // 安全地获取自定义值
+        NSNumber *customValue = cachedVideoLikesNumber;
+        if (customValue && [customValue isKindOfClass:[NSNumber class]]) {
+            return customValue;
+        }
+        
+        return %orig;
+    } @catch (NSException *exception) {
+        NSLog(@"获取点赞数失败: %@", exception);
+        return %orig;
     }
-    return %orig;
 }
 
 - (void)setDiggCount:(NSNumber *)count {

@@ -3,6 +3,119 @@
 #import "DYYYManager.h"
 #import "AwemeHeaders.h"
 
+// 定义常量
+#ifndef DYYY_IGNORE_GLOBAL_ALPHA_TAG
+#define DYYY_IGNORE_GLOBAL_ALPHA_TAG 88888
+#endif
+
+// 前向声明 DYYYLayoutStateManager
+@class DYYYLayoutStateManager;
+
+@interface DYYYLayoutStateManager : NSObject
+@property (nonatomic, assign) BOOL isLayoutInProgress;
+@property (nonatomic, assign) BOOL isTabHeightUpdating;
+@property (nonatomic, assign) NSTimeInterval lastLayoutTime;
++ (instancetype)sharedManager;
+- (BOOL)canPerformLayoutOperation;
+- (void)markLayoutStart;
+- (void)markLayoutEnd;
+@end
+
+@implementation DYYYLayoutStateManager
+
++ (instancetype)sharedManager {
+    static DYYYLayoutStateManager *sharedInstance = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedInstance = [[self alloc] init];
+    });
+    return sharedInstance;
+}
+
+- (instancetype)init {
+    if (self = [super init]) {
+        _isLayoutInProgress = NO;
+        _isTabHeightUpdating = NO;
+        _lastLayoutTime = 0;
+    }
+    return self;
+}
+
+- (BOOL)canPerformLayoutOperation {
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    
+    // 如果距离上次操作时间小于阈值，则不允许进行新的布局操作
+    if (now - self.lastLayoutTime < 0.1) {
+        return NO;
+    }
+    
+    // 如果正在进行布局，则不允许重入
+    if (self.isLayoutInProgress) {
+        return NO;
+    }
+    
+    return YES;
+}
+
+- (void)markLayoutStart {
+    self.isLayoutInProgress = YES;
+    self.lastLayoutTime = [NSDate timeIntervalSinceReferenceDate];
+}
+
+- (void)markLayoutEnd {
+    self.isLayoutInProgress = NO;
+}
+
+- (void)temporarilyPausedLayoutForSettingChange {
+    self.isLayoutInProgress = YES;
+    
+    // 自动恢复
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        self.isLayoutInProgress = NO;
+    });
+}
+
+- (void)performSafeLayoutBlock:(void(^)(void))layoutBlock {
+    if (self.isLayoutInProgress) {
+        // 布局中，延迟执行
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            [self performSafeLayoutBlock:layoutBlock];
+        });
+        return;
+    }
+    
+    [self markLayoutStart];
+    @try {
+        if (layoutBlock) {
+            layoutBlock();
+        }
+    } @finally {
+        [self markLayoutEnd];
+    }
+}
+
+@end
+
+@interface UIView (DYYYHelper)
+- (UIViewController *)firstAvailableUIViewController;
+@end
+
+@implementation UIView (DYYYHelper)
+- (UIViewController *)firstAvailableUIViewController {
+    // 从视图向上查找第一个可用的视图控制器
+    UIResponder *responder = self;
+    while ((responder = [responder nextResponder])) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            return (UIViewController *)responder;
+        }
+    }
+    return nil;
+}
+@end
+
+@interface AWELiveProgressView : UIView
+@end
+
 static UIButton *speedButton = nil;
 
 // 添加 tabHeight 变量声明
@@ -10,21 +123,68 @@ static CGFloat tabHeight = 0;
 
 // 更精准的标签栏高度计算（每次都重新计算，不缓存）
 static CGFloat getTabBarHeight(void) {
-    // 不再缓存，每次都重新计算
+    DYYYLayoutStateManager *stateManager = [DYYYLayoutStateManager sharedManager];
+    
+    // 如果正在更新中，返回缓存值
+    if (stateManager.isTabHeightUpdating) {
+        return tabHeight > 0 ? tabHeight : 83.0;
+    }
+    
+    static CGFloat cachedHeight = 83.0;
+    static NSTimeInterval lastUpdateTime = 0;
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+
+    // 增加缓存时间到2秒，减少频繁计算
+    if (now - lastUpdateTime < 2.0) {
+        return cachedHeight;
+    }
+
+    // 标记正在更新
+    stateManager.isTabHeightUpdating = YES;
+    
     CGFloat measuredHeight = 83.0;
-    UIWindow *keyWindow = [DYYYManager getActiveWindow];
-    if (keyWindow) {
-        for (UIView *subview in keyWindow.rootViewController.view.subviews) {
-            if ([NSStringFromClass([subview class]) containsString:@"TabBar"]) {
-                CGFloat h = subview.frame.size.height;
-                if (h > 30 && h < 120) {
-                    measuredHeight = h;
+    @try {
+        UIWindow *keyWindow = [DYYYManager getActiveWindow];
+        if (!keyWindow || !keyWindow.rootViewController || !keyWindow.rootViewController.view) {
+            measuredHeight = cachedHeight;
+            goto cleanup;
+        }
+
+        // 确保视图已经完成布局
+        if (keyWindow.rootViewController.view.frame.size.height < 100) {
+            measuredHeight = cachedHeight;
+            goto cleanup;
+        }
+
+        // 查找TabBar - 使用更安全的遍历方式
+        NSArray *subviews = [keyWindow.rootViewController.view.subviews copy];
+        for (UIView *subview in subviews) {
+            @try {
+                NSString *className = NSStringFromClass([subview class]);
+                if ([className containsString:@"TabBar"] && subview.frame.size.height > 0) {
+                    CGFloat h = subview.frame.size.height;
+                    if (h >= 30 && h <= 120) {
+                        measuredHeight = h;
+                        NSLog(@"[DYYY] 安全测量标签栏高度: %f", h);
+                        break;
+                    }
                 }
-                break;
+            } @catch (NSException *innerException) {
+                continue; // 跳过有问题的子视图
             }
         }
+        
+    } @catch (NSException *exception) {
+        NSLog(@"[DYYY] 获取TabBar高度异常: %@", exception);
+        measuredHeight = cachedHeight;
     }
+
+cleanup:
+    cachedHeight = measuredHeight;
+    lastUpdateTime = now;
     tabHeight = measuredHeight;
+    stateManager.isTabHeightUpdating = NO;
+    
     return measuredHeight;
 }
 
@@ -43,29 +203,35 @@ static void DYYYRemoveBlurViewsWithTag(UIView *view, NSInteger tag);
 - (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency;
 - (void)setTextColorAndShadowInView:(UIView *)view textColor:(UIColor *)textColor isDarkMode:(BOOL)isDarkMode transparency:(float)transparency;
 - (void)applyBlurEffectIfNeeded;
+- (void)dyyySettingChanged:(NSNotification *)note;
 @end
 
 @interface AWECommentInputViewSwiftImpl_CommentInputContainerView (DYYYBlurEffect)
 - (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency;
 - (void)setTextColorAndShadowInView:(UIView *)view textColor:(UIColor *)textColor isDarkMode:(BOOL)isDarkMode transparency:(float)transparency;
+- (void)dyyySettingChanged:(NSNotification *)note;
 @end
 
 @interface AWEInnerNotificationWindow (DYYYBlurEffect)
 - (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency;
 - (void)setupBlurEffectForNotificationView;
 - (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView;
+- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView depth:(int)depth;
 - (void)applyBlurEffectToView:(UIView *)containerView;
 - (void)clearBackgroundRecursivelyInView:(UIView *)view exceptClass:(Class)exceptClass;
 - (void)adjustTextColorInView:(UIView *)view darkMode:(BOOL)isDarkMode;
 - (void)setLabelsColorWhiteInView:(UIView *)view;
 - (void)clearBackgroundRecursivelyInView:(UIView *)view;
-- (void)adjustTextVisibilityForBlurEffect:(UIView *)containerView transparency:(float)transparency;
 @end
 
 @interface AWEUserActionSheetView (DYYYBlurEffect)
 - (void)applyBlurEffectAndWhiteText;
 - (void)setTextColorWhiteRecursivelyInView:(UIView *)view;
 @property(nonatomic, strong) UIView *containerView;
+@end
+
+@interface AWEPlayInteractionViewController (DYYYBlurEffect)
+- (void)performSafeLayoutAdjustment;
 @end
 
 @interface AWEAwemeDetailNaviBarContainerView : UIView
@@ -91,19 +257,9 @@ static BOOL DYYYIsFunctionEnabled(NSString *key) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:key];
 }
 
-// 简单日志函数
-static void DYYYLog(NSString *format, ...) {
-    va_list args;
-    va_start(args, format);
-    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
-    va_end(args);
-    
-    NSLog(@"[DYYY] %@", message);
-}
-
-// 定义一个共享的颜色配置函数
+// 定义共享的颜色配置函数
 static void DYYYConfigureSharedBlurAppearance(UIVisualEffectView *blurView, float transparency, BOOL isDarkMode) {
-    if (!blurView) return; // 添加安全检查
+    if (!blurView) return;
     
     blurView.alpha = transparency;
     
@@ -279,19 +435,49 @@ static UIVisualEffectView *DYYYCreateBlurEffectView(UIView *containerView, float
 
 // 应用毛玻璃效果的统一接口
 static void DYYYApplyBlurEffect(UIView *view, float transparency) {
-    if (!view) return;
+    if (!view || transparency <= 0) return;
+
     @try {
-        DYYYRemoveBlurViewsWithTag(view, 9999);
-        view.backgroundColor = [UIColor clearColor];
-        BOOL isDarkMode = [DYYYManager isDarkMode];
-        UIVisualEffectView *blurEffectView = DYYYCreateBlurEffectView(view, transparency, isDarkMode);
-        if (blurEffectView) {
-            DYYYOptimizeBlurViewPerformance(blurEffectView);
-            [view insertSubview:blurEffectView atIndex:0];
-            DYYYEnhanceTextForBlurEffect(view, transparency, isDarkMode);
+        // 检查视图是否还有效
+        if (view.superview == nil) {
+            return;
         }
-    } @catch (__unused NSException *e) {
-        // 防止插入异常导致界面卡死
+
+        BOOL isDarkMode = [DYYYManager isDarkMode];
+
+        // 移除现有的毛玻璃视图
+        for (UIView *subview in [view.subviews copy]) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 9999) {
+                [subview removeFromSuperview];
+            }
+        }
+
+        // 创建新的毛玻璃视图
+        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight];
+        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+        blurView.frame = view.bounds;
+        blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        blurView.tag = 9999;
+        blurView.alpha = transparency;
+
+        // 添加颜色覆盖层，提升观感
+        UIView *overlayView = [[UIView alloc] initWithFrame:view.bounds];
+        CGFloat overlayAlpha = isDarkMode ? 0.2 : 0.1;
+        overlayView.backgroundColor = [UIColor colorWithWhite:(isDarkMode ? 0 : 1) alpha:overlayAlpha];
+        overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [blurView.contentView addSubview:overlayView];
+
+        // 性能优化
+        DYYYOptimizeBlurViewPerformance(blurView);
+
+        // 插入到最底层
+        [view insertSubview:blurView atIndex:0];
+
+        // 文本增强
+        DYYYEnhanceTextForBlurEffect(view, transparency, isDarkMode);
+
+    } @catch (NSException *exception) {
+        NSLog(@"应用毛玻璃效果失败: %@", exception);
     }
 }
 
@@ -342,8 +528,6 @@ static void DYYYApplyCommentInputBlur(UIView *view) {
     // 设置子视图背景透明（保留文本控件可见性）
     DYYYSetViewsTransparent(view, YES);
 }
-
-
 
 // MARK: - 暗黑模式适配增强
 static void DYYYUpdateBlurEffectForTraitCollection(UIView *view, UITraitCollection *traitCollection) {
@@ -465,7 +649,7 @@ static float DYYYGetUserTransparencySafe(NSString *key, float defaultValue) {
     return result;
 }
 
-// 智能判断是否为“评论输入相关视图”而不是手动字符串匹配
+// 智能判断是否为"评论输入相关视图"而不是手动字符串匹配
 static BOOL DYYYIsCommentInputRelatedView(UIView *view) {
     if (!view) return NO;
     static NSArray *patterns = nil;
@@ -480,14 +664,14 @@ static BOOL DYYYIsCommentInputRelatedView(UIView *view) {
     return NO;
 }
 
-// 智能判断是否为“弹幕”相关视图
+// 智能判断是否为"弹幕"相关视图
 static BOOL DYYYIsDanmuLabel(UIView *view) {
     if (![view isKindOfClass:[UILabel class]]) return NO;
     UILabel *label = (UILabel *)view;
     return [label.text containsString:@"弹幕"];
 }
 
-// 智能判断是否为“白色背景”视图
+// 智能判断是否为"白色背景"视图
 static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
     if (!view || !view.backgroundColor) return NO;
     CGFloat r=0,g=0,b=0,a=0;
@@ -497,71 +681,173 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
     return NO;
 }
 
+// 界面稳定性检查函数
+static BOOL DYYYIsInterfaceStable(UIViewController *viewController) {
+    if (!viewController || !viewController.view) {
+        return NO;
+    }
+    
+    // 检查视图是否已经显示
+    if (!viewController.view.window) {
+        return NO;
+    }
+    
+    // 检查视图大小是否合理
+    CGRect bounds = viewController.view.bounds;
+    if (CGRectIsEmpty(bounds) || bounds.size.height < 100) {
+        return NO;
+    }
+    
+    // 检查视图控制器是否处于转场中
+    if (viewController.transitionCoordinator) {
+        return NO;
+    }
+    
+    return YES;
+}
+
+static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
+    if (!view || transparency <= 0) return;
+    
+    // 保存原始状态，用于失败时恢复
+    UIColor *originalBgColor = view.backgroundColor;
+    NSArray *originalSubviews = [view.subviews copy];
+    
+    @try {
+        DYYYApplyBlurEffect(view, transparency);
+    } @catch (NSException *exception) {
+        NSLog(@"[DYYY] 应用毛玻璃效果失败: %@", exception);
+        
+        // 还原视图状态
+        view.backgroundColor = originalBgColor;
+        
+        // 移除可能添加的毛玻璃视图
+        for (UIView *subview in [view.subviews copy]) {
+            if (![originalSubviews containsObject:subview] && 
+                [subview isKindOfClass:[UIVisualEffectView class]]) {
+                [subview removeFromSuperview];
+            }
+        }
+    }
+}
+
 // 为 AWEUserActionSheetView 添加毛玻璃效果
 %hook AWEUserActionSheetView
 
-- (void)layoutSubviews {
-	%orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableSheetBlur"]) {
-		[self applyBlurEffectAndWhiteText];
-	}
+- (void)layoutSubviews {    
+    %orig;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableSheetBlur"]) {
+        [self applyBlurEffectAndWhiteText];
+    }
 }
 
 %new
 - (void)applyBlurEffectAndWhiteText {
-	// 应用毛玻璃效果到容器视图
-	if (self.containerView) {
-		self.containerView.backgroundColor = [UIColor clearColor];
+    // 应用毛玻璃效果到容器视图
+    if (self.containerView) {
+        self.containerView.backgroundColor = [UIColor clearColor];
 
-		for (UIView *subview in self.containerView.subviews) {
-			if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 9999) {
-				[subview removeFromSuperview];
-			}
-		}
+        for (UIView *subview in self.containerView.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 9999) {
+                [subview removeFromSuperview];
+            }
+        }
 
-		// 动态获取用户设置的透明度
-		float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYSheetBlurTransparent"] floatValue];
-		if (userTransparency <= 0 || userTransparency > 1) {
-			userTransparency = 0.9; // 默认值0.9
-		}
+        // 动态获取用户设置的透明度
+        float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYSheetBlurTransparent"] floatValue];
+        if (userTransparency <= 0 || userTransparency > 1) {
+            userTransparency = 0.9; // 默认值0.9
+        }
 
-		UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-		UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-		blurEffectView.frame = self.containerView.bounds;
-		blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-		blurEffectView.alpha = userTransparency; // 设置为用户自定义透明度
-		blurEffectView.tag = 9999;
+        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
+        UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+        blurEffectView.frame = self.containerView.bounds;
+        blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        blurEffectView.alpha = userTransparency; // 设置为用户自定义透明度
+        blurEffectView.tag = 9999;
 
-		[self.containerView insertSubview:blurEffectView atIndex:0];
+        [self.containerView insertSubview:blurEffectView atIndex:0];
 
-		[self setTextColorWhiteRecursivelyInView:self.containerView];
-	}
+        [self setTextColorWhiteRecursivelyInView:self.containerView];
+    }
 }
 
 %new
 - (void)setTextColorWhiteRecursivelyInView:(UIView *)view {
-	for (UIView *subview in view.subviews) {
-		if (![subview isKindOfClass:[UIVisualEffectView class]]) {
-			subview.backgroundColor = [UIColor clearColor];
-		}
+    for (UIView *subview in view.subviews) {
+        if (![subview isKindOfClass:[UIVisualEffectView class]]) {
+            subview.backgroundColor = [UIColor clearColor];
+        }
 
-		if ([subview isKindOfClass:[UILabel class]]) {
-			UILabel *label = (UILabel *)subview;
-			label.textColor = [UIColor whiteColor];
-		}
+        if ([subview isKindOfClass:[UILabel class]]) {
+            UILabel *label = (UILabel *)subview;
+            label.textColor = [UIColor whiteColor];
+        }
 
-		if ([subview isKindOfClass:[UIButton class]]) {
-			UIButton *button = (UIButton *)subview;
-			[button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-		}
+        if ([subview isKindOfClass:[UIButton class]]) {
+            UIButton *button = (UIButton *)subview;
+            [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        }
 
-		[self setTextColorWhiteRecursivelyInView:subview];
-	}
+        [self setTextColorWhiteRecursivelyInView:subview];
+    }
 }
 %end
 
 // MARK: - 评论区毛玻璃效果
 %hook AWEBaseListViewController
+
+- (void)viewDidLoad {
+    %orig;
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYSettingChanged" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dyyySettingChanged:) name:@"DYYYSettingChanged" object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYSettingChanged" object:nil];
+    %orig;
+}
+
+%new
+- (void)dyyySettingChanged:(NSNotification *)note {
+    static NSTimeInterval lastHandleTime = 0;
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    
+    // 防止频繁处理通知
+    if (now - lastHandleTime < 1.0) {
+        return;
+    }
+    
+    lastHandleTime = now;
+    DYYYLayoutStateManager *stateManager = [DYYYLayoutStateManager sharedManager];
+    
+    if (stateManager.isLayoutInProgress) {
+        // 延迟处理，避免布局冲突
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            tabHeight = getTabBarHeight();
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self isViewLoaded] && self.view.window) {
+                    [self.view setNeedsLayout];
+                }
+            });
+        });
+        return;
+    }
+    
+    // 仅更新tabHeight值，不立即应用UI变更
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+        tabHeight = getTabBarHeight();
+        
+        // 延迟应用UI变更
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if ([self isViewLoaded] && self.view.window) {
+                [self.view setNeedsLayout];
+                [self.view layoutIfNeeded];
+            }
+        });
+    });
+}
 
 // MARK: - 用于文本增强的函数
 %new
@@ -801,7 +1087,13 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 
 %new
 - (void)dyyySettingChanged:(NSNotification *)note {
-    [self setNeedsLayout];
+    // 只更新tabHeight值，不进行全局刷新
+    tabHeight = getTabBarHeight();
+    
+    // 对于UIView子类，直接检查window并刷新自身
+    if (self.window) {
+        [self setNeedsLayout];
+    }
 }
 
 %new
@@ -875,7 +1167,7 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
     }
 }
 
-- (void)layoutSubviews {
+- (void)layoutSubviews {    
     %orig;
 
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
@@ -963,7 +1255,7 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 // MARK: - 评论输入框背景控制
 %hook AWECommentInputViewSwiftImpl_CommentInputBackgroundView
 
-- (void)layoutSubviews {
+- (void)layoutSubviews {    
     %orig;
     
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
@@ -1038,6 +1330,37 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 // MARK: - UIView毛玻璃处理
 %hook UIView
 - (void)layoutSubviews {
+    static NSDate *lastUpdateTime = nil;
+    NSDate *now = [NSDate date];
+
+    // 更新间隔小于0.2秒，跳过部分处理
+    if (lastUpdateTime && [now timeIntervalSinceDate:lastUpdateTime] < 0.5) {
+        %orig;
+        return;
+    }
+    lastUpdateTime = now;
+
+    // 只处理特定类型的视图
+    NSString *className = NSStringFromClass([self class]);
+    static NSArray *targetClassPatterns;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        targetClassPatterns = @[@"AWEComment", @"AWEFeedProgress", @"AWEPlayInteraction"];
+    });
+
+    BOOL shouldProcess = NO;
+    for (NSString *pattern in targetClassPatterns) {
+        if ([className containsString:pattern]) {
+            shouldProcess = YES;
+            break;
+        }
+    }
+
+    if (!shouldProcess) {
+        %orig;
+        return;
+    }
+
     @try {
         %orig;
 
@@ -1140,7 +1463,6 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
             }
         }
         if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
-            NSString *className = NSStringFromClass([self class]);
             if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
                 for (UIView *subview in self.subviews) {
                     if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor) {
@@ -1158,65 +1480,111 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
                 }
             }
         }
-    } @catch (__unused NSException *e) {
-        // 防止崩溃
+    } @catch (NSException *e) {
+        NSLog(@"[DYYY] layoutSubviews异常: %@", e);
     }
 }
 
 - (void)setFrame:(CGRect)frame {
+    // 使用状态管理器检查
+    DYYYLayoutStateManager *stateManager = [DYYYLayoutStateManager sharedManager];
+    
+    // 检查防重入标记
     static void *DYYYFrameKey = &DYYYFrameKey;
     if (objc_getAssociatedObject(self, DYYYFrameKey)) {
-        @try { %orig(frame); } @catch (__unused NSException *e) {}
+        %orig(frame);
         return;
     }
+    
+    // 如果布局操作过于频繁，延迟执行
+    if (![stateManager canPerformLayoutOperation]) {
+        %orig(frame);
+        return;
+    }
+    
     objc_setAssociatedObject(self, DYYYFrameKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [stateManager markLayoutStart];
+    
     @try {
-        BOOL enableBlur = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"];
-        BOOL enableFS = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"];
-        BOOL hideAvatar = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenAvatarList"];
-
-        Class SkylightListViewClass = NSClassFromString(@"AWEIMSkylightListView");
-        if (hideAvatar && SkylightListViewClass && [self isKindOfClass:SkylightListViewClass]) {
-            frame = CGRectZero;
+        NSString *className = NSStringFromClass([self class]);
+        
+        // 只处理特定的关键视图类型
+        static NSArray *criticalClasses = nil;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            criticalClasses = @[@"AWEPlayInteraction", @"AWEAwemePlayVideo", @"AWEDPlayerFeedPlayer"];
+        });
+        
+        BOOL isCriticalClass = NO;
+        for (NSString *pattern in criticalClasses) {
+            if ([className containsString:pattern]) {
+                isCriticalClass = YES;
+                break;
+            }
+        }
+        
+        if (!isCriticalClass) {
             %orig(frame);
             return;
         }
-
+        
+        BOOL enableFS = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"];
+        
+        if (!enableFS) {
+            %orig(frame);
+            return;
+        }
+        
+        // 验证视图控制器
         UIViewController *vc = [self firstAvailableUIViewController];
-        Class DetailVCClass = NSClassFromString(@"AWEMixVideoPanelDetailTableViewController");
+        if (!vc) {
+            %orig(frame);
+            return;
+        }
+        
         Class PlayVCClass1 = NSClassFromString(@"AWEAwemePlayVideoViewController");
         Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
-
-        BOOL isDetailVC = (DetailVCClass && [vc isKindOfClass:DetailVCClass]);
-        BOOL isPlayVC = ((PlayVCClass1 && [vc isKindOfClass:PlayVCClass1]) || (PlayVCClass2 && [vc isKindOfClass:PlayVCClass2]));
-
-        if (isPlayVC && enableBlur) {
-            if (frame.origin.x != 0) {
-                return;
-            }
-        }
-
-        if (isPlayVC && enableFS) {
-            if (frame.origin.x != 0 && frame.origin.y != 0) {
-                %orig(frame);
-                return;
-            }
-            CGRect superF = self.superview.frame;
-            if (CGRectGetHeight(superF) > 0 && CGRectGetHeight(frame) > 0 && CGRectGetHeight(frame) < CGRectGetHeight(superF)) {
-                CGFloat diff = CGRectGetHeight(superF) - CGRectGetHeight(frame);
-                if (fabs(diff - tabHeight) < 1.0) {
-                    frame.size.height = CGRectGetHeight(superF);
-                }
-            }
+        
+        BOOL isPlayVC = ((PlayVCClass1 && [vc isKindOfClass:PlayVCClass1]) || 
+                         (PlayVCClass2 && [vc isKindOfClass:PlayVCClass2]));
+        
+        if (!isPlayVC) {
             %orig(frame);
             return;
         }
-
-        %orig(frame);
-    } @catch (__unused NSException *e) {
-        // 防止崩溃
+        
+        // 直接处理frame调整逻辑，不调用新方法
+        CGRect adjustedFrame = frame;
+        
+        // 确保有有效的superview
+        if (self.superview) {
+            CGRect superFrame = self.superview.frame;
+            
+            // 验证superview的frame是否有效
+            if (!CGRectIsEmpty(superFrame) && superFrame.size.height >= 100) {
+                // 只在合理的情况下调整frame
+                if (adjustedFrame.origin.x == 0 && adjustedFrame.origin.y == 0) {
+                    CGFloat currentTabHeight = tabHeight > 0 ? tabHeight : 83.0;
+                    CGFloat heightDiff = superFrame.size.height - adjustedFrame.size.height;
+                    
+                    // 只有当差值接近tabHeight时才调整
+                    if (fabs(heightDiff - currentTabHeight) < 2.0 && heightDiff > 10) {
+                        adjustedFrame.size.height = superFrame.size.height;
+                        NSLog(@"[DYYY] 安全调整frame: %@ -> %@", 
+                              NSStringFromCGRect(frame), NSStringFromCGRect(adjustedFrame));
+                    }
+                }
+            }
+        }
+        
+        %orig(adjustedFrame);
+        
+    } @catch (NSException *e) {
+        NSLog(@"[DYYY] setFrame安全异常处理: %@", e);
+        %orig(frame); // 发生异常时使用原始frame
     } @finally {
         objc_setAssociatedObject(self, DYYYFrameKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [stateManager markLayoutEnd];
     }
 }
 
@@ -1266,17 +1634,16 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 }
 
 %new
-- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView {
+- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView depth:(int)depth {
+    // 最大递归深度限制
+    if (depth > 5) return;
+    
     for (UIView *subview in parentView.subviews) {
-        // 检查是否是通知容器视图
-        if ([NSStringFromClass([subview class]) containsString:@"AWEInnerNotificationContainerView"] ||
-            [NSStringFromClass([subview class]) containsString:@"InnerNotification"]) {
-            [self applyBlurEffectToView:subview];
-        }
+        // 原有检查逻辑...
         
-        // 递归搜索子视图
+        // 限制递归深度的递归
         if (subview.subviews.count > 0) {
-            [self findAndApplyBlurEffectToNotificationViews:subview];
+            [self findAndApplyBlurEffectToNotificationViews:subview depth:depth+1];
         }
     }
 }
@@ -1383,6 +1750,34 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
         subview.backgroundColor = [UIColor clearColor];
         [self clearBackgroundRecursivelyInView:subview exceptClass:exceptClass];
     }
+}
+
+%new
+- (void)setLabelsColorWhiteInView:(UIView *)view {
+    if (!view) return;
+    
+    for (UIView *subview in view.subviews) {
+        if ([subview isKindOfClass:[UILabel class]]) {
+            UILabel *label = (UILabel *)subview;
+            label.textColor = [UIColor whiteColor];
+            // 添加阴影增强可读性
+            label.shadowColor = [UIColor blackColor];
+            label.shadowOffset = CGSizeMake(0.5, 0.5);
+        } else if ([subview isKindOfClass:[UIButton class]]) {
+            UIButton *button = (UIButton *)subview;
+            [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        }
+        
+        // 递归处理
+        if (subview.subviews.count > 0) {
+            [self setLabelsColorWhiteInView:subview];
+        }
+    }
+}
+
+%new
+- (void)findAndApplyBlurEffectToNotificationViews:(UIView *)parentView {
+    [self findAndApplyBlurEffectToNotificationViews:parentView depth:0];
 }
 
 %end
@@ -1498,57 +1893,21 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 
 %new
 - (UIViewController *)findViewController:(UIViewController *)vc ofClass:(Class)targetClass {
-	if (!vc)
-		return nil;
-	if ([vc isKindOfClass:targetClass])
-		return vc;
+    if (!vc)
+        return nil;
+    if ([vc isKindOfClass:targetClass])
+        return vc;
 
-	for (UIViewController *childVC in vc.childViewControllers) {
-		UIViewController *found = [self findViewController:childVC ofClass:targetClass];
-		if (found)
-			return found;
-	}
-
-	return [self findViewController:vc.presentedViewController ofClass:targetClass];
-}
-%end
-
-
-// 全局透明方法
-%hook AWEPlayInteractionViewController
-- (void)viewDidLayoutSubviews {
-    %orig;
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-        // 恢复 frame
-        if (self.view.superview) {
-            CGRect frame = self.view.superview.bounds;
-            self.view.frame = frame;
-        }
-        return;
+    // 递归查找子视图控制器
+    for (UIViewController *childVC in vc.childViewControllers) {
+        UIViewController *foundVC = [self findViewController:childVC ofClass:targetClass];
+        if (foundVC)
+            return foundVC;
     }
-    static BOOL isAdjusting = NO;
-    if (isAdjusting) return;
-    isAdjusting = YES;
-    @try {
-        CGRect frame = self.view.frame;
-        CGRect originalFrame = frame;
-        CGFloat superviewHeight = self.view.superview ? self.view.superview.frame.size.height : 0;
-        if (superviewHeight < 50 || superviewHeight > 2000) {
-            isAdjusting = NO;
-            return;
-        }
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-            frame.size.height = superviewHeight - 83;
-            if (frame.size.height > originalFrame.size.height && 
-                frame.size.height < superviewHeight * 1.1) {
-                self.view.frame = frame;
-            }
-        }
-    } @catch (NSException *exception) {
-        NSLog(@"[DYYY] 全屏模式调整异常: %@", exception);
-    }
-    isAdjusting = NO;
+    
+    return nil;
 }
+
 %end
 
 
@@ -1582,39 +1941,6 @@ static BOOL DYYYIsWhiteBackgroundView(UIView *view) {
 			}
 		}
 	}
-}
-
-%end
-
-
-%hook AWEBaseListViewController
-
-- (void)viewDidLoad {
-    %orig;
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dyyySettingChanged:) name:@"DYYYSettingChanged" object:nil];
-}
-
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"DYYYSettingChanged" object:nil];
-    %orig;
-}
-
-%new
-- (void)dyyySettingChanged:(NSNotification *)note {
-    // 重新计算 tabHeight
-    getTabBarHeight();
-    // 强制刷新所有窗口和主视图
-    for (UIWindow *window in [UIApplication sharedApplication].windows) {
-        [window setNeedsLayout];
-        [window layoutIfNeeded];
-        [window.rootViewController.view setNeedsLayout];
-        [window.rootViewController.view layoutIfNeeded];
-        // 递归刷新所有子 viewController
-        for (UIViewController *vc in window.rootViewController.childViewControllers) {
-            [vc.view setNeedsLayout];
-            [vc.view layoutIfNeeded];
-        }
-    }
 }
 
 %end

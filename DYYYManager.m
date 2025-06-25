@@ -3697,4 +3697,42 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
     
     return transform;
 }
+
++ (UIViewController *)topViewControllerFrom:(UIViewController *)viewController {
+    if (!viewController) {
+        return nil;
+    }
+    
+    // 如果有presented的控制器，递归查找
+    if (viewController.presentedViewController) {
+        return [self topViewControllerFrom:viewController.presentedViewController];
+    }
+    
+    // 处理UITabBarController
+    if ([viewController isKindOfClass:[UITabBarController class]]) {
+        UITabBarController *tabBarController = (UITabBarController *)viewController;
+        if (tabBarController.selectedViewController) {
+            return [self topViewControllerFrom:tabBarController.selectedViewController];
+        }
+    }
+    
+    // 处理UINavigationController
+    if ([viewController isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *navController = (UINavigationController *)viewController;
+        if (navController.visibleViewController) {
+            return [self topViewControllerFrom:navController.visibleViewController];
+        }
+    }
+    
+    // 检查子控制器
+    for (UIViewController *childVC in viewController.childViewControllers) {
+        if (childVC.view.window) {
+            return [self topViewControllerFrom:childVC];
+        }
+    }
+    
+    // 如果没有其他特殊情况，返回控制器本身
+    return viewController;
+}
+
 @end

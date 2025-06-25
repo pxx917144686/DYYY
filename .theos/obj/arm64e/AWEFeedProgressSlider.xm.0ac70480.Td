@@ -59,6 +59,7 @@
   /Users/pxx917144686/theos/vendor/include/BulletinBoard/module.modulemap \
   /Users/pxx917144686/theos/vendor/include/BaseBoard/module.modulemap \
   /Users/pxx917144686/theos/vendor/include/UserNotificationsUIKit/module.modulemap \
+  /Users/pxx917144686/Downloads/DYYY/DYYYManager.h \
   /Users/pxx917144686/Downloads/DYYY/AwemeHeaders.h
 
 /Users/pxx917144686/theos/Prefix.pch:
@@ -178,5 +179,7 @@
 /Users/pxx917144686/theos/vendor/include/BaseBoard/module.modulemap:
 
 /Users/pxx917144686/theos/vendor/include/UserNotificationsUIKit/module.modulemap:
+
+/Users/pxx917144686/Downloads/DYYY/DYYYManager.h:
 
 /Users/pxx917144686/Downloads/DYYY/AwemeHeaders.h:
