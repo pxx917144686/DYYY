@@ -3372,25 +3372,57 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     }
 }
 
+// 全局锁来保护设置修改
+static NSLock *settingsLock = nil;
+
++ (void)initialize {
+    if (self == [DYYYSettingViewController class]) {
+        settingsLock = [[NSLock alloc] init];
+    }
+}
+
 - (void)updateAreaSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
-    // 先更新数据部分 - 始终安全执行
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    // 定义属地显示的子开关键名列表
+    NSArray<NSString *> *areaSubKeys = @[
+        @"DYYYisEnableAreaProvince",
+        @"DYYYisEnableAreaCity", 
+        @"DYYYisEnableAreaDistrict", 
+        @"DYYYisEnableAreaStreet"
+    ];
+    
+    // 添加此行：将变量声明移到方法开头，确保在整个方法范围内可见
     NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
     
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
+    // 使用锁保护设置修改
+    [settingsLock lock];
+    
+    @try {
+        // 先更新数据部分
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        // 移除此行: NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
         
-        if (![item.key isEqualToString:@"DYYYisEnableArea"]) {
-            [defaults setBool:enabled forKey:item.key];
+        for (NSUInteger row = 0; row < sectionItems.count; row++) {
+            DYYYSettingItem *item = sectionItems[row];
+            
+            // 严格只更新属地显示的子开关，其他所有开关都不修改
+            if ([areaSubKeys containsObject:item.key]) {
+                [defaults setBool:enabled forKey:item.key];
+            }
         }
+        [defaults synchronize];
+        
+        // 添加日志确认哪些键被修改
+        NSLog(@"DYYY: updateAreaSubSwitchesUI - 只修改了属地子开关，总开关状态: %@", enabled ? @"开" : @"关");
     }
-    [defaults synchronize];
+    @finally {
+        [settingsLock unlock];
+    }
     
     // 再更新UI部分 - 只在cell可见时执行
     for (NSUInteger row = 0; row < sectionItems.count; row++) {
         DYYYSettingItem *item = sectionItems[row];
         
-        if (![item.key isEqualToString:@"DYYYisEnableArea"]) {
+        if ([areaSubKeys containsObject:item.key]) {
             NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
             UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
             
