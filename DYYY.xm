@@ -3849,6 +3849,23 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 		%orig;
 	}
 }
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    
+    @try {
+        // 确保所有UI更新操作安全执行
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
+            // 延迟更新UI，避免生命周期冲突
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // UI更新代码
+            });
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"DYYY视图生命周期异常: %@", exception);
+    }
+}
+
 %end
 
 // 禁用点击首页刷新
@@ -4211,141 +4228,153 @@ static CLLocationManager *locationManager = nil;
 }
 
 - (id)timestampLabel {
-    UILabel *label = %orig;
-    
-    // 准备第一行显示日期时间
-    NSString *firstLine = @"";
-    NSString *secondLine = @"";
-    
-    // 处理时间和日期显示
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
-        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-        
-        // 根据子开关决定日期格式
-        NSString *dateFormat = @"yyyy-MM-dd HH:mm"; // 默认格式
-        
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"]) {
-            dateFormat = @"yyyy-MM-dd HH:mm";
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"]) {
-            dateFormat = @"MM-dd HH:mm";
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"]) {
-            dateFormat = @"HH:mm:ss";
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"]) {
-            dateFormat = @"HH:mm";
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"]) {
-            dateFormat = @"yyyy-MM-dd";
-        } else {
-            // 检查是否有旧的格式设置
-            NSString *oldFormat = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDateTimeFormat"];
-            if (oldFormat && oldFormat.length > 0) {
-                dateFormat = oldFormat;
-            }
-        }
-        
-        formatter.dateFormat = dateFormat;
-        
-        // 使用视频发布时间而不是当前时间
-        NSDate *creationDate = nil;
-        NSNumber *createTimeStamp = [self.model valueForKey:@"createTime"];
-        if (createTimeStamp) {
-            // 时间戳转换为日期
-            creationDate = [NSDate dateWithTimeIntervalSince1970:[createTimeStamp doubleValue]];
-        } else {
-            // 回退到原始标签文本中可能包含的时间信息
-            NSString *originalText = label.text;
-            if (originalText && originalText.length > 0) {
-                firstLine = originalText;
-            } else {
-                creationDate = [NSDate date]; // 作为最后的回退选项
-            }
-        }
-        
-        if (creationDate) {
-            firstLine = [formatter stringFromDate:creationDate];
-        }
-    }
-    
-    // 处理自定义属地，放在第二行
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
-        NSString *cityCode = self.model.cityCode;
-        NSString *customCityCode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCustomCityCode"];
-        
-        // 检查是否使用自定义属地
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableCustomArea"] && customCityCode) {
-            cityCode = customCityCode;
-        }
-        
-        CityManager *cityManager = [CityManager sharedInstance];
-        NSString *locationPrefix = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLocationPrefix"] ?: @"IP属地:";
-        NSMutableString *location = [NSMutableString stringWithString:locationPrefix];
-        
-        // 生成四级地址
-        NSString *fourLevelAddress = [cityManager generateRandomFourLevelAddressForCityCode:cityCode];
-        
-        if (fourLevelAddress.length > 0) {
-            [location appendString:fourLevelAddress];
-        } else {
-            [location appendString:@"未知地区"];
-        }
-        
-        // 设置第二行文本
-        if (location.length > locationPrefix.length) {
-            secondLine = location;
-        }
-    }
-    
-    // 如果有两行内容，设置为多行显示
-    if (secondLine.length > 0) {
-        label.numberOfLines = 2;
-        label.textAlignment = NSTextAlignmentLeft;
-        label.lineBreakMode = NSLineBreakByWordWrapping;
-        
-        // 组合成两行文本
-        label.text = [NSString stringWithFormat:@"%@\n%@", firstLine, secondLine];
-        
-        // 动态调整标签大小
-        CGSize textSize = [label.text boundingRectWithSize:CGSizeMake(label.frame.size.width, CGFLOAT_MAX)
-                                                  options:NSStringDrawingUsesLineFragmentOrigin
-                                               attributes:@{NSFontAttributeName: label.font}
-                                                  context:nil].size;
-        CGRect frame = label.frame;
-        frame.size.height = textSize.height + 10;
-        label.frame = frame;
-        
-        // 设置段落样式
-        NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
-        paragraphStyle.alignment = NSTextAlignmentLeft;
-        paragraphStyle.lineBreakMode = NSLineBreakByWordWrapping;
-        
-        NSMutableAttributedString *attributedText = [[NSMutableAttributedString alloc] initWithString:label.text];
-        [attributedText addAttribute:NSParagraphStyleAttributeName 
-                              value:paragraphStyle 
-                              range:NSMakeRange(0, label.text.length)];
-        
-        label.attributedText = attributedText;
-    } else {
-        label.numberOfLines = 1;
-        label.text = firstLine;
-        label.textAlignment = NSTextAlignmentLeft;
-    }
-    
-    // 设置标签颜色
-    NSString *labelColor = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelColor"];
-    if (labelColor.length > 0) {
-        label.textColor = [DYYYManager colorWithHexString:labelColor];
-    }
-    
-    // 添加长按手势
-    if (!objc_getAssociatedObject(label, "hasLongPressGesture")) {
-        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] 
-                                                 initWithTarget:self 
-                                                 action:@selector(handleLongPress:)];
-        [label addGestureRecognizer:longPress];
-        label.userInteractionEnabled = YES;
-        objc_setAssociatedObject(label, "hasLongPressGesture", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    
-    return label;
+	UILabel *label = %orig;
+	
+	// 准备第一行显示日期时间
+	NSString *firstLine = @"";
+	NSString *secondLine = @"";
+	
+	// 处理时间和日期显示
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
+		NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+		
+		// 根据子开关决定日期格式
+		NSString *dateFormat = @"yyyy-MM-dd HH:mm"; // 默认格式
+		
+		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"]) {
+			dateFormat = @"yyyy-MM-dd HH:mm";
+		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"]) {
+			dateFormat = @"MM-dd HH:mm";
+		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"]) {
+			dateFormat = @"HH:mm:ss";
+		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"]) {
+			dateFormat = @"HH:mm";
+		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"]) {
+			dateFormat = @"yyyy-MM-dd";
+		} else {
+			// 检查是否有旧的格式设置
+			NSString *oldFormat = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDateTimeFormat"];
+			if (oldFormat && oldFormat.length > 0) {
+				dateFormat = oldFormat;
+			}
+		}
+		
+		formatter.dateFormat = dateFormat;
+		
+		// 使用视频发布时间而不是当前时间
+		NSDate *creationDate = nil;
+		NSNumber *createTimeStamp = [self.model valueForKey:@"createTime"];
+		if (createTimeStamp) {
+			// 时间戳转换为日期
+			creationDate = [NSDate dateWithTimeIntervalSince1970:[createTimeStamp doubleValue]];
+		} else {
+			// 回退到原始标签文本中可能包含的时间信息
+			NSString *originalText = label.text;
+			if (originalText && originalText.length > 0) {
+				firstLine = originalText;
+			} else {
+				creationDate = [NSDate date]; // 作为最后的回退选项
+			}
+		}
+		
+		if (creationDate) {
+			firstLine = [formatter stringFromDate:creationDate];
+		}
+	}
+	
+	// 处理自定义属地，放在第二行 - 添加安全检查
+	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"]) {
+		NSString *cityCode = self.model.cityCode;
+		NSString *customCityCode = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCustomCityCode"];
+		
+		// 检查是否使用自定义属地
+		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableCustomArea"] && customCityCode) {
+			cityCode = customCityCode;
+		}
+		
+		// 添加安全检查 - 确保cityCode不为nil且不为空字符串
+		if (cityCode && cityCode.length > 0) {
+			CityManager *cityManager = [CityManager sharedInstance];
+			// 确保cityManager有效
+			if (cityManager && [cityManager respondsToSelector:@selector(generateRandomFourLevelAddressForCityCode:)]) {
+				NSString *locationPrefix = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLocationPrefix"] ?: @"IP属地:";
+				NSMutableString *location = [NSMutableString stringWithString:locationPrefix];
+				
+				@try {
+					// 使用@try-@catch块捕获可能的异常
+					NSString *fourLevelAddress = [cityManager generateRandomFourLevelAddressForCityCode:cityCode];
+					
+					if (fourLevelAddress && fourLevelAddress.length > 0) {
+						[location appendString:fourLevelAddress];
+					} else {
+						[location appendString:@"未知地区"];
+					}
+				} @catch (NSException *exception) {
+					// 捕获任何异常，防止崩溃
+					NSLog(@"DYYY异常: %@", exception);
+					[location appendString:@"未知地区"];
+				}
+				
+				// 设置第二行文本
+				if (location.length > locationPrefix.length) {
+					secondLine = location;
+				}
+			}
+		}
+	}
+	
+	// 如果有两行内容，设置为多行显示
+	if (secondLine.length > 0) {
+		label.numberOfLines = 2;
+		label.textAlignment = NSTextAlignmentLeft;
+		label.lineBreakMode = NSLineBreakByWordWrapping;
+		
+		// 组合成两行文本
+		label.text = [NSString stringWithFormat:@"%@\n%@", firstLine, secondLine];
+		
+		// 动态调整标签大小
+		CGSize textSize = [label.text boundingRectWithSize:CGSizeMake(label.frame.size.width, CGFLOAT_MAX)
+												  options:NSStringDrawingUsesLineFragmentOrigin
+											   attributes:@{NSFontAttributeName: label.font}
+												  context:nil].size;
+		CGRect frame = label.frame;
+		frame.size.height = textSize.height + 10;
+		label.frame = frame;
+		
+		// 设置段落样式
+		NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+		paragraphStyle.alignment = NSTextAlignmentLeft;
+		paragraphStyle.lineBreakMode = NSLineBreakByWordWrapping;
+		
+		NSMutableAttributedString *attributedText = [[NSMutableAttributedString alloc] initWithString:label.text];
+		[attributedText addAttribute:NSParagraphStyleAttributeName 
+							  value:paragraphStyle 
+							  range:NSMakeRange(0, label.text.length)];
+		
+		label.attributedText = attributedText;
+	} else {
+		label.numberOfLines = 1;
+		label.text = firstLine;
+		label.textAlignment = NSTextAlignmentLeft;
+	}
+	
+	// 设置标签颜色
+	NSString *labelColor = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYLabelColor"];
+	if (labelColor.length > 0) {
+		label.textColor = [DYYYManager colorWithHexString:labelColor];
+	}
+	
+	// 添加长按手势
+	if (!objc_getAssociatedObject(label, "hasLongPressGesture")) {
+		UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] 
+												 initWithTarget:self 
+												 action:@selector(handleLongPress:)];
+		[label addGestureRecognizer:longPress];
+		label.userInteractionEnabled = YES;
+		objc_setAssociatedObject(label, "hasLongPressGesture", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+	}
+	
+	return label;
 }
 
 // 显示城市选择器
