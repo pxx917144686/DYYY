@@ -10,6 +10,7 @@
 #import <objc/runtime.h>
 #import "DYYYBottomAlertView.h"
 #import "DYYYUtils.h"
+#import "DYYYSwitchManager.h"
 
 @interface UISwitch (DYYY_FuturisticEffects)
 - (void)applyFuturisticEffects;
@@ -2549,19 +2550,6 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     }
 }
 
-// 在 handleABTestBlockEnabled 和 handleABTestPatchEnabled 方法中实现切换功能
-- (void)handleABTestBlockEnabled:(BOOL)enabled {
-    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:@"DYYYABTestBlockEnabled"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    [DYYYManager showToast:enabled ? @"已启用ABTest拦截" : @"已关闭ABTest拦截"];
-}
-
-- (void)handleABTestPatchEnabled:(BOOL)enabled {
-    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:@"DYYYABTestPatchEnabled"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    [DYYYManager showToast:enabled ? @"已启用ABTest补丁模式" : @"已关闭ABTest补丁模式"];
-}
-
 // 根据设置项返回图标名称
 - (UIImage *)iconImageForSettingItem:(DYYYSettingItem *)item {
     NSString *iconName;
@@ -3074,6 +3062,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     if (!sender) {
         return;
     }
+    
     NSInteger section = sender.tag / 1000;
     NSInteger row = sender.tag % 1000;
 
@@ -3087,209 +3076,45 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         return;
     }
 
-    @try {
-        DYYYSettingItem *item = currentSection[row];
-        if (!item) {
-            return;
-        }
-
-        // 保存设置值
-        [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:item.key];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-
-        // 互斥逻辑：按钮大/中/小只能选一个
-        if (([item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"] ||
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"]) && sender.isOn) {
-            [self updateMutuallyExclusiveSwitches:section excludingItemKey:item.key];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:item.key];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-
-        // 只在总开关从关闭变为打开时，自动打开所有子开关
-        if ([item.key isEqualToString:@"DYYYEnableFloatClearButton"] && sender.isOn) {
-            NSArray<NSString *> *subKeys = @[
-                @"DYYYHideDanmaku",
-                @"DYYYEnabshijianjindu",
-                @"DYYYHideTimeProgress",
-                @"DYYYHideSlider",
-                @"DYYYHideTabBar",
-                @"DYYYHideSpeed"
-            ];
-            NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-            for (NSUInteger r = 0; r < sectionItems.count; r++) {
-                DYYYSettingItem *subItem = sectionItems[r];
-                if ([subKeys containsObject:subItem.key]) {
-                    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:subItem.key];
-                    NSIndexPath *cellPath = [NSIndexPath indexPathForRow:r inSection:section];
-                    UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-                    if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                        UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                        subSwitch.on = YES;
-                    }
-                }
-            }
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        }
-
-        // 特定功能处理 - 确保菜单开关能控制功能
-        if ([item.key isEqualToString:@"DYYYStreamlinethesidebar"]) {
-            [DYYYManager showToast:sender.isOn ? @"侧栏简化已启用，重新打开侧栏生效" : @"侧栏简化已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYisDarkKeyBoard"]) {
-            [DYYYManager showToast:sender.isOn ? @"深色键盘已启用" : @"深色键盘已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYEnableVideoHighestQuality"]) {
-            [DYYYManager showToast:sender.isOn ? @"默认最高画质已启用" : @"默认最高画质已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYEnableNoiseFilter"]) {
-            [DYYYManager showToast:sender.isOn ? @"视频降噪增强已启用" : @"视频降噪增强已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYisEnableAutoPlay"]) {
-            [DYYYManager showToast:sender.isOn ? @"自动播放已启用，重启应用生效" : @"自动播放已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYisEnableModern"]) {
-            [DYYYManager showToast:sender.isOn ? @"现代面板已启用" : @"现代面板已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYEnableSaveAvatar"]) {
-            [DYYYManager showToast:sender.isOn ? @"保存头像功能已启用" : @"保存头像功能已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYCommentLivePhotoNotWaterMark"]) {
-            [DYYYManager showToast:sender.isOn ? @"评论动图保存已启用" : @"评论动图保存已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYCommentNotWaterMark"]) {
-            [DYYYManager showToast:sender.isOn ? @"评论图片保存已启用" : @"评论图片保存已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYFourceDownloadEmotion"]) {
-            [DYYYManager showToast:sender.isOn ? @"强制下载表情已启用，重启应用生效" : @"强制下载表情已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYfollowTips"]) {
-            [DYYYManager showToast:sender.isOn ? @"关注二次确认已启用" : @"关注二次确认已关闭"];
-        }
-        else if ([item.key isEqualToString:@"DYYYcollectTips"]) {
-            [DYYYManager showToast:sender.isOn ? @"收藏二次确认已启用" : @"收藏二次确认已关闭"];
-        }
-        // 隐藏功能的处理
-        else if ([item.key isEqualToString:@"DYYYHideGuideTipView"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏搜索引导提示框" : @"已显示搜索引导提示框"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHideFeedTabJumpGuide"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏顶栏引导提示" : @"已显示顶栏引导提示"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHideWords"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏大家都在搜" : @"已显示大家都在搜"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHideShowPlayletComment"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏短剧免费去看" : @"已显示短剧免费去看"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHideCommentMusicAnchor"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏评论音乐" : @"已显示评论音乐"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHidePOIEntryAnchor"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏评论定位" : @"已显示评论定位"];
-        }
-        else if ([item.key isEqualToString:@"DYYYHideCommentSearchAnchor"]) {
-            [DYYYManager showToast:sender.isOn ? @"已隐藏评论搜索" : @"已显示评论搜索"];
-        }
-        // ABTest热更新功能
-        else if ([item.key isEqualToString:@"DYYYABTestBlockEnabled"]) {
-            [self handleABTestBlockEnabled:sender.isOn];
-        }
-        else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
-            [self handleABTestPatchEnabled:sender.isOn];
-        }
-
-        // 进度时长依赖处理
-        if ([item.key isEqualToString:@"DYYYisShowScheduleDisplay"]) {
-            // 关闭时，清空样式设置
-            if (!sender.isOn) {
-                [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYScheduleStyle"];
-            }
-            // 刷新相关cell
-            for (NSInteger s = 0; s < self.settingSections.count; s++) {
-                NSArray *items = self.settingSections[s];
-                for (NSInteger r = 0; r < items.count; r++) {
-                    DYYYSettingItem *subItem = items[r];
-                    if ([subItem.key isEqualToString:@"DYYYScheduleStyle"]) {
-                        NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
-                        [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
-                    }
-                }
-            }
-        }
-
-        // 处理开关依赖关系
-        [self updateSwitchDependencies:item.key isEnabled:sender.isOn section:section];
-
-        // 主动发送设置变更通知，确保清屏按钮、隐藏功能、倍速按钮等立即响应
-        NSArray *floatButtonKeys = @[
-            // 清屏相关
-            @"DYYYEnableFloatClearButton",
-            @"DYYYEnableFloatClearButtonSize",
-            @"DYYYCustomAlbumSizeLarge",
-            @"DYYYCustomAlbumSizeMedium",
-            @"DYYYCustomAlbumSizeSmall",
-            @"DYYYCustomAlbumImagePath",
-            @"DYYYEnableCustomAlbum",
-            @"DYYYHideTabBar",
-            @"DYYYHideDanmaku",
-            @"DYYYHideSlider",
-            @"DYYYHideChapter",
-            // 倍速相关
-            @"DYYYEnableFloatSpeedButton",
-            @"DYYYSpeedSettings",
-            @"DYYYSpeedButtonShowX",
-            @"DYYYSpeedButtonSize"
-        ];
-        if ([floatButtonKeys containsObject:item.key] || [item.key hasPrefix:@"DYYYHide"]) {
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged"
-                                                                object:nil
-                                                              userInfo:@{@"key": item.key, @"value": @(sender.isOn)}];
-        }
-
-        // 触觉反馈
-        [self.feedbackGenerator impactOccurred];
-
-        // 安全地同步设置
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        });
-    } @catch (NSException *exception) {
-        NSLog(@"设置切换失败: %@", exception);
-        // 恢复开关状态
-        sender.on = !sender.on;
-    }
-}
-
-// 开关依赖关系处理方法
-- (void)updateSwitchDependencies:(NSString *)key isEnabled:(BOOL)enabled section:(NSInteger)section {
-    if (section >= self.settingSections.count) {
+    DYYYSettingItem *item = currentSection[row];
+    if (!item) {
         return;
     }
-    // 处理清屏功能子选项
-    if ([key isEqualToString:@"DYYYEnableFloatClearButton"]) {
-        [self updateClearButtonSubSwitchesUI:section enabled:enabled];
+
+    // 使用开关管理器处理切换逻辑
+    [[DYYYSwitchManager sharedManager] handleSwitchToggled:sender 
+                                                  withItem:item 
+                                                   section:section 
+                                                       row:row
+                                                 tableView:self.tableView
+                                          settingSections:self.settingSections];
+
+    // 触觉反馈
+    [self.feedbackGenerator impactOccurred];
+
+    // 进度时长依赖处理
+    if ([item.key isEqualToString:@"DYYYisShowScheduleDisplay"]) {
+        // 关闭时，清空样式设置
+        if (!sender.isOn) {
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYScheduleStyle"];
+        }
+        // 刷新相关cell
+        for (NSInteger s = 0; s < self.settingSections.count; s++) {
+            NSArray *items = self.settingSections[s];
+            for (NSInteger r = 0; r < items.count; r++) {
+                DYYYSettingItem *subItem = items[r];
+                if ([subItem.key isEqualToString:@"DYYYScheduleStyle"]) {
+                    NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
+                    [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
+                }
+            }
+        }
     }
-    // 处理长按功能子选项
-    else if ([key isEqualToString:@"DYYYLongPressDownload"]) {
-        [self updateLongPressSubSwitchesUI:section enabled:enabled];
-    }
-    // 处理时间属地显示的子选项
-    else if ([key isEqualToString:@"DYYYisEnableArea"]) {
-        [self updateAreaSubSwitchesUI:section enabled:enabled];
-    }
-    // 处理视频显示日期时间的子选项
-    else if ([key isEqualToString:@"DYYYShowDateTime"]) {
-        [self updateDateTimeFormatSubSwitchesUI:section enabled:enabled];
-    }
-    // 处理主页自定义总开关
-    else if ([key isEqualToString:@"DYYYEnableSocialStatsCustom"]) {
-        [self updateSubswitchesForSection:section parentKey:key];
-    }
-    // 处理视频自定义总开关
-    else if ([key isEqualToString:@"DYYYEnableVideoStatsCustom"]) {
-        [self updateSubswitchesForSection:section parentKey:key];
-    }
+
+    // 安全地同步设置
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    });
 }
 
 - (void)updateClearButtonSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
@@ -3302,7 +3127,12 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         @"DYYYHideSpeed"
     ];
     
-    [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled];
+    // 使用 DYYYSwitchManager 的方法
+    [[DYYYSwitchManager sharedManager] updateSubSwitchesInSection:section 
+                                                         withKeys:subKeys 
+                                                          enabled:enabled 
+                                                        tableView:self.tableView 
+                                                 settingSections:self.settingSections];
 }
 
 - (void)updateLongPressSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
@@ -3320,56 +3150,12 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         @"DYYYLongPressCreateVideo"
     ];
     
-    [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled];
-}
-
-- (void)updateSubSwitchesInSection:(NSInteger)section withKeys:(NSArray<NSString *> *)keys enabled:(BOOL)enabled {
-    // 先更新默认设置中的值
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    for (NSString *key in keys) {
-        [defaults setBool:enabled forKey:key];
-    }
-    [defaults synchronize];
-    
-    // 然后尝试更新UI，只有当相应的cell可见时
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([keys containsObject:item.key]) {
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            // 获取cell - 可能为nil
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 只有当cell存在并且有正确类型的accessoryView时才更新UI
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *switchControl = (UISwitch *)cell.accessoryView;
-                switchControl.on = enabled;
-            }
-        }
-    }
-}
-
-- (void)updateAreaMainSwitchUI:(NSInteger)section {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([item.key isEqualToString:@"DYYYisEnableArea"]) {
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *mainSwitch = (UISwitch *)cell.accessoryView;
-                BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
-                mainSwitch.on = shouldBeOn;
-            }
-            break;
-        }
-    }
+    // 使用 DYYYSwitchManager 的方法
+    [[DYYYSwitchManager sharedManager] updateSubSwitchesInSection:section 
+                                                         withKeys:subKeys 
+                                                          enabled:enabled 
+                                                        tableView:self.tableView 
+                                                 settingSections:self.settingSections];
 }
 
 // 全局锁来保护设置修改
@@ -3378,232 +3164,6 @@ static NSLock *settingsLock = nil;
 + (void)initialize {
     if (self == [DYYYSettingViewController class]) {
         settingsLock = [[NSLock alloc] init];
-    }
-}
-
-- (void)updateAreaSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
-    // 定义属地显示的子开关键名列表
-    NSArray<NSString *> *areaSubKeys = @[
-        @"DYYYisEnableAreaProvince",
-        @"DYYYisEnableAreaCity", 
-        @"DYYYisEnableAreaDistrict", 
-        @"DYYYisEnableAreaStreet"
-    ];
-    
-    // 添加此行：将变量声明移到方法开头，确保在整个方法范围内可见
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    // 使用锁保护设置修改
-    [settingsLock lock];
-    
-    @try {
-        // 先更新数据部分
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        // 移除此行: NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-        
-        for (NSUInteger row = 0; row < sectionItems.count; row++) {
-            DYYYSettingItem *item = sectionItems[row];
-            
-            // 严格只更新属地显示的子开关，其他所有开关都不修改
-            if ([areaSubKeys containsObject:item.key]) {
-                [defaults setBool:enabled forKey:item.key];
-            }
-        }
-        [defaults synchronize];
-        
-        // 添加日志确认哪些键被修改
-        NSLog(@"DYYY: updateAreaSubSwitchesUI - 只修改了属地子开关，总开关状态: %@", enabled ? @"开" : @"关");
-    }
-    @finally {
-        [settingsLock unlock];
-    }
-    
-    // 再更新UI部分 - 只在cell可见时执行
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([areaSubKeys containsObject:item.key]) {
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *switchControl = (UISwitch *)cell.accessoryView;
-                switchControl.on = enabled;
-            }
-        }
-    }
-}
-
-- (void)updateMutuallyExclusiveSwitches:(NSInteger)section excludingItemKey:(NSString *)excludedKey {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        if (([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] ||
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"]) &&
-            ![item.key isEqualToString:excludedKey]) {
-            // 先更新数据
-            [defaults setBool:NO forKey:item.key];
-            
-            // 再更新UI（增加nil检查）
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *cellSwitch = (UISwitch *)cell.accessoryView;
-                cellSwitch.on = NO;
-            }
-        }
-    }
-    [defaults synchronize];
-}
-
-- (void)updateAllSubswitchesForSection:(NSInteger)section {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"] || 
-            [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] || 
-            [item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"]) {
-            
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *cellSwitch = (UISwitch *)cell.accessoryView;
-                cellSwitch.on = NO;
-            }
-        }
-    }
-}
-
-- (void)updateSubswitchesForSection:(NSInteger)section parentKey:(NSString *)parentKey {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    NSArray *keysToUpdate = nil;
-    
-    if ([parentKey isEqualToString:@"DYYYLongPressDownload"]) {
-        keysToUpdate = @[
-            @"DYYYLongPressSaveVideo",
-            @"DYYYEnableFLEX",
-            @"DYYYLongPressSaveCover", 
-            @"DYYYLongPressSaveAudio",
-            @"DYYYLongPressSaveCurrentImage",
-            @"DYYYLongPressSaveAllImages",
-            @"DYYYLongPressCopyText",
-            @"DYYYLongPressCopyLink",
-            @"DYYYLongPressApiDownload", 
-            @"DYYYLongPressFilterUser",
-            @"DYYYLongPressFilterTitle", 
-            @"DYYYLongPressTimerClose",
-            @"DYYYLongPressCreateVideo"
-        ];
-    } else if ([parentKey isEqualToString:@"DYYYCopyText"]) {
-        keysToUpdate = @[@"DYYYCopyOriginalText", @"DYYYCopyShareLink"];
-    } else if ([parentKey isEqualToString:@"DYYYEnableDoubleOpenAlertController"]) {
-        keysToUpdate = @[@"DYYYDoubleTapDownload", @"DYYYEnableImageToVideo", 
-                          @"DYYYDoubleTapDownloadAudio", @"DYYYDoubleTapCopyDesc", 
-                          @"DYYYDoubleTapComment", @"DYYYDoubleTapLike", 
-                          @"DYYYDoubleTapshowSharePanel", @"DYYYDoubleTapshowDislikeOnVideo", 
-                          @"DYYYDoubleInterfaceDownload"];
-    }
-    
-    if (!keysToUpdate) return;
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([keysToUpdate containsObject:item.key]) {
-            // 查找并更新cell的开关状态
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            if ([cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                subSwitch.on = NO;
-            }
-        }
-    }
-}
-
-- (void)updateDateTimeFormatMainSwitchUI:(NSInteger)section {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([item.key isEqualToString:@"DYYYShowDateTime"]) {
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *mainSwitch = (UISwitch *)cell.accessoryView;
-                BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"];
-                mainSwitch.on = shouldBeOn;
-            }
-            break;
-        }
-    }
-}
-
-- (void)updateDateTimeFormatSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled {
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
-            // 直接更新数据，确保状态一致
-            [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:item.key];
-            
-            // 更新UI（如果单元格可见）
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 添加保护
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                subSwitch.on = enabled;
-            }
-        }
-    }
-    
-    // 确保同步数据
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
-- (void)updateDateTimeFormatExclusiveSwitch:(NSInteger)section currentKey:(NSString *)currentKey {
-    NSArray<NSString *> *allFormatKeys = @[@"DYYYDateTimeFormat_YMDHM", 
-                                          @"DYYYDateTimeFormat_MDHM", 
-                                          @"DYYYDateTimeFormat_HMS", 
-                                          @"DYYYDateTimeFormat_HM", 
-                                          @"DYYYDateTimeFormat_YMD"];
-    
-    // 先更新数据
-    for (NSString *key in allFormatKeys) {
-        [[NSUserDefaults standardUserDefaults] setBool:[key isEqualToString:currentKey] forKey:key];
-    }
-    
-    // 再更新UI
-    NSArray<DYYYSettingItem *> *sectionItems = self.settingSections[section];
-    
-    for (NSUInteger row = 0; row < sectionItems.count; row++) {
-        DYYYSettingItem *item = sectionItems[row];
-        
-        if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
-            NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
-            UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:cellPath];
-            
-            // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                subSwitch.on = [item.key isEqualToString:currentKey];
-            }
-        }
     }
 }
 
@@ -3849,18 +3409,21 @@ static NSLock *settingsLock = nil;
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMD"];
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
                 
-                // 更新UI中子开关的状态
+                // 使用 DYYYSwitchManager 的方法更新UI中子开关的状态
                 for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-                    [self updateDateTimeFormatSubSwitchesUI:section enabled:NO];
+                    [[DYYYSwitchManager sharedManager] updateDateTimeFormatSubSwitchesUI:section 
+                                                                                 enabled:NO 
+                                                                               tableView:self.tableView 
+                                                                        settingSections:self.settingSections];
                 }
             }
             else if ([item.key hasPrefix:@"DYYYDateTimeFormat_"]) {
                 // 重置一个子开关时检查是否有其他子开关启用
                 BOOL anyEnabled = NO;
-                for (NSString *key in @[@"DYYYDateTimeFormat_YMDHM", @"DYYYDateTimeFormat_MDHM", 
-                                        @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
-                                        @"DYYYDateTimeFormat_YMD"]) {
-                    if (![key isEqualToString:key] && [[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+                for (NSString *checkKey in @[@"DYYYDateTimeFormat_YMDHM", @"DYYYDateTimeFormat_MDHM", 
+                                             @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
+                                             @"DYYYDateTimeFormat_YMD"]) {
+                    if (![checkKey isEqualToString:item.key] && [[NSUserDefaults standardUserDefaults] boolForKey:checkKey]) {
                         anyEnabled = YES;
                         break;
                     }
@@ -3871,7 +3434,9 @@ static NSLock *settingsLock = nil;
                     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
                     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
                     for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-                        [self updateDateTimeFormatMainSwitchUI:section];
+                        [[DYYYSwitchManager sharedManager] updateDateTimeFormatMainSwitchUI:section 
+                                                                                  tableView:self.tableView 
+                                                                           settingSections:self.settingSections];
                     }
                 }
             }
@@ -3884,9 +3449,12 @@ static NSLock *settingsLock = nil;
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaDistrict"];
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaStreet"];
                 
-                // 更新UI
+                // 使用 DYYYSwitchManager 的方法更新UI
                 for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-                    [self updateAreaSubSwitchesUI:section enabled:NO];
+                    [[DYYYSwitchManager sharedManager] updateAreaSubSwitchesUI:section 
+                                                                       enabled:NO 
+                                                                     tableView:self.tableView 
+                                                              settingSections:self.settingSections];
                 }
             }
             
@@ -4015,18 +3583,21 @@ static NSLock *settingsLock = nil;
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYDateTimeFormat_YMD"];
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
         
-        // 更新UI中子开关的状态
+        // 使用 DYYYSwitchManager 的方法更新UI中子开关的状态
         for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-            [self updateDateTimeFormatSubSwitchesUI:section enabled:NO];
+            [[DYYYSwitchManager sharedManager] updateDateTimeFormatSubSwitchesUI:section 
+                                                                         enabled:NO 
+                                                                       tableView:self.tableView 
+                                                                settingSections:self.settingSections];
         }
     }
     else if ([key hasPrefix:@"DYYYDateTimeFormat_"]) {
         // 重置一个子开关时检查是否有其他子开关启用
         BOOL anyEnabled = NO;
-        for (NSString *key in @[@"DYYYDateTimeFormat_YMDHM", @"DYYYDateTimeFormat_MDHM", 
-                                @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
-                                @"DYYYDateTimeFormat_YMD"]) {
-            if (![key isEqualToString:key] && [[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+        for (NSString *checkKey in @[@"DYYYDateTimeFormat_YMDHM", @"DYYYDateTimeFormat_MDHM", 
+                                     @"DYYYDateTimeFormat_HMS", @"DYYYDateTimeFormat_HM", 
+                                     @"DYYYDateTimeFormat_YMD"]) {
+            if (![checkKey isEqualToString:key] && [[NSUserDefaults standardUserDefaults] boolForKey:checkKey]) {
                 anyEnabled = YES;
                 break;
             }
@@ -4037,7 +3608,9 @@ static NSLock *settingsLock = nil;
             [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYShowDateTime"];
             [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYDateTimeFormat"];
             for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-                [self updateDateTimeFormatMainSwitchUI:section];
+                [[DYYYSwitchManager sharedManager] updateDateTimeFormatMainSwitchUI:section 
+                                                                          tableView:self.tableView 
+                                                                   settingSections:self.settingSections];
             }
         }
     }
@@ -4050,9 +3623,12 @@ static NSLock *settingsLock = nil;
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaDistrict"];
         [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"DYYYisEnableAreaStreet"];
         
-        // 更新UI
+        // 使用 DYYYSwitchManager 的方法更新UI
         for (NSInteger section = 0; section < [self.tableView numberOfSections]; section++) {
-            [self updateAreaSubSwitchesUI:section enabled:NO];
+            [[DYYYSwitchManager sharedManager] updateAreaSubSwitchesUI:section 
+                                                               enabled:NO 
+                                                             tableView:self.tableView 
+                                                      settingSections:self.settingSections];
         }
     }
     

@@ -1962,9 +1962,9 @@ UIView* findTTPlayerView(UIView *root) {
     BOOL hideTimerclose = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideTimerclose"];
 
     // 存储处理后的原始组
-    NSMutableArray *modifiedOriginalGroups = [NSMutableArray array];
+    NSMutableArray *processedOriginalGroups = [NSMutableArray array];
 
-    // 处理原始面板，收集所有未被隐藏的官方按钮
+    // 先处理原始面板，收集所有未被隐藏的官方按钮
     for (id group in originalArray) {
         if ([group isKindOfClass:%c(AWELongPressPanelViewGroupModel)]) {
             AWELongPressPanelViewGroupModel *groupModel = (AWELongPressPanelViewGroupModel *)group;
@@ -2029,15 +2029,19 @@ UIView* findTTPlayerView(UIView *root) {
                 newGroup.groupType = groupModel.groupType;
                 newGroup.isModern = YES;
                 newGroup.groupArr = filteredGroupArr;
-                [modifiedOriginalGroups addObject:newGroup];
+                [processedOriginalGroups addObject:newGroup];
             }
         }
     }
 
-    // 如果没有任何功能启用，仅使用官方按钮
+    // 确保总是有可用的按钮显示
     if (!hasAnyFeatureEnabled) {
-        // 直接返回修改后的原始组
-        return modifiedOriginalGroups;
+        // 如果没有自定义功能，但有处理过的原始组，返回它们
+        if (processedOriginalGroups.count > 0) {
+            return processedOriginalGroups;
+        }
+        // 如果连原始组都被完全过滤了，返回未经处理的原始数组，避免白屏
+        return originalArray;
     }
 
     // 创建自定义功能按钮
@@ -2704,7 +2708,90 @@ UIView* findTTPlayerView(UIView *root) {
         NSLog(@"DYYY: PIP 按钮已添加，当前按钮总数: %lu", (unsigned long)viewModels.count);
     }
 
-    // 创建自定义组
+    // 再检查是否有自定义功能启用
+    BOOL hasCustomFeaturesEnabled = viewModels.count > 0;
+
+    // 处理原始面板，收集所有未被隐藏的官方按钮
+    NSMutableArray *modifiedOriginalGroups = [NSMutableArray array];
+    for (id group in originalArray) {
+        if ([group isKindOfClass:%c(AWELongPressPanelViewGroupModel)]) {
+            AWELongPressPanelViewGroupModel *groupModel = (AWELongPressPanelViewGroupModel *)group;
+            NSMutableArray *filteredGroupArr = [NSMutableArray array];
+
+            for (id item in groupModel.groupArr) {
+                if ([item isKindOfClass:%c(AWELongPressPanelBaseViewModel)]) {
+                    AWELongPressPanelBaseViewModel *viewModel = (AWELongPressPanelBaseViewModel *)item;
+                    NSString *descString = viewModel.describeString;
+                    
+                    // 根据描述字符串判断按钮类型并决定是否保留
+                    BOOL shouldHide = NO;
+                    if ([descString isEqualToString:@"转发到日常"] && hideDaily) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"推荐"] && hideRecommend) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"不感兴趣"] && hideNotInterested) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"举报"] && hideReport) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"倍速"] && hideSpeed) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"清屏播放"] && hideClearScreen) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"缓存视频"] && hideFavorite) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"添加至稍后再看"] && hideLater) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"投屏"] && hideCast) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"电脑/Pad打开"] && hideOpenInPC) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"弹幕"] && hideSubtitle) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"弹幕开关"] && hideSubtitle) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"弹幕设置"] && hideSubtitle) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"自动连播"] && hideAutoPlay) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"识别图片"] && hideSearchImage) {
+                        shouldHide = YES;
+                    } else if (([descString isEqualToString:@"听抖音"] || [descString isEqualToString:@"后台听"] || [descString isEqualToString:@"听视频"]) && hideListenDouyin) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"后台播放设置"] && hideBackgroundPlay) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"首页双列快捷入口"] && hideBiserial) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"定时关闭"] && hideTimerclose) {
+                        shouldHide = YES;
+                    }
+
+                    if (!shouldHide) {
+                        [filteredGroupArr addObject:viewModel];
+                    }
+                }
+            }
+
+            // 如果过滤后的组不为空，则保存原始组结构
+            if (filteredGroupArr.count > 0) {
+                AWELongPressPanelViewGroupModel *newGroup = [[%c(AWELongPressPanelViewGroupModel) alloc] init];
+                newGroup.isDYYYCustomGroup = YES;
+                newGroup.groupType = groupModel.groupType;
+                newGroup.isModern = YES;
+                newGroup.groupArr = filteredGroupArr;
+                [modifiedOriginalGroups addObject:newGroup];
+            }
+        }
+    }
+
+    // 如果没有自定义功能，返回过滤后的原始按钮或原始数组
+    if (!hasAnyFeatureEnabled) {
+        if (modifiedOriginalGroups.count > 0) {
+            return modifiedOriginalGroups;
+        }
+        return originalArray;
+    }
+
+    // 最后合并自定义按钮和原始按钮
     NSMutableArray *customGroups = [NSMutableArray array];
     NSInteger totalButtons = viewModels.count;
 
@@ -2754,11 +2841,14 @@ UIView* findTTPlayerView(UIView *root) {
         [customGroups addObject:secondRowGroup];
     }
 
-    // 准备最终结果数组
+    // 合并自定义按钮和原始按钮
     NSMutableArray *resultArray = [NSMutableArray arrayWithArray:customGroups];
-
-    // 添加修改后的原始组
     [resultArray addObjectsFromArray:modifiedOriginalGroups];
+
+    // 最终安全检查
+    if (resultArray.count == 0) {
+        return originalArray;
+    }
 
     return resultArray;
 }

@@ -54,6 +54,7 @@ DYYY_FILES = DYYY.xm \
             CityManager.m \
             DYYYManager.m \
             DYYYSettingViewController.m \
+            DYYYSwitchManager.m \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
