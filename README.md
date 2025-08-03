@@ -1,14 +1,4 @@
-![Preview](./x/xx.png)
-![Preview](./x/xxx.png)
 
-<table>
-<tr>
-<td>
-
-<img src="./x/theos.png" width="400" height="180" />
-
-</td>
-<td>
 
 ```js
 终端执行 克隆 Theos 仓库
@@ -45,13 +35,6 @@ source ~/.zshrc
 
 
 
-<h1 align="center">
-  <br>
-  关于. `清理缓存+打包编译 `
-</h1>
-
-![Preview](./x/cd.png)
-
 
 ### Logos: 文件扩展名
 
@@ -68,25 +51,9 @@ source ~/.zshrc
 
 
 
-### Theos: 命令
+### Theos: 编译
 
-Theos 中的命令以 Makefile 目标的形式实现，通过 `make <命令>` 执行。这些命令可以组合使用，以一次性完成多个任务。Theos 提供了多种命令，涵盖从打包到安装的各种功能。
-
-#### 核心命令
-| **命令**                     | **描述**                                                                 |
-|------------------------------|-------------------------------------------------------------------------|
-| `make`                       | 编译自上次构建以来更改的源代码，不执行进一步操作。                         |
-| `make clean`                 | 清理构建目录，以便下次运行 `make` 时完全重新构建项目。                     |
-| `make stage`                 | 编译源代码并将输出暂存到 `$THEOS_STAGING_DIR`（默认为 `.theos/_/`），创建将安装到目标设备上的文件系统层次结构。 |
-| `make package`               | 编译源代码，执行暂存，并将输出包构建到 `$THEOS_PACKAGE_DIR`（默认为 `packages/`）。 |
-| `make install`               | 将最近构建的包安装到位于 `$THEOS_DEVICE_IP:$THEOS_DEVICE_PORT` 的设备上。如果未设置 `$THEOS_DEVICE_IP`，则尝试本地安装。 |
-| `make uninstall`             | 如果当前项目的包已安装，则在位于 `$THEOS_DEVICE_IP:$THEOS_DEVICE_PORT` 的设备上卸载该包。如果未设置 `$THEOS_DEVICE_IP`，则尝试本地卸载。 |
-
-最常用的可能是 `make xxxxxxx`，它会构建最新更改、暂存、打包并安装到配置的设备上。这是 `make package install` 的快捷方式。
-
-
-
-
+make clean && make package
 
 
 
