@@ -8,10 +8,11 @@
 #import "DYYYBottomAlertView.h"
 #import "DYYYToast.h"
 #import "DYYYConfirmCloseView.h"
-#import "DYYYScreenshot.h" // 添加截图功能头文件
+#import "DYYYScreenshot.h" // 截图功能头文件
 #import <CoreMotion/CoreMotion.h>
 #import <QuartzCore/QuartzCore.h>
 #import "DYYYFloatSpeedButton.h" 
+#import "DYYYPipPlayer.h"
 
 // 外部符号声明
 extern FloatingSpeedButton *speedButton;
@@ -2557,6 +2558,24 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
             [menuModules addObject:downloadAllModule];
         }
     }
+
+    if (!isImageContent && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnablePipPlayer"] || 
+        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnablePipPlayer"]) {
+        
+        DYYYMenuModule *pipModule = [DYYYMenuModule moduleWithTitle:@"小窗播放"
+                                                                icon:@"pip.enter"
+                                                               color:@"#007AFF"
+                                                              action:^{
+            // 获取当前视频模型
+            AWEVideoModel *videoModel = awemeModel.video;
+            if (videoModel) {
+                // 使用正确的类名和方法
+                DYYYPipManager *pipManager = [DYYYPipManager sharedManager];
+                [pipManager createPipWithAwemeModel:awemeModel];
+            }
+        }];
+        [menuModules addObject:pipModule];
+    }   
 
     // 添加音频保存功能模块
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDoubleTapDownloadAudio"] || 

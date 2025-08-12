@@ -12,6 +12,7 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface URLModel : NSObject
 @property(nonatomic, strong) NSArray *originURLList;
+- (NSURL *)getDYYYSrcURLDownload;
 @end
 
 @interface DUXToast : NSObject

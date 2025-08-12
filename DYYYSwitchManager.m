@@ -265,6 +265,7 @@ static NSLock *settingsLock = nil;
             @"DYYYLongPressSaveVideo",
             @"DYYYLongPressSaveAudio", 
             @"DYYYEnableFLEX",
+            @"DYYYLongPressPip",
             @"DYYYLongPressSaveCurrentImage",
             @"DYYYLongPressSaveAllImages",
             @"DYYYLongPressCopyLink",
@@ -301,6 +302,7 @@ static NSLock *settingsLock = nil;
             @"DYYYDoubleTapCopyDesc", 
             @"DYYYDoubleTapComment", 
             @"DYYYDoubleTapLike", 
+            @"DYYYDoubleTapPip",
             @"DYYYDoubleTapshowSharePanel", 
             @"DYYYDoubleTapshowDislikeOnVideo", 
             @"DYYYDoubleInterfaceDownload"

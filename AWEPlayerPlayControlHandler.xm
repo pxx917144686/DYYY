@@ -49,17 +49,99 @@
                 bestURL = [NSURL URLWithString:url];
                 break;
             }
+        }
+    }
+    
+    if (!bestURL) {
+        NSString *highestRes = nil;
+        int highestValue = 0;
+        
+        for (NSString *url in self.originURLList) {
+            NSArray *resMarkers = @[@"1080p", @"720p", @"4k", @"2k", @"uhd", @"hd", @"high", @"best"];
+            for (NSString *marker in resMarkers) {
+                if ([url.lowercaseString containsString:marker.lowercaseString]) {
+                    int value = 0;
+                    if ([marker isEqualToString:@"4k"] || [marker isEqualToString:@"uhd"]) value = 4;
+                    else if ([marker isEqualToString:@"2k"]) value = 3;
+                    else if ([marker isEqualToString:@"1080p"]) value = 2;
+                    else if ([marker isEqualToString:@"720p"] || [marker isEqualToString:@"hd"]) value = 1;
+                    else value = 0;
+                    
+                    if (value > highestValue) {
+                        highestValue = value;
+                        highestRes = url;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        if (highestRes) {
+            bestURL = [NSURL URLWithString:highestRes];
+        }
+    }
+    
+    if (!bestURL && self.originURLList.count > 0) {
+        bestURL = [NSURL URLWithString:self.originURLList.lastObject];
+    }
+    
+    if (!bestURL && self.originURLList.count > 0) {
+        bestURL = [NSURL URLWithString:self.originURLList.firstObject];
+    }
+    
+    if (bestURL && bestURL.scheme && bestURL.host) {
+        return bestURL;
+    } else if (self.originURLList.count > 0) {
+        return [NSURL URLWithString:self.originURLList.lastObject];
+    }
+    
+    return nil;
+}
+%end
+
+%hook URLModel
+%new
+- (NSURL *)getDYYYSrcURLDownload {
+    if (!self.originURLList || self.originURLList.count == 0) return nil;
+    
+    NSURL *bestURL = nil;
+    
+    for (NSString *url in self.originURLList) {
+        if ([url containsString:@"watermark=0"] || 
+            [url containsString:@"remove_watermark=1"] || 
+            [url containsString:@"noWatermark=1"]) {
+            bestURL = [NSURL URLWithString:url];
+            break;
+        }
+    }
+    
+    if (!bestURL) {
+        for (NSString *url in self.originURLList) {
+            if ([url containsString:@"video_mp4"] || 
+                [url hasSuffix:@".mp4"] || 
+                [url hasSuffix:@".mov"] ||
+                [url hasSuffix:@".m4v"] ||
+                [url hasSuffix:@".avi"] ||
+                [url hasSuffix:@".wmv"] ||
+                [url hasSuffix:@".flv"] ||
+                [url hasSuffix:@".mkv"] ||
+                [url hasSuffix:@".webm"] ||
+                [url containsString:@"/video/"] ||
+                [url containsString:@"type=video"]) {
+                bestURL = [NSURL URLWithString:url];
+                break;
+            }
             
-            if ([url hasSuffix:@".mp3"] || 
-                [url hasSuffix:@".m4a"] ||
-                [url hasSuffix:@".wav"] ||
-                [url hasSuffix:@".aac"] ||
-                [url hasSuffix:@".ogg"] ||
-                [url hasSuffix:@".flac"] ||
-                [url hasSuffix:@".alac"] ||
-                [url hasSuffix:@".aiff"] ||
-                [url containsString:@"/audio/"] ||
-                [url containsString:@"type=audio"]) {
+            if ([url hasSuffix:@".jpeg"] || 
+                [url hasSuffix:@".jpg"] ||
+                [url hasSuffix:@".png"] ||
+                [url hasSuffix:@".gif"] ||
+                [url hasSuffix:@".webp"] ||
+                [url hasSuffix:@".heic"] ||
+                [url hasSuffix:@".tiff"] ||
+                [url hasSuffix:@".bmp"] ||
+                [url containsString:@"/image/"] ||
+                [url containsString:@"type=image"]) {
                 bestURL = [NSURL URLWithString:url];
                 break;
             }
@@ -94,60 +176,6 @@
             bestURL = [NSURL URLWithString:highestRes];
         }
     }
-    
-    if (!bestURL) {
-        NSString *highestQuality = nil;
-        int highestScore = 0;
-        
-        for (NSString *url in self.originURLList) {
-            NSURLComponents *components = [NSURLComponents componentsWithString:url];
-            for (NSURLQueryItem *item in components.queryItems) {
-                if ([item.name.lowercaseString containsString:@"quality"] || 
-                    [item.name.lowercaseString containsString:@"definition"] ||
-                    [item.name.lowercaseString containsString:@"resolution"]) {
-                    NSString *value = item.value.lowercaseString;
-                    int score = 0;
-                    
-                    if ([value containsString:@"high"]) score += 3;
-                    if ([value containsString:@"medium"]) score += 2;
-                    if ([value containsString:@"low"]) score += 1;
-                    
-                    if (score > highestScore) {
-                        highestScore = score;
-                        highestQuality = url;
-                    }
-                }
-            }
-        }
-        
-        if (highestQuality) {
-            bestURL = [NSURL URLWithString:highestQuality];
-        }
-    }
-    
-	if (!bestURL) {
-		NSString *largestFile = nil;
-		long long maxSize = 0;
-		
-		for (NSString *url in self.originURLList) {
-			NSURLComponents *components = [NSURLComponents componentsWithString:url];
-			for (NSURLQueryItem *item in components.queryItems) {
-				if ([item.name.lowercaseString containsString:@"size"] || 
-					[item.name.lowercaseString containsString:@"bitrate"] ||
-					[item.name.lowercaseString containsString:@"rate"]) {
-					long long size = [item.value longLongValue];
-					if (size > maxSize) {
-						maxSize = size;
-						largestFile = url;
-					}
-				}
-			}
-		}
-		
-		if (largestFile) {
-			bestURL = [NSURL URLWithString:largestFile];
-		}
-	}
     
     if (!bestURL && self.originURLList.count > 0) {
         bestURL = [NSURL URLWithString:self.originURLList.lastObject];
@@ -616,6 +644,8 @@
 }
 
 %end
+
+
 
 // 默认视频流最高画质
 %hook AWEVideoModel

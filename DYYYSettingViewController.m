@@ -470,8 +470,6 @@ void loadFixedABTestData(void) {
 
 // 获取当前ABTest数据
 NSDictionary *getCurrentABTestData(void) {
-    // 这里需要从抖音的ABTest管理器获取数据
-    // 简化实现，仅通过反射获取，实际需要根据抖音内部机制调整
     Class AWEABTestManagerClass = NSClassFromString(@"AWEABTestManager");
     if (!AWEABTestManagerClass) {
         return nil;
@@ -1321,6 +1319,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -保存视频" key:@"DYYYLongPressSaveVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -分享音频" key:@"DYYYLongPressSaveAudio" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -启用FLEX" key:@"DYYYEnableFLEX" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -PIP小窗播放" key:@"DYYYLongPressPip" type:DYYYSettingItemTypeSwitch],                
                 [DYYYSettingItem itemWithTitle:@"  -保存当前图片" key:@"DYYYLongPressSaveCurrentImage" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -保存所有图片" key:@"DYYYLongPressSaveAllImages" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制链接" key:@"DYYYLongPressCopyLink" type:DYYYSettingItemTypeSwitch],
@@ -1358,6 +1357,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"  -分享视频" key:@"DYYYDoubleTapshowSharePanel" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -长按面板" key:@"DYYYDoubleTapshowDislikeOnVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -接口解析" key:@"DYYYDoubleInterfaceDownload" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -PIP小窗播放" key:@"DYYYEnablePipPlayer" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"默认最高画质" key:@"DYYYEnableVideoHighestQuality" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"视频降噪增强" key:@"DYYYEnableNoiseFilter" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"默认清晰度-最高" key:@"DYYYDefaultQualityBest" type:DYYYSettingItemTypeSwitch],
