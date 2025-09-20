@@ -17,6 +17,36 @@ NS_ASSUME_NONNULL_BEGIN
 + (UIViewController *)topView;
 
 + (NSUInteger)clearDirectoryContents:(NSString *)directoryPath;
+
+/**
+ * 应用毛玻璃效果到指定视图
+ * @param view 要应用毛玻璃效果的视图
+ * @param userTransparency 用户设置的透明度 (0-1)
+ * @param tag 毛玻璃视图的标签
+ */
++ (void)applyBlurEffectToView:(UIView *)view transparency:(float)userTransparency blurViewTag:(NSInteger)tag;
+
+
+/**
+ * 递归清除视图及其子视图的背景色
+ * @param view 要清除背景的视图
+ */
++ (void)clearBackgroundRecursivelyInView:(UIView *)view;
+
+/**
+ * 检查是否为深色模式
+ * @return 是否为深色模式
+ */
++ (BOOL)isDarkMode;
+
+/**
+ * 查找指定类的所有子视图
+ * @param targetClass 目标类
+ * @param container 容器视图
+ * @return 找到的子视图数组
+ */
++ (NSArray<UIView *> *)findAllSubviewsOfClass:(Class)targetClass inContainer:(UIView *)container;
+
 @end
 
 #ifdef __cplusplus

@@ -1345,6 +1345,8 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"隐藏长按-后台播放" key:@"DYYYHideBackgroundPlay" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"隐藏长按-双列入口" key:@"DYYYHideBiserial" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"隐藏长按-定时关闭" key:@"DYYYHideTimerclose" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-保存至相册" key:@"DYYYHideSaveToAlbum" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"隐藏长按-识图搜同款" key:@"DYYYHideImageSearch" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"长按面板-复制功能" key:@"DYYYCopyText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制原文本" key:@"DYYYCopyOriginalText" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -复制分享链接" key:@"DYYYCopyShareLink" type:DYYYSettingItemTypeSwitch],
@@ -1887,6 +1889,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
         [self presentViewController:alert animated:YES completion:nil];
     }
 }
+
 
 // 支持 UIColorPickerViewController 回调
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000

@@ -1,4 +1,6 @@
 #import "DYYYUtils.h"
+#import <stdatomic.h>
+#import <os/lock.h>
 
 @implementation DYYYUtils
 
@@ -103,6 +105,109 @@
     
     return totalSize;
 }
+
++ (void)applyBlurEffectToView:(UIView *)view transparency:(float)userTransparency blurViewTag:(NSInteger)tag {
+    if (!view)
+        return;
+
+    view.backgroundColor = [UIColor clearColor];
+
+    UIVisualEffectView *existingBlurView = nil;
+    for (UIView *subview in view.subviews) {
+        if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == tag) {
+            existingBlurView = (UIVisualEffectView *)subview;
+            break;
+        }
+    }
+
+    BOOL isDarkMode = [DYYYUtils isDarkMode];
+    UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
+
+    UIView *overlayView = nil;
+
+    if (!existingBlurView) {
+        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
+        UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+        blurEffectView.frame = view.bounds;
+        blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        blurEffectView.alpha = userTransparency;
+        blurEffectView.tag = tag;
+
+        overlayView = [[UIView alloc] initWithFrame:view.bounds];
+        overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [blurEffectView.contentView addSubview:overlayView];
+
+        [view insertSubview:blurEffectView atIndex:0];
+    } else {
+        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
+        [existingBlurView setEffect:blurEffect];
+        existingBlurView.alpha = userTransparency;
+
+        for (UIView *subview in existingBlurView.contentView.subviews) {
+            if ([subview isKindOfClass:[UIView class]]) {
+                overlayView = subview;
+                break;
+            }
+        }
+        if (!overlayView) {
+            overlayView = [[UIView alloc] initWithFrame:existingBlurView.bounds];
+            overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            [existingBlurView.contentView addSubview:overlayView];
+        }
+    }
+    if (overlayView) {
+        CGFloat alpha = isDarkMode ? 0.2 : 0.1;
+        overlayView.backgroundColor = [UIColor colorWithWhite:(isDarkMode ? 0 : 1) alpha:alpha];
+    }
+}
+
++ (void)clearBackgroundRecursivelyInView:(UIView *)view {
+    if (!view)
+        return;
+
+    BOOL shouldClear = YES;
+
+    if ([view isKindOfClass:[UIVisualEffectView class]]) {
+        shouldClear = NO;  // 不清除 UIVisualEffectView 本身的背景
+    } else if (view.superview && [view.superview isKindOfClass:[UIVisualEffectView class]]) {
+        shouldClear = NO;  // 不清除 UIVisualEffectView 的 contentView 的背景
+    }
+
+    if (shouldClear) {
+        view.backgroundColor = [UIColor clearColor];
+        view.opaque = NO;
+    }
+
+    for (UIView *subview in view.subviews) {
+        [self clearBackgroundRecursivelyInView:subview];
+    }
+}
+
++ (BOOL)isDarkMode {
+    if (@available(iOS 13.0, *)) {
+        UITraitCollection *traitCollection = [UIScreen mainScreen].traitCollection;
+        return traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    }
+    return NO;
+}
+
++ (NSArray<UIView *> *)findAllSubviewsOfClass:(Class)targetClass inContainer:(UIView *)container {
+    NSMutableArray<UIView *> *foundViews = [NSMutableArray array];
+    [self findSubviewsOfClass:targetClass inView:container result:foundViews];
+    return [foundViews copy];
+}
+
++ (void)findSubviewsOfClass:(Class)targetClass inView:(UIView *)view result:(NSMutableArray<UIView *> *)result {
+    if ([view isKindOfClass:targetClass]) {
+        [result addObject:view];
+    }
+    
+    for (UIView *subview in view.subviews) {
+        [self findSubviewsOfClass:targetClass inView:subview result:result];
+    }
+}
+
+
 @end
 
 NSString *cleanShareURL(NSString *url) {

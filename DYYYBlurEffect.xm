@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import "DYYYManager.h"
+#import "DYYYUtils.h"
 #import "AwemeHeaders.h"
 
 // 定义常量
@@ -925,60 +926,17 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 %new
 - (void)applyBlurEffectIfNeeded {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] &&
-        [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
-
-        @try {
-            self.view.backgroundColor = [UIColor clearColor];
-            for (UIView *subview in self.view.subviews) {
-                if (![subview isKindOfClass:[UIVisualEffectView class]]) {
-                    subview.backgroundColor = [UIColor clearColor];
-                }
-            }
-
-            UIVisualEffectView *existingBlurView = nil;
-            for (UIView *subview in self.view.subviews) {
-                if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == 999) {
-                    existingBlurView = (UIVisualEffectView *)subview;
-                    break;
-                }
-            }
-
-            BOOL isDarkMode = [DYYYManager isDarkMode];
-            UIBlurEffectStyle blurStyle = isDarkMode ? UIBlurEffectStyleDark : UIBlurEffectStyleLight;
-
-            // 使用统一的透明度值
-            float userTransparency = DYYYGetUserTransparency(@"DYYYCommentBlurTransparent", 0.5);
-
-            if (!existingBlurView) {
-                UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
-                UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-                blurEffectView.frame = self.view.bounds;
-                blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-                blurEffectView.tag = 999;
-
-                // 创建一个覆盖层
-                UIView *overlayView = [[UIView alloc] initWithFrame:self.view.bounds];
-                overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-                [blurEffectView.contentView addSubview:overlayView];
-                
-                // 使用共享配置函数
-                DYYYConfigureSharedBlurAppearance(blurEffectView, userTransparency, isDarkMode);
-
-                [self.view insertSubview:blurEffectView atIndex:0];
-            } else {
-                UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:blurStyle];
-                [existingBlurView setEffect:blurEffect];
-                
-                // 使用共享配置函数
-                DYYYConfigureSharedBlurAppearance(existingBlurView, userTransparency, isDarkMode);
-
-                [self.view insertSubview:existingBlurView atIndex:0];
-            }
+    if (DYYYGetBool(@"DYYYisEnableCommentBlur") && [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
+        // 动态获取用户设置的透明度
+        float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+        if (userTransparency <= 0 || userTransparency > 1) {
+            userTransparency = 0.9;
         }
-        @catch (NSException *exception) {
-            NSLog(@"[DYYY] Exception in applyBlurEffectIfNeeded: %@", exception);
-        }
+
+        // 应用毛玻璃效果
+               [DYYYUtils applyBlurEffectToView:self.view transparency:userTransparency blurViewTag:999];
+
+        [DYYYUtils clearBackgroundRecursivelyInView:self.view];
     }
 }
 
@@ -1056,6 +1014,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
     if ([self respondsToSelector:@selector(dyyyApplyBlurEffect)]) {
         [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
     }
+    [self applyBlurEffectIfNeeded];
 }
 - (void)viewDidAppear:(BOOL)animated {
     %orig;

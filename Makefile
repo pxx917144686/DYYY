@@ -66,6 +66,10 @@ DYYY_FILES += $(shell find FLEX -name '*.m' -o -name '*.mm') FLEX/flex_fishhook.
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
+# 解决class_ro_t指针签名警告
+$(TWEAK_NAME)_CFLAGS += -Wno-deprecated-declarations -Wno-sign-compare -Wno-pointer-sign
+# 统一启用class_ro_t指针签名，避免混合编译警告
+$(TWEAK_NAME)_CFLAGS += -fobjc-runtime=ios-15.0
 
 # 使用全局C++
 CXXFLAGS += -std=c++11
@@ -77,6 +81,12 @@ $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 # 框架
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage
 $(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp
+# 链接器标志，解决class_ro_t指针签名警告
+$(TWEAK_NAME)_LDFLAGS += -Xlinker -no_adhoc_codesign -Xlinker -objc_abi_version -Xlinker 2
+# 统一class_ro_t指针签名设置，解决链接警告
+$(TWEAK_NAME)_LDFLAGS += -Xlinker -no_warn_duplicate_libraries
+# 抑制class_ro_t指针签名不一致警告
+$(TWEAK_NAME)_LDFLAGS += -Wl,-w
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/libwebp/include
 
 # FLEX 库和头文件路径

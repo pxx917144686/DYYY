@@ -168,6 +168,8 @@
     BOOL hideBackgroundPlay = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideBackgroundPlay"];
     BOOL hideBiserial = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideBiserial"];
     BOOL hideTimerclose = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideTimerclose"];
+    BOOL hideSaveToAlbum = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideSaveToAlbum"];
+    BOOL hideImageSearch = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideImageSearch"];
 
     // 存储处理后的原始组
     NSMutableArray *processedOriginalGroups = [NSMutableArray array];
@@ -221,6 +223,10 @@
                     } else if ([descString isEqualToString:@"首页双列快捷入口"] && hideBiserial) {
                         shouldHide = YES;
                     } else if ([descString isEqualToString:@"定时关闭"] && hideTimerclose) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"保存至相册"] && hideSaveToAlbum) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"识图搜同款"] && hideImageSearch) {
                         shouldHide = YES;
                     }
 
@@ -949,6 +955,10 @@
                     } else if ([descString isEqualToString:@"首页双列快捷入口"] && hideBiserial) {
                         shouldHide = YES;
                     } else if ([descString isEqualToString:@"定时关闭"] && hideTimerclose) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"保存至相册"] && hideSaveToAlbum) {
+                        shouldHide = YES;
+                    } else if ([descString isEqualToString:@"识图搜同款"] && hideImageSearch) {
                         shouldHide = YES;
                     }
 

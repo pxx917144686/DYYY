@@ -2,6 +2,9 @@
 #import <Photos/Photos.h>
 
 #define DYYYGetBool(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
+#define DYYYGetFloat(key) [[NSUserDefaults standardUserDefaults] floatForKey:key]
+#define DYYYGetInteger(key) [[NSUserDefaults standardUserDefaults] integerForKey:key]
+#define DYYYGetString(key) [[NSUserDefaults standardUserDefaults] stringForKey:key]
 #define DYYY_IGNORE_GLOBAL_ALPHA_TAG 114514
 typedef NS_ENUM(NSInteger, MediaType) {
   MediaTypeVideo,
@@ -256,8 +259,12 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @end
 
+@interface AWETabBarSkinContainerView : UIView
+@end
+
 @interface AWENormalModeTabBar : UIView
 @property(nonatomic, assign, readonly) UITabBarController *yy_viewController;
+@property(retain, nonatomic) AWETabBarSkinContainerView *skinContainerView;
 @end
 
 @interface AWEPlayInteractionListenFeedView : UIView
@@ -1089,6 +1096,13 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @end
 
 @interface AWECommentInputViewSwiftImpl_CommentInputBar : UIView
+@end
+
+@interface AWECommentContainerViewController : UIViewController
+@property (nonatomic, strong) UIView *view;
+@end
+
+@interface AWEListKitMagicCollectionView : UICollectionView
 @end
 
 void showVideoStatsEditAlert(UIViewController *viewController);

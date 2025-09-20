@@ -9,7 +9,8 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
     DYYYSettingItemTypeTextField,
     DYYYSettingItemTypeSpeedPicker,
     DYYYSettingItemTypeColorPicker,
-    DYYYSettingItemTypeCustomPicker
+    DYYYSettingItemTypeCustomPicker,
+    DYYYSettingItemTypeButton
 };
 
 // 为按钮大小定义枚举
