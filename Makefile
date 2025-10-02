@@ -58,7 +58,7 @@ DYYY_FILES = DYYY.xm \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
-DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm
+DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm DYYYBundleHook.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
 
 # 添加 FLEX 源文件
