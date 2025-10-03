@@ -19,6 +19,7 @@ static BOOL dyyy_ensurePhotoAuthThen(void (^grantedBlock)(void));
 
 static const void *kDYYY_POI_LongPressAddedKey = &kDYYY_POI_LongPressAddedKey;
 static const void *kDYYY_POI_LongPressAddedToViewKey = &kDYYY_POI_LongPressAddedToViewKey;
+static const void *kDYYY_POI_SavingKey = &kDYYY_POI_SavingKey;
 
 %hook AWEPOIDetailUGCPhotosPreviewViewController
 
@@ -95,11 +96,32 @@ static void dyyy_handlePOIPreviewLongPress(id self, UILongPressGestureRecognizer
 static void dyyy_doSaveAtPoint(id self, CGPoint p) {
     UIView *root = [self valueForKey:@"view"];
     if (!root) return;
+    
+    // 防重复保存：检查是否正在保存
+    NSNumber *saving = objc_getAssociatedObject(self, kDYYY_POI_SavingKey);
+    if ([saving boolValue]) {
+        return; // 正在保存，直接返回
+    }
+    
+    // 设置保存状态
+    objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    
     // 优先：直接从业务 photo URL 下载（自带进度动画）
-    if (dyyy_tryDownloadFromPhotoAtPoint(root, p)) return;
+    if (dyyy_tryDownloadFromPhotoAtPoint(root, p)) {
+        // 下载完成后重置保存状态（延迟3秒，因为下载是异步的）
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        });
+        return;
+    }
+    
+    // 回退：从 UIImageView 保存
     UIImageView *iv = dyyy_findBestImageView(root, p);
     UIImage *image = dyyy_extractImageFromImageView(iv);
-    if (!image) return;
+    if (!image) {
+        objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
 
     DYYYToast *toast = [[DYYYToast alloc] initWithFrame:[UIScreen mainScreen].bounds];
     dispatch_async(dispatch_get_main_queue(), ^{ [toast show]; [toast setProgress:0.15f]; });
@@ -112,7 +134,10 @@ static void dyyy_doSaveAtPoint(id self, CGPoint p) {
                          alphaInfo == kCGImageAlphaFirst);
         NSData *data = hasAlpha ? UIImagePNGRepresentation(image) : UIImageJPEGRepresentation(image, 0.95);
         if (!data || data.length == 0) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [toast dismiss]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ 
+                [toast dismiss]; 
+                objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            });
             return;
         }
         NSString *ext = hasAlpha ? @"png" : @"jpg";
@@ -120,12 +145,18 @@ static void dyyy_doSaveAtPoint(id self, CGPoint p) {
         BOOL ok = [data writeToFile:path atomically:YES];
         dispatch_async(dispatch_get_main_queue(), ^{ [toast setProgress:0.7f]; });
         if (!ok) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [toast dismiss]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ 
+                [toast dismiss]; 
+                objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            });
             return;
         }
         NSURL *fileURL = [NSURL fileURLWithPath:path];
         [DYYYManager saveMedia:fileURL mediaType:MediaTypeImage completion:^{
-            dispatch_async(dispatch_get_main_queue(), ^{ [toast showSuccessAnimation:nil]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ 
+                [toast showSuccessAnimation:nil];
+                objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            });
         }];
     });
 }
