@@ -537,6 +537,9 @@ static NSLock *settingsLock = nil;
     else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
         message = enabled ? @"已启用ABTest补丁模式" : @"已关闭ABTest补丁模式";
     }
+    else if ([item.key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+        message = enabled ? @"液态玻璃UI已启用，重启应用生效" : @"液态玻璃UI已关闭，重启应用生效";
+    }
     
     if (message) {
         [DYYYManager showToast:message];

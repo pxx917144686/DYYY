@@ -25,6 +25,7 @@ export THEOS_PACKAGE_DIR = $(CURDIR)
 # TARGET
 ARCHS = arm64 arm64e
 TARGET = iphone:clang:latest:15.0
+USE_SWIFT = 1
 
 # 关闭严格错误检查和警告
 export DEBUG = 0
@@ -61,6 +62,9 @@ DYYY_FILES = DYYY.xm \
 DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm DYYYBundleHook.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
 
+# Swift 源文件
+DYYY_FILES += DYYYSwiftUIBridge.swift
+
 # 添加 FLEX 源文件
 DYYY_FILES += $(shell find FLEX -name '*.m' -o -name '*.mm') FLEX/flex_fishhook.c
 
@@ -71,15 +75,11 @@ $(TWEAK_NAME)_CFLAGS += -Wno-deprecated-declarations -Wno-sign-compare -Wno-poin
 # 统一启用class_ro_t指针签名，避免混合编译警告
 $(TWEAK_NAME)_CFLAGS += -fobjc-runtime=ios-15.0
 
-# 使用全局C++
-CXXFLAGS += -std=c++11
-CCFLAGS += -std=c++11
-
 # 保留内部生成器选项
 $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
-$(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage
+$(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage SwiftUI Combine
 $(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp
 # 链接器标志，解决class_ro_t指针签名警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_adhoc_codesign -Xlinker -objc_abi_version -Xlinker 2

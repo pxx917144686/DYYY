@@ -8,6 +8,37 @@
 #ifndef DYYY_IGNORE_GLOBAL_ALPHA_TAG
 #define DYYY_IGNORE_GLOBAL_ALPHA_TAG 88888
 #endif
+// 统一判断是否启用“液态玻璃UI”
+static inline BOOL DYYYIsLiquidGlassEnabled(void) {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+}
+
+// 在 keyWindow 根视图全局注入 SwiftUI Hosting（仅 iOS26 + 开关为真，且防重复）。
+static void DYYYInstallGlobalSwiftUIHostingIfNeeded(void) {
+    if (@available(iOS 26.0, *)) {
+        if (!DYYYIsLiquidGlassEnabled()) return;
+        UIWindow *keyWindow = [DYYYManager getActiveWindow];
+        if (!keyWindow || !keyWindow.rootViewController || !keyWindow.rootViewController.view) return;
+        UIView *rootView = keyWindow.rootViewController.view;
+        const NSInteger tag = 987657;
+        if ([rootView viewWithTag:tag]) return;
+
+        Class Bridge = NSClassFromString(@"DYYYSwiftUIBridge");
+        SEL sel = @selector(makeHostingController);
+        if (!(Bridge && [Bridge respondsToSelector:sel])) return;
+        IMP imp = [Bridge methodForSelector:sel];
+        UIViewController* (*fn)(id, SEL) = (UIViewController* (*)(id, SEL))imp;
+        UIViewController *host = fn(Bridge, sel);
+        if (![host isKindOfClass:[UIViewController class]] || !host.view) return;
+        host.view.frame = rootView.bounds;
+        host.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        host.view.userInteractionEnabled = NO;
+        host.view.backgroundColor = [UIColor clearColor];
+        host.view.tag = tag;
+        [rootView insertSubview:host.view atIndex:0];
+    }
+}
+
 
 // 前向声明 DYYYLayoutStateManager
 @class DYYYLayoutStateManager;
@@ -247,10 +278,15 @@ static NSString * const kDYYYNotificationEnabledKey = @"DYYYEnableNotificationTr
 static NSString * const kDYYYNotificationTransparentKey = @"DYYYNotificationBlurTransparent";
 static NSString * const kDYYYNotificationCornerRadiusKey = @"DYYYNotificationCornerRadius";
 
-// 获取用户设置的透明度值
+// 获取用户设置的透明度值（支持液态玻璃增强：默认更高的透明度）
 static float DYYYGetUserTransparency(NSString *key, float defaultValue) {
     float value = [[[NSUserDefaults standardUserDefaults] objectForKey:key] floatValue];
-    return (value <= 0 || value > 1) ? defaultValue : value;
+    float fallback = (value <= 0 || value > 1) ? defaultValue : value;
+    if (DYYYIsLiquidGlassEnabled()) {
+        // 液态玻璃启用时，适度提升默认透明度观感
+        fallback = MAX(fallback, defaultValue);
+    }
+    return fallback;
 }
 
 // 检查功能是否启用
@@ -737,8 +773,33 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 - (void)layoutSubviews {    
     %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableSheetBlur"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableSheetBlur"] || DYYYIsLiquidGlassEnabled()) {
         [self applyBlurEffectAndWhiteText];
+    }
+
+    // iOS26 + 开关为真 → 注入 SwiftUI Hosting（不改变现有 UIKit 视觉）
+    if (@available(iOS 26.0, *)) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+            const NSInteger tag = 987655;
+            if (![self.containerView viewWithTag:tag]) {
+                Class Bridge = NSClassFromString(@"DYYYSwiftUIBridge");
+                SEL sel = @selector(makeHostingController);
+                if (Bridge && [Bridge respondsToSelector:sel]) {
+                    IMP imp = [Bridge methodForSelector:sel];
+                    UIViewController* (*fn)(id, SEL) = (UIViewController* (*)(id, SEL))imp;
+                    UIViewController *host = fn(Bridge, sel);
+                    if ([host isKindOfClass:[UIViewController class]] && host.view && self.containerView) {
+                        [self.containerView addSubview:host.view];
+                        host.view.frame = self.containerView.bounds;
+                        host.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                        host.view.userInteractionEnabled = NO;
+                        host.view.backgroundColor = [UIColor clearColor];
+                        host.view.tag = tag;
+                        [self.containerView sendSubviewToBack:host.view];
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -926,7 +987,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 %new
 - (void)applyBlurEffectIfNeeded {
-    if (DYYYGetBool(@"DYYYisEnableCommentBlur") && [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
+    if ((DYYYGetBool(@"DYYYisEnableCommentBlur") || DYYYIsLiquidGlassEnabled()) && [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
         // 动态获取用户设置的透明度
         float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
         if (userTransparency <= 0 || userTransparency > 1) {
@@ -942,7 +1003,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 %new
 - (void)dyyyApplyBlurEffect {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] &&
+    if (([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) &&
         [self isKindOfClass:NSClassFromString(@"AWECommentPanelContainerSwiftImpl.CommentContainerInnerViewController")]) {
 
         self.view.backgroundColor = [UIColor clearColor];
@@ -1020,6 +1081,36 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
     %orig;
     if ([self respondsToSelector:@selector(dyyyApplyBlurEffect)]) {
         [self performSelector:@selector(dyyyApplyBlurEffect) withObject:nil afterDelay:0];
+    }
+
+    // 仅在开关打开且系统为 iOS 26 以上时，注入 SwiftUI Hosting（不改变现有 UIKit 视觉）
+    if (@available(iOS 26.0, *)) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+            // 安装全局宿主层
+            dispatch_async(dispatch_get_main_queue(), ^{
+                DYYYInstallGlobalSwiftUIHostingIfNeeded();
+            });
+            Class Bridge = NSClassFromString(@"DYYYSwiftUIBridge");
+            SEL sel = @selector(makeHostingController);
+            if (Bridge && [Bridge respondsToSelector:sel]) {
+                IMP imp = [Bridge methodForSelector:sel];
+                UIViewController* (*fn)(id, SEL) = (UIViewController* (*)(id, SEL))imp;
+                UIViewController *host = fn(Bridge, sel);
+                if ([host isKindOfClass:[UIViewController class]] && host.view) {
+                    const NSInteger tag = 987654;
+                    if (![self.view viewWithTag:tag]) {
+                        [self addChildViewController:host];
+                        host.view.frame = self.view.bounds;
+                        host.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                        host.view.userInteractionEnabled = NO;
+                        host.view.backgroundColor = [UIColor clearColor];
+                        host.view.tag = tag;
+                        [self.view insertSubview:host.view atIndex:0];
+                        [host didMoveToParentViewController:self];
+                    }
+                }
+            }
+        }
     }
 }
 - (void)viewWillAppear:(BOOL)animated {
@@ -1129,7 +1220,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 - (void)layoutSubviews {    
     %orig;
 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) {
         // 优先处理评论输入相关视图的毛玻璃和弹幕逻辑
         for (UIView *subview in self.subviews) {
             if (DYYYIsCommentInputRelatedView(subview)) {
@@ -1217,7 +1308,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 - (void)layoutSubviews {    
     %orig;
     
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) {
         // 保持完全透明，确保上层的毛玻璃效果可见
         self.backgroundColor = [UIColor clearColor];
         
@@ -1238,7 +1329,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 - (void)layoutSubviews {
     %orig;
     
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) {
         float userTransparency = DYYYGetUserTransparency(@"DYYYCommentBlurTransparent", 0.5);
         BOOL isDarkMode = [DYYYManager isDarkMode];
         
@@ -1405,7 +1496,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
                 }
             }
         }
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] || [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] || [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) {
 
             UIViewController *vc = [self firstAvailableUIViewController];
             if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
@@ -1421,7 +1512,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
                 }
             }
         }
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"]) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] || DYYYIsLiquidGlassEnabled()) {
             if ([className isEqualToString:@"AWECommentInputViewSwiftImpl.CommentInputContainerView"]) {
                 for (UIView *subview in self.subviews) {
                     if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor) {
@@ -1554,7 +1645,7 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 - (id)initWithFrame:(CGRect)frame {
     id orig = %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"] || DYYYIsLiquidGlassEnabled()) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self setupBlurEffectForNotificationView];
         });
@@ -1564,21 +1655,50 @@ static void DYYYApplyBlurEffectSafely(UIView *view, float transparency) {
 
 - (void)layoutSubviews {
     %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"] || DYYYIsLiquidGlassEnabled()) {
         [self setupBlurEffectForNotificationView];
+    }
+
+    // iOS26 + 开关为真 → 注入 SwiftUI Hosting 到通知窗口（不改变现有 UIKit 视觉）
+    if (@available(iOS 26.0, *)) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+            // 安装全局宿主层
+            dispatch_async(dispatch_get_main_queue(), ^{
+                DYYYInstallGlobalSwiftUIHostingIfNeeded();
+            });
+            const NSInteger tag = 987656;
+            if (![self viewWithTag:tag]) {
+                Class Bridge = NSClassFromString(@"DYYYSwiftUIBridge");
+                SEL sel = @selector(makeHostingController);
+                if (Bridge && [Bridge respondsToSelector:sel]) {
+                    IMP imp = [Bridge methodForSelector:sel];
+                    UIViewController* (*fn)(id, SEL) = (UIViewController* (*)(id, SEL))imp;
+                    UIViewController *host = fn(Bridge, sel);
+                    if ([host isKindOfClass:[UIViewController class]] && host.view) {
+                        [self addSubview:host.view];
+                        host.view.frame = self.bounds;
+                        host.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                        host.view.userInteractionEnabled = NO;
+                        host.view.backgroundColor = [UIColor clearColor];
+                        host.view.tag = tag;
+                        [self sendSubviewToBack:host.view];
+                    }
+                }
+            }
+        }
     }
 }
 
 - (void)didMoveToWindow {
     %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"]) {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"] || DYYYIsLiquidGlassEnabled()) {
         [self setupBlurEffectForNotificationView];
     }
 }
 
 - (void)didAddSubview:(UIView *)subview {
     %orig;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"] && 
+    if (([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableNotificationTransparency"] || DYYYIsLiquidGlassEnabled()) && 
         [NSStringFromClass([subview class]) containsString:@"AWEInnerNotificationContainerView"]) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self setupBlurEffectForNotificationView];

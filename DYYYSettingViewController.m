@@ -1267,6 +1267,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
             
             // 第五部分 - 增强功能
             @[
+                [DYYYSettingItem itemWithTitle:@"切换:液态玻璃UI（重启APP生效）" key:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"启用新版玻璃面板" key:@"DYYYisEnableModern" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"启用保存他人头像" key:@"DYYYEnableSaveAvatar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"禁用点击首页刷新" key:@"DYYYDisableHomeRefresh" type:DYYYSettingItemTypeSwitch],
