@@ -64,6 +64,7 @@ DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsVie
 
 # Swift 源文件
 DYYY_FILES += DYYYSwiftUIBridge.swift
+DYYY_FILES += DYYYSDKPatch.m
 
 # 添加 FLEX 源文件
 DYYY_FILES += $(shell find FLEX -name '*.m' -o -name '*.mm') FLEX/flex_fishhook.c

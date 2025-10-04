@@ -538,7 +538,7 @@ static NSLock *settingsLock = nil;
         message = enabled ? @"已启用ABTest补丁模式" : @"已关闭ABTest补丁模式";
     }
     else if ([item.key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-        message = enabled ? @"液态玻璃UI已启用，重启应用生效" : @"液态玻璃UI已关闭，重启应用生效";
+        message = enabled ? @"液态玻璃UI-重启APP生效" : @"液态玻璃UI功能-已关闭";
     }
     
     if (message) {

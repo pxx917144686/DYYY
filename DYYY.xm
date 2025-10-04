@@ -15,6 +15,9 @@
 #import "CityManager.h"
 #import "DYYYManager.h"
 #import "DYYYSettingViewController.h"
+
+// 前向声明 SwiftUI 注入函数
+extern void DYYYInjectSwiftUIToTabBar(AWENormalModeTabBar *tabBar);
 #import "DYYYToast.h"
 #import "DYYYBottomAlertView.h"
 #import "DYYYConfirmCloseView.h"
@@ -1624,6 +1627,15 @@ static NSLock *downloadCountLock = nil;
 
 - (void)layoutSubviews {
     %orig;
+    
+    // 注入 SwiftUI 渲染管线到底部标签栏
+    if (@available(iOS 15.0, *)) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                DYYYInjectSwiftUIToTabBar(self);
+            });
+        }
+    }
 
     if (originalTabHeight == 0 && self.frame.size.height > 30) {
         originalTabHeight = self.frame.size.height;
@@ -1748,6 +1760,7 @@ static NSLock *downloadCountLock = nil;
     // 背景和分隔线处理
     BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
     BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
+    BOOL liquidGlassEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
 
     if (hideBottomBg || enableFullScreen) {
         if (self.skinContainerView) {
@@ -1756,6 +1769,35 @@ static NSLock *downloadCountLock = nil;
     } else {
         if (self.skinContainerView) {
             self.skinContainerView.hidden = NO;
+        }
+    }
+    
+    // 液态玻璃UI背景处理：当启用液态玻璃时，调整背景透明度
+    if (@available(iOS 15.0, *)) {
+        if (liquidGlassEnabled) {
+            // 查找背景视图并调整透明度以配合 SwiftUI 效果
+            UIView *backgroundView = nil;
+            for (UIView *subview in self.subviews) {
+                if ([subview class] == [UIView class]) {
+                    BOOL hasImageView = NO;
+                    for (UIView *childView in subview.subviews) {
+                        if ([childView isKindOfClass:[UIImageView class]]) {
+                            hasImageView = YES;
+                            break;
+                        }
+                    }
+                    if (hasImageView) {
+                        backgroundView = subview;
+                        break;
+                    }
+                }
+            }
+            
+            if (backgroundView) {
+                // 设置背景为半透明，让 SwiftUI 液态玻璃效果透出
+                backgroundView.alpha = 0.3;
+                backgroundView.backgroundColor = [UIColor clearColor];
+            }
         }
     }
 
@@ -1839,6 +1881,37 @@ static NSLock *downloadCountLock = nil;
             if (subview.frame.size.height > 0 && subview.frame.size.height <= 0.5 && subview.frame.size.width > 300) {
                 subview.hidden = YES;
             }
+        }
+    }
+}
+
+%end
+
+// Hook 标签按钮状态变化，为 SwiftUI 提供状态响应
+%hook AWENormalModeTabBarGeneralButton
+
+- (void)setStatus:(NSInteger)status {
+    %orig(status);
+    
+    // 标签按钮状态改变时，更新 SwiftUI 效果
+    if (@available(iOS 15.0, *)) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // 查找父标签栏并更新 SwiftUI 效果
+                UIView *parentView = self.superview;
+                while (parentView && ![parentView isKindOfClass:NSClassFromString(@"AWENormalModeTabBar")]) {
+                    parentView = parentView.superview;
+                }
+                if (parentView) {
+                    AWENormalModeTabBar *tabBar = (AWENormalModeTabBar *)parentView;
+                    // 重新注入 SwiftUI 以响应状态变化
+                    UIView *existingSwiftUI = [tabBar viewWithTag:987658];
+                    if (existingSwiftUI) {
+                        [existingSwiftUI removeFromSuperview];
+                    }
+                    DYYYInjectSwiftUIToTabBar(tabBar);
+                }
+            });
         }
     }
 }
