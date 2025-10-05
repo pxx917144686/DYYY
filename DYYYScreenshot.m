@@ -197,7 +197,6 @@
 
     UIActivityViewController *activityViewController = [[UIActivityViewController alloc] initWithActivityItems:@[image] applicationActivities:nil];
     
-    // 为用户提供一个更好的反馈
     [DYYYManager showToast:@"截图成功！"];
     
     UIViewController *presentingController = [DYYYManager getActiveTopController];
