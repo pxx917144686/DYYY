@@ -41,6 +41,26 @@ static const void *kDYYY_POI_SavingKey = &kDYYY_POI_SavingKey;
 
 %end
 
+%hook AWEPOIDetailPhotosDynamicPreviewViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig(animated);
+    dyyy_addLongPressToPOIPreview(self);
+}
+
+%new
+- (void)dyyy_onPOILongPress:(UILongPressGestureRecognizer *)gr {
+    dyyy_handlePOIPreviewLongPress(self, gr);
+}
+
+// 放宽手势识别以避免退出
+%new
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return YES;
+}
+
+%end
+
 static void dyyy_addLongPressToPOIPreview(id self) {
     UIView *root = [self valueForKey:@"view"];
     if (!root) return;
@@ -106,7 +126,7 @@ static void dyyy_doSaveAtPoint(id self, CGPoint p) {
     // 设置保存状态
     objc_setAssociatedObject(self, kDYYY_POI_SavingKey, @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     
-    // 优先：直接从业务 photo URL 下载（自带进度动画）
+    // 直接从业务 photo URL 下载（自带进度动画）
     if (dyyy_tryDownloadFromPhotoAtPoint(root, p)) {
         // 下载完成后重置保存状态（延迟3秒，因为下载是异步的）
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -227,7 +247,7 @@ static UIImage *dyyy_extractImageAtPoint(UIView *root, CGPoint location) {
     UIView *hit = [root hitTest:location withEvent:nil];
     UIView *cursor = hit;
     while (cursor) {
-        // 根据你提供的层级：AWEPOIDetailUGCPhotosPreviewScrollView -> imageView / photo
+        // 层级：AWEPOIDetailUGCPhotosPreviewScrollView -> imageView / photo
         if ([NSStringFromClass([cursor class]) containsString:@"AWEPOIDetailUGCPhotosPreviewScrollView"]) {
             @try {
                 id photo = [cursor valueForKey:@"photo"]; // AWEPOIDetailPhotoBaseInfo *
