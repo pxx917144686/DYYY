@@ -1680,7 +1680,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
     
     // 创建文本标签
     self.footerLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 40)];
-    self.footerLabel.text = @"DYYY++ (修改2025-10-03)";
+    self.footerLabel.text = @"DYYY++ (修改2025-10-05)";
     self.footerLabel.textAlignment = NSTextAlignmentCenter;
     self.footerLabel.font = [UIFont systemFontOfSize:14];
     self.footerLabel.textColor = [UIColor secondaryLabelColor];
