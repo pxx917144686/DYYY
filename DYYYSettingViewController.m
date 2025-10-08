@@ -1117,7 +1117,6 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"推荐过滤低赞" key:@"DYYYfilterLowLikes" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐过滤文案" key:@"DYYYfilterKeywords" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐视频时限" key:@"DYYYfiltertimelimit" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭，单位为天"],
-                [DYYYSettingItem itemWithTitle:@"推荐过滤HDR" key:@"DYYYFilterFeedHDR" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"首页全屏+透明" key:@"DYYYisEnableFullScreen" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去除App内更新" key:@"DYYYNoUpdates" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去青少年弹窗" key:@"DYYYHideteenmode" type:DYYYSettingItemTypeSwitch],
@@ -1270,6 +1269,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 @[
                 [DYYYSettingItem itemWithTitle:@"液态玻璃UI(重启APP生效)" key:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"启用新版玻璃面板" key:@"DYYYisEnableModern" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"屏蔽-HDR视频" key:@"DYYYFilterFeedHDR" type:DYYYSettingItemTypeSwitch],            
                 [DYYYSettingItem itemWithTitle:@"启用保存他人头像" key:@"DYYYEnableSaveAvatar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"禁用点击首页刷新" key:@"DYYYDisableHomeRefresh" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"禁用双击视频点赞" key:@"DYYYDouble" type:DYYYSettingItemTypeSwitch],

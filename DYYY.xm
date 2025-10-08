@@ -3367,14 +3367,25 @@ static NSLock *downloadCountLock = nil;
 	// 只有收藏按钮才显示确认弹窗
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYcollectTips"] && [self.accessibilityLabel isEqualToString:@"收藏"]) {
 
+		// 复制并强持有原始 block，避免在异步确认期间被释放
+		void (^storedBlock)(void) = nil;
+		if (r && [r isKindOfClass:NSClassFromString(@"NSBlock")]) {
+			storedBlock = [((void (^)(void))r) copy];
+		}
+		// 使用关联对象绑定到按钮实例，确认后再清理
+		objc_setAssociatedObject(self, @selector(touchUpInsideBlock), storedBlock, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
 		dispatch_async(dispatch_get_main_queue(), ^{
-		  [DYYYBottomAlertView showAlertWithTitle:@"收藏确认"
+			[DYYYBottomAlertView showAlertWithTitle:@"收藏确认"
 						  message:@"是否确认/取消收藏？"
 					     cancelAction:nil
 					    confirmAction:^{
-					      if (r && [r isKindOfClass:NSClassFromString(@"NSBlock")]) {
-						      ((void (^)(void))r)();
-					      }
+							void (^blockToCall)(void) = objc_getAssociatedObject(self, @selector(touchUpInsideBlock));
+							if (blockToCall) {
+								blockToCall();
+							}
+							// 执行后清理关联，释放强引用
+							objc_setAssociatedObject(self, @selector(touchUpInsideBlock), nil, OBJC_ASSOCIATION_ASSIGN);
 					    }];
 		});
 

@@ -1,4 +1,5 @@
 #import "DYYYPipPlayer.h"
+#import "DYYYUtils.h"
 #import <objc/runtime.h>
 #import "DYYYManager.h"
 
@@ -214,10 +215,10 @@
                                                         object:nil 
                                                       userInfo:@{@"awemeModel": self.awemeModel}];
     
-    // 延迟关闭小窗，确保主界面有时间处理
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 延迟关闭小窗，确保主界面有时间处理（弱持有 self，避免释放后回调触发）
+    [DYYYUtils dispatchAfter:0.5 owner:self block:^{
         [self dyyy_closeAndStopPip];
-    });
+    }];
     
     NSLog(@"DYYY: 已发送恢复请求，正在切换到全屏播放");
 }

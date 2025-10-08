@@ -1,5 +1,6 @@
 #import "DYYYToast.h"
 #import "DYYYManager.h"
+#import "DYYYUtils.h"
 
 @interface DYYYToast ()
 
@@ -500,8 +501,7 @@
     circleLayer.opacity = 1.0;
     [circleLayer addAnimation:circleAnimation forKey:@"fadeIn"];
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
+    [DYYYUtils dispatchAfter:0.1 owner:self block:^{
         if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHapticFeedbackEnabled"]) {
             UINotificationFeedbackGenerator *feedbackGenerator = [[UINotificationFeedbackGenerator alloc] init];
             [feedbackGenerator notificationOccurred:UINotificationFeedbackTypeSuccess];
@@ -510,28 +510,13 @@
         CABasicAnimation *checkmarkAnimation = [CABasicAnimation animationWithKeyPath:@"strokeEnd"];
         checkmarkAnimation.fromValue = @0.0;
         checkmarkAnimation.toValue = @1.0;
-        checkmarkAnimation.duration = 0.15;
-        checkmarkAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+        checkmarkAnimation.duration = 0.2;
         checkmarkLayer.strokeEnd = 1.0;
-        [checkmarkLayer addAnimation:checkmarkAnimation forKey:@"drawCheckmark"];
+        [checkmarkLayer addAnimation:checkmarkAnimation forKey:@"checkmarkAnimation"];
+    }];
 
-        [UIView animateWithDuration:0.15
-                              delay:0.1
-             usingSpringWithDamping:0.6
-              initialSpringVelocity:0.8
-                            options:UIViewAnimationOptionCurveEaseInOut
-                         animations:^{
-            self.progressView.transform = CGAffineTransformMakeScale(1.15, 1.15);
-        }
-                         completion:^(BOOL finished) {
-            [UIView animateWithDuration:0.2
-                             animations:^{
-                self.progressView.transform = CGAffineTransformIdentity;
-            }];
-        }];
-        
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
             [UIView animateWithDuration:0.2
                              animations:^{
                 self.alpha = 0;
@@ -543,7 +528,6 @@
                 }
             }];
         });
-    });
 }
 
 @end

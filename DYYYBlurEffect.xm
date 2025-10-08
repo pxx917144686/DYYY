@@ -15,6 +15,12 @@ static inline BOOL DYYYIsLiquidGlassEnabled(void) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
 }
 
+// 全局定时器与停止函数（供控制器调用）
+static NSTimer *gDYYYLGTimer = nil;
+void DYYYStopLiquidGlassTimerIfNeeded(void) {
+    if (gDYYYLGTimer) { [gDYYYLGTimer invalidate]; gDYYYLGTimer = nil; }
+}
+
 // 检查是否有透明功能冲突
 static inline BOOL DYYYHasTransparencyConflict(void) {
     // 检查是否启用了全局透明功能
@@ -148,10 +154,11 @@ static void DYYYStartRealTimeInterfaceMonitoring(void);
         NSLog(@"[DYYY] SDK 26 补丁应用完成");
     }
     
-    // 延迟处理透明功能冲突，避免启动时阻塞
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 延迟处理透明功能冲突，避免启动时阻塞（使用安全延迟，防止切窗时回调悬挂）
+    [DYYYUtils dispatchAfter:2.0 owner:[UIApplication sharedApplication] block:^{
+        if (![UIApplication sharedApplication].keyWindow) return;
         DYYYHandleTransparencyConflict();
-    });
+    }];
     
     NSLog(@"[DYYY] Liquid Glass 模块初始化完成");
 }
@@ -453,25 +460,56 @@ static inline void DYYYSetVideoPlayingState(BOOL playing) {
 // 实时界面变化响应 - 定时器触发
 static void DYYYStartRealTimeInterfaceMonitoring(void) {
     if (!DYYYIsLiquidGlassEnabled()) return;
-    
-    // 创建定时器，每0.5秒检查一次界面变化
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer * _Nonnull timer) {
+
+    // 确保仅一个定时器在运行
+    static dispatch_once_t sObserverOnce;
+
+    // 安装生命周期观察者：窗口切换/前后台/设置变更时，安全地启动或停止监控
+    dispatch_once(&sObserverOnce, ^{
+        NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+        [nc addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification * _Nonnull note) {
+            if (gDYYYLGTimer) { [gDYYYLGTimer invalidate]; gDYYYLGTimer = nil; }
+        }];
+        [nc addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification * _Nonnull note) {
+            if (DYYYIsLiquidGlassEnabled() && !gDYYYLGTimer) { DYYYStartRealTimeInterfaceMonitoring(); }
+        }];
+        [nc addObserverForName:UIWindowDidResignKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification * _Nonnull note) {
+            if (gDYYYLGTimer) { [gDYYYLGTimer invalidate]; gDYYYLGTimer = nil; }
+        }];
+        [nc addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification * _Nonnull note) {
+            if (DYYYIsLiquidGlassEnabled() && !gDYYYLGTimer) { DYYYStartRealTimeInterfaceMonitoring(); }
+        }];
+        [nc addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification * _Nonnull note) {
             if (!DYYYIsLiquidGlassEnabled()) {
-                [timer invalidate];
-                return;
-            }
-            
-            // 检查界面信息是否发生变化
-            static NSDictionary *lastInterfaceInfo = nil;
-            NSDictionary *currentInfo = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"DYYYInterfaceInfo"];
-            
-            if (![lastInterfaceInfo isEqual:currentInfo]) {
-                lastInterfaceInfo = [currentInfo copy];
-                DYYYCollectDouyinInterfaceInfo();
+                if (gDYYYLGTimer) { [gDYYYLGTimer invalidate]; gDYYYLGTimer = nil; }
+            } else {
+                if (!gDYYYLGTimer) { DYYYStartRealTimeInterfaceMonitoring(); }
             }
         }];
     });
+
+    if (gDYYYLGTimer) return; // 已在运行
+
+    // 创建定时器：每0.5秒检查一次界面变化（主线程 RunLoop）
+    gDYYYLGTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(__kindof NSTimer * _Nonnull timer) {
+        if (!DYYYIsLiquidGlassEnabled()) {
+            DYYYStopLiquidGlassTimerIfNeeded();
+            return;
+        }
+
+        // 在窗口切换等场景下，确保当前 keyWindow 存在再工作
+        if (UIApplication.sharedApplication.keyWindow == nil) {
+            return;
+        }
+
+        // 检查界面信息是否发生变化
+        static NSDictionary *lastInterfaceInfo = nil;
+        NSDictionary *currentInfo = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"DYYYInterfaceInfo"];
+        if (![lastInterfaceInfo isEqual:currentInfo]) {
+            lastInterfaceInfo = [currentInfo copy];
+            DYYYCollectDouyinInterfaceInfo();
+        }
+    }];
 }
 
 // 判断是否应该应用 Liquid Glass
@@ -1070,7 +1108,7 @@ static void DYYYAnimateLiquidGlassChange(UIVisualEffectView *visualEffectView, B
 }
 @end
 
-// Hook 实现 - 简化版本避免启动问题
+// Hook 实现 - 避免启动问题
 %hook UIView
 
 - (void)didMoveToSuperview {
@@ -1083,8 +1121,10 @@ static void DYYYAnimateLiquidGlassChange(UIVisualEffectView *visualEffectView, B
             
             // 只处理标签栏，减少启动负担
             if ([className isEqualToString:@"AWENormalModeTabBar"]) {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [DYYYUtils dispatchAfter:0.5 owner:self block:^{
                     @try {
+                        if (![UIApplication sharedApplication].keyWindow) return;
+                        if (self.window != [UIApplication sharedApplication].keyWindow) return;
                         if (DYYYShouldApplyLiquidGlassWithConflictResolution(self)) {
                             DYYYApplyLiquidGlassToDouyinUI(self);
                             NSLog(@"[DYYY] 为标签栏应用 Liquid Glass 效果");
@@ -1092,7 +1132,7 @@ static void DYYYAnimateLiquidGlassChange(UIVisualEffectView *visualEffectView, B
                     } @catch (NSException *exception) {
                         NSLog(@"[DYYY] 应用 Liquid Glass 时出错: %@", exception.reason);
                     }
-                });
+                }];
             }
         }
     } @catch (NSException *exception) {
@@ -1108,13 +1148,15 @@ static void DYYYAnimateLiquidGlassChange(UIVisualEffectView *visualEffectView, B
         if (DYYYIsLiquidGlassEnabled()) {
             UITraitCollection *currentTraitCollection = self.traitCollection;
             if (currentTraitCollection.userInterfaceStyle != previousTraitCollection.userInterfaceStyle) {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [DYYYUtils dispatchAfter:0.3 owner:self block:^{
                     @try {
+                        if (![UIApplication sharedApplication].keyWindow) return;
+                        if (self.window != [UIApplication sharedApplication].keyWindow) return;
                         [self updateMaterialEffectsForTraitCollection:currentTraitCollection];
                     } @catch (NSException *exception) {
                         NSLog(@"[DYYY] 更新主题效果时出错: %@", exception.reason);
                     }
-                });
+                }];
             }
         }
     } @catch (NSException *exception) {

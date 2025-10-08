@@ -6519,6 +6519,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     
     // 同步显示器刷新率
     CADisplayLink *displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(syncWithDisplayRefresh:)];
+    // 强引用保存，便于退出时失效，避免 self 释放后仍回调
+    objc_setAssociatedObject(self, "dyyy_displayLink_syncWith", displayLink, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (@available(iOS 15.0, *)) {
         displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
     }
@@ -6612,6 +6614,31 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     [scrollView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:NULL];
 }
 
+// 清理新增的 KVO、CADisplayLink 与通知，避免对象释放后仍有主线程回调
+- (void)dealloc {
+    @try {
+        UIView *rootView = self.view;
+        UIScrollView *scrollView = [self findScrollViewInView:rootView];
+        if (scrollView) {
+            @try { [scrollView removeObserver:self forKeyPath:@"contentOffset"]; } @catch (__unused NSException *e) {}
+            CADisplayLink *smoothLink = objc_getAssociatedObject(scrollView, "smoothRenderDisplayLink");
+            if (smoothLink) {
+                [smoothLink invalidate];
+                objc_setAssociatedObject(scrollView, "smoothRenderDisplayLink", nil, OBJC_ASSOCIATION_ASSIGN);
+            }
+        }
+    } @catch (__unused NSException *e) {}
+
+    CADisplayLink *syncLink = objc_getAssociatedObject(self, "dyyy_displayLink_syncWith");
+    if (syncLink) {
+        [syncLink invalidate];
+        objc_setAssociatedObject(self, "dyyy_displayLink_syncWith", nil, OBJC_ASSOCIATION_ASSIGN);
+    }
+
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    %orig;
+}
+
 %new
 - (void)syncWithDisplayRefresh:(CADisplayLink *)displayLink {
     // 获取当前活动菜单
@@ -6653,21 +6680,17 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     CFTimeInterval timeDelta = lastTimestamp == 0 ? 0 : displayLink.timestamp - lastTimestamp;
     lastTimestamp = displayLink.timestamp;
     
-    // 获取scrollView
-    UIScrollView *scrollView = objc_getAssociatedObject(displayLink, "targetScrollView");
-    if (!scrollView) {
-        // 尝试查找scrollView
-        UIViewController *topVC = [DYYYManager getActiveTopController];
-        if (topVC) {
-            UIView *overlayView = [topVC.view viewWithTag:9527];
-            if (overlayView) {
-                scrollView = [self findScrollViewInView:overlayView];
-                if (scrollView) {
-                    objc_setAssociatedObject(displayLink, "targetScrollView", scrollView, OBJC_ASSOCIATION_ASSIGN);
-                }
-            }
+    // 获取 scrollView：避免使用 assign 关联造成悬挂指针，这里每帧安全获取
+    UIScrollView *scrollView = nil;
+    UIViewController *topVC = [DYYYManager getActiveTopController];
+    if (topVC) {
+        UIView *overlayView = [topVC.view viewWithTag:9527];
+        if (overlayView) {
+            scrollView = [self findScrollViewInView:overlayView];
         }
-        if (!scrollView) return;
+    }
+    if (!scrollView || !scrollView.window) {
+        return;
     }
     
     // 动态优化可见区域内的模块

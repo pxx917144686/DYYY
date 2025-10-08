@@ -197,6 +197,18 @@
     return [foundViews copy];
 }
 
+
+// 在主线程安全延迟执行：weak-strong dance，避免 owner 释放后回调继续执行
++ (void)dispatchAfter:(NSTimeInterval)delaySeconds owner:(id)owner block:(dispatch_block_t)block {
+    if (delaySeconds < 0) delaySeconds = 0;
+    __weak id weakOwner = owner;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delaySeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong id strongOwner = weakOwner;
+        if (!strongOwner) return;
+        if (block) block();
+    });
+}
+
 + (void)findSubviewsOfClass:(Class)targetClass inView:(UIView *)view result:(NSMutableArray<UIView *> *)result {
     if ([view isKindOfClass:targetClass]) {
         [result addObject:view];

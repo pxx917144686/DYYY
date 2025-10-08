@@ -47,6 +47,11 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (NSArray<UIView *> *)findAllSubviewsOfClass:(Class)targetClass inContainer:(UIView *)container;
 
+/**
+ * 在主线程安全延迟执行：对 owner 进行弱引用，回调时校验 owner 仍存活
+ */
+ + (void)dispatchAfter:(NSTimeInterval)delaySeconds owner:(id)owner block:(dispatch_block_t)block;
+
 @end
 
 #ifdef __cplusplus
