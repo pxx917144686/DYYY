@@ -10,19 +10,16 @@
 🟠 <font color="orange">自由使用、修改、分发</font>
 
 ---
+# [看看 👉 theos](https://theos.dev/docs/)
 
 ### Logos: 文件扩展名
 
 | **扩展名** | **处理顺序**                                                                 |
 |------------|-----------------------------------------------------------------------------|
-| **.x**     | 由 Logos 处理，然后预处理并编译为 Objective-C。                                |
-| **.xm**    | 由 Logos 处理，然后预处理并编译为 Objective-C++。                              |
-| **.xi**    | 先预处理，Logos 再处理结果，然后编译为 Objective-C。                          |
-| **.xmi**   | 先预处理，Logos 再处理结果，然后编译为 Objective-C++。                        |
-
-Logos 本身不关心文件扩展名，无论文件是 Objective-C 还是 Objective-C++
-
-
+| **.x**     | Logos 处理并编译为 Objective-C                               |
+| **.xm**    | Logos 处理并编译为 Objective-C++                            |
+| **.xi**    | 先预处理，Logos 再处理结果，然后编译为 Objective-C                          |
+| **.xmi**   | 先预处理，Logos 再处理结果，然后编译为 Objective-C++                       |
 
 ### Theos: 编译
 
