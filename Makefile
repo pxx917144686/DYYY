@@ -61,9 +61,10 @@ DYYY_FILES = DYYY.xm \
             DYYYUtils.m
 DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm DYYYBlurEffect.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm DYYYBundleHook.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
+DYYY_FILES += DYYYSystemVersionSpoof.xm
 
 # Swift 源文件
-DYYY_FILES += DYYYSwiftUIBridge.swift
+DYYY_FILES += DYYYSwiftUIBridge.swift LiquidGlass.swift LiquidGlassAvailability.swift LiquidGlassUIKitView.swift LiquidGlassKeys.swift LiquidGlassHostIntegration.swift LiquidGlassDebug.swift
 DYYY_FILES += DYYYSDKPatch.m
 
 # 添加 FLEX 源文件

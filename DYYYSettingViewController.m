@@ -1117,6 +1117,7 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                 [DYYYSettingItem itemWithTitle:@"推荐过滤低赞" key:@"DYYYfilterLowLikes" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐过滤文案" key:@"DYYYfilterKeywords" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
                 [DYYYSettingItem itemWithTitle:@"推荐视频时限" key:@"DYYYfiltertimelimit" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭，单位为天"],
+                [DYYYSettingItem itemWithTitle:@"推荐过滤HDR" key:@"DYYYFilterFeedHDR" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"首页全屏+透明" key:@"DYYYisEnableFullScreen" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去除App内更新" key:@"DYYYNoUpdates" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去青少年弹窗" key:@"DYYYHideteenmode" type:DYYYSettingItemTypeSwitch],

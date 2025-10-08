@@ -48,29 +48,7 @@ struct LiquidGlassBridgeView: View {
 
     var body: some View {
         if liquidGlassEnabled {
-            ZStack {
-                // 使用 Apple 官方推荐的 .background(.material) 方法
-                Rectangle()
-                    .background(.ultraThinMaterial) // 官方推荐：超薄材质
-                    .opacity(0.9)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // 动态响应层 - 根据系统主题调整
-                Rectangle()
-                    .background(colorScheme == .dark ? .thickMaterial : .thinMaterial)
-                    .opacity(0.4)
-                    .offset(y: -1)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // 顶部高光效果
-                Rectangle()
-                    .background(.regularMaterial)
-                    .opacity(0.3)
-                    .frame(height: 0.5)
-                    .offset(y: -20)
-                    .blendMode(.overlay)
-            }
-            .compositingGroup() // 优化渲染性能
+            SystemLiquidGlassView()
         } else {
             Color.clear
         }
@@ -101,55 +79,9 @@ struct TabBarLiquidGlassView: View {
     
     var body: some View {
         if liquidGlassEnabled {
-            ZStack {
-                // 使用 Apple 官方推荐的 .background(.material) 方法
-                Rectangle()
-                    .background(.ultraThinMaterial) // 基础材质
-                    .opacity(getBaseOpacity() * renderQuality)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // 动态响应层 - 根据标签栏状态
-                if selectedTabIndex >= 0 && selectedTabIndex < tabBarButtons.count {
-                    Rectangle()
-                        .background(.thinMaterial)
-                        .opacity(0.4)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // 视频播放状态响应层
-                if isVideoPlaying {
-                    Rectangle()
-                        .background(.regularMaterial)
-                        .opacity(0.3)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // 主题适配层 - 使用系统主题响应
-                Rectangle()
-                    .background(colorScheme == .dark ? .thickMaterial : .ultraThinMaterial)
-                    .opacity(0.2)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // DYYY 清屏功能响应层
-                if isClearButtonActive {
-                    Rectangle()
-                        .background(.ultraThinMaterial)
-                        .opacity(0.15 * Double(hiddenElementsCount))
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // DYYY 倍速功能响应层
-                if isSpeedButtonActive && currentPlaybackSpeed != 1.0 {
-                    Rectangle()
-                        .background(.thinMaterial)
-                        .opacity(0.1 * currentPlaybackSpeed)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-            }
-            .compositingGroup() // 优化渲染性能
+            SystemLiquidGlassView()
             .onAppear {
                 updateDouyinInterfaceInfo()
-                adjustRenderQuality()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DYYYInterfaceStateChanged"))) { _ in
                 updateDouyinInterfaceInfo()
@@ -159,20 +91,7 @@ struct TabBarLiquidGlassView: View {
         }
     }
     
-    private func getBaseOpacity() -> Double {
-        // 根据当前状态动态调整基础透明度
-        var opacity: Double = 0.8
-        
-        if isVideoPlaying {
-            opacity *= 0.7 // 视频播放时降低透明度
-        }
-        
-        if currentTheme == "dark" {
-            opacity *= 1.2 // 暗色主题时增加透明度
-        }
-        
-        return min(opacity, 1.0)
-    }
+    private func getBaseOpacity() -> Double { 0.8 }
     
     private func updateDouyinInterfaceInfo() {
         // 从 UserDefaults 读取抖音界面信息
@@ -190,20 +109,6 @@ struct TabBarLiquidGlassView: View {
             isSpeedButtonActive = interfaceInfo["isSpeedButtonActive"] as? Bool ?? false
             currentPlaybackSpeed = interfaceInfo["currentPlaybackSpeed"] as? Double ?? 1.0
             hiddenElementsCount = interfaceInfo["hiddenElementsCount"] as? Int ?? 0
-        }
-    }
-    
-    private func adjustRenderQuality() {
-        // 根据设备性能调整渲染质量
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let memoryGB = Double(totalMemory) / (1024 * 1024 * 1024)
-        
-        if memoryGB >= 6.0 {
-            renderQuality = 1.0 // 高性能设备
-        } else if memoryGB >= 4.0 {
-            renderQuality = 0.8 // 中等性能设备
-        } else {
-            renderQuality = 0.6 // 低性能设备
         }
     }
 }
@@ -238,55 +143,9 @@ struct EnhancedLiquidGlassView: View {
     
     var body: some View {
         if liquidGlassEnabled {
-            ZStack {
-                // 使用 Apple 官方推荐的 .background(.material) 方法
-                Rectangle()
-                    .background(.ultraThinMaterial) // 基础材质
-                    .opacity(getBaseOpacity() * renderQuality)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // 动态响应层 - 根据标签栏状态
-                if selectedTabIndex >= 0 && selectedTabIndex < tabBarButtons.count {
-                    Rectangle()
-                        .background(.thinMaterial)
-                        .opacity(0.4)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // 视频播放状态响应层
-                if isVideoPlaying {
-                    Rectangle()
-                        .background(.regularMaterial)
-                        .opacity(0.3)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // 主题适配层 - 使用系统主题响应
-                Rectangle()
-                    .background(colorScheme == .dark ? .thickMaterial : .ultraThinMaterial)
-                    .opacity(0.2)
-                    .ignoresSafeArea(.all, edges: .bottom)
-                
-                // DYYY 清屏功能响应层
-                if isClearButtonActive {
-                    Rectangle()
-                        .background(.ultraThinMaterial)
-                        .opacity(0.15 * Double(hiddenElementsCount))
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-                
-                // DYYY 倍速功能响应层
-                if isSpeedButtonActive && currentPlaybackSpeed != 1.0 {
-                    Rectangle()
-                        .background(.thinMaterial)
-                        .opacity(0.1 * currentPlaybackSpeed)
-                        .ignoresSafeArea(.all, edges: .bottom)
-                }
-            }
-            .compositingGroup() // 优化渲染性能
+            SystemLiquidGlassView()
             .onAppear {
                 updateDouyinInterfaceInfo()
-                adjustRenderQuality()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DYYYInterfaceStateChanged"))) { _ in
                 updateDouyinInterfaceInfo()
@@ -296,20 +155,7 @@ struct EnhancedLiquidGlassView: View {
         }
     }
     
-    private func getBaseOpacity() -> Double {
-        // 根据当前状态动态调整基础透明度
-        var opacity: Double = 0.8
-        
-        if isVideoPlaying {
-            opacity *= 0.7 // 视频播放时降低透明度
-        }
-        
-        if currentTheme == "dark" {
-            opacity *= 1.2 // 暗色主题时增加透明度
-        }
-        
-        return min(opacity, 1.0)
-    }
+    private func getBaseOpacity() -> Double { 0.8 }
     
     private func updateDouyinInterfaceInfo() {
         // 从 UserDefaults 读取抖音界面信息
@@ -330,17 +176,5 @@ struct EnhancedLiquidGlassView: View {
         }
     }
     
-    private func adjustRenderQuality() {
-        // 根据设备性能调整渲染质量
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let memoryGB = Double(totalMemory) / (1024 * 1024 * 1024)
-        
-        if memoryGB >= 6.0 {
-            renderQuality = 1.0 // 高性能设备
-        } else if memoryGB >= 4.0 {
-            renderQuality = 0.8 // 中等性能设备
-        } else {
-            renderQuality = 0.6 // 低性能设备
-        }
-    }
+    // 移除质量调节，保持严格系统材质
 }

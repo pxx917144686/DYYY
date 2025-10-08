@@ -9,27 +9,32 @@
 
 	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
 	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
-	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
+    BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
+    BOOL skipAllLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYSkipAllLive"];
+	BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYFilterFeedHDR"];
 
 	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
 	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
-	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+    BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+    BOOL shouldFilterAllLive = NO;
 
 	BOOL shouldFilterLowLikes = NO;
 	BOOL shouldFilterKeywords = NO;
 	BOOL shouldFilterTime = NO;
-	BOOL shouldFilterUser = NO;
+    BOOL shouldFilterUser = NO;
+    BOOL shouldFilterHDR = NO;
+    BOOL shouldFilterProp = NO;
 
-	// 获取用户设置的需要过滤的关键词
-	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
+    // 获取用户设置的需要过滤的关键词（兼容大小写键名）
+    NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"] ?: [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterKeywords"];
 	NSArray *keywordsList = nil;
 
 	if (filterKeywords.length > 0) {
 		keywordsList = [filterKeywords componentsSeparatedByString:@","];
 	}
 
-	// 获取需要过滤的用户列表
-	NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterUsers"];
+    // 获取需要过滤的用户列表（兼容大小写键名）
+    NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterUsers"] ?: [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterUsers"];
 
 	// 检查是否需要过滤特定用户
 	if (self.shareRecExtra && filterUsers.length > 0 && self.author) {
@@ -101,9 +106,10 @@
 			}
 		}
 
-		// 过滤视频发布时间
-		long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-		NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+        // 过滤视频发布时间（兼容大小写键名）
+        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+        NSNumber *daysNumber = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfiltertimelimit"] ?: [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterTimeLimit"];
+        NSInteger daysThreshold = [daysNumber respondsToSelector:@selector(integerValue)] ? [daysNumber integerValue] : 0;
 		if (daysThreshold > 0) {
 			NSTimeInterval videoTimestamp = [self.createTime doubleValue];
 			if (videoTimestamp > 0) {
@@ -114,7 +120,54 @@
 			}
 		}
 	}
-	return (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime || shouldFilterUser) ? nil : orig;
+
+	// 检查是否为HDR视频
+	if (filterHDR && self.video && self.video.bitrateModels) {
+		for (id bitrateModel in self.video.bitrateModels) {
+			NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
+			NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+			// 如果hdrType=1且hdrBit=10，则视为HDR视频
+			if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
+				shouldFilterHDR = YES;
+				break;
+			}
+		}
+	}
+
+	// 过滤包含指定拍同款（道具）的视频：读取 DYYYFilterProp，匹配 propName
+	NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterProp"];
+	if (filterProp.length > 0) {
+		NSArray *propKeywordsList = [filterProp componentsSeparatedByString:@","];
+		if (propKeywordsList.count > 0) {
+			id propGuideV2 = [self valueForKey:@"propGuideV2"]; // 运行时访问
+			NSString *propName = nil;
+			@try {
+				propName = [propGuideV2 valueForKey:@"propName"];
+			} @catch (__unused NSException *e) {}
+			if (propName.length > 0) {
+				for (NSString *propKeyword in propKeywordsList) {
+					NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+					if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+						shouldFilterProp = YES;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// 过滤全部直播：当 videoFeedTag == "直播中" 时触发
+	if (skipAllLive) {
+		NSString *videoFeedTag = nil;
+		@try {
+			videoFeedTag = [self valueForKey:@"videoFeedTag"];
+		} @catch (__unused NSException *e) {}
+		if ([videoFeedTag isKindOfClass:[NSString class]] && [videoFeedTag isEqualToString:@"直播中"]) {
+			shouldFilterAllLive = YES;
+		}
+	}
+
+	return (shouldFilterAds || shouldFilterRec || shouldFilterAllLive || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime || shouldFilterUser || shouldFilterHDR || shouldFilterProp) ? nil : orig;
 }
 
 - (id)init {
@@ -123,15 +176,20 @@
 	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
 	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
 	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
+    BOOL skipAllLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYSkipAllLive"];
+	BOOL filterHDR = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYFilterFeedHDR"];
 
 	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
 	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
 	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
+    BOOL shouldFilterAllLive = NO;
 
 	BOOL shouldFilterLowLikes = NO;
 	BOOL shouldFilterKeywords = NO;
 
 	BOOL shouldFilterTime = NO;
+	BOOL shouldFilterHDR = NO;
+    BOOL shouldFilterProp = NO;
 
 	// 获取用户设置的需要过滤的关键词
 	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
@@ -188,9 +246,10 @@
 			}
 		}
 
-		// 过滤视频发布时间
-		long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-		NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
+        // 过滤视频发布时间（兼容大小写键名）
+        long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
+        NSNumber *daysNumber = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfiltertimelimit"] ?: [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterTimeLimit"];
+        NSInteger daysThreshold = [daysNumber respondsToSelector:@selector(integerValue)] ? [daysNumber integerValue] : 0;
 		if (daysThreshold > 0) {
 			NSTimeInterval videoTimestamp = [self.createTime doubleValue];
 			if (videoTimestamp > 0) {
@@ -202,7 +261,53 @@
 		}
 	}
 
-	return (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime) ? nil : orig;
+	// 检查是否为HDR视频
+	if (filterHDR && self.video && self.video.bitrateModels) {
+		for (id bitrateModel in self.video.bitrateModels) {
+			NSNumber *hdrType = [bitrateModel valueForKey:@"hdrType"];
+			NSNumber *hdrBit = [bitrateModel valueForKey:@"hdrBit"];
+			// 如果hdrType=1且hdrBit=10，则视为HDR视频
+			if (hdrType && [hdrType integerValue] == 1 && hdrBit && [hdrBit integerValue] == 10) {
+				shouldFilterHDR = YES;
+				break;
+			}
+		}
+	}
+
+    // 过滤包含指定拍同款（道具）的视频：读取 DYYYFilterProp，匹配 propName
+    NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterProp"];
+    if (filterProp.length > 0) {
+        NSArray *propKeywordsList = [filterProp componentsSeparatedByString:@","];
+        if (propKeywordsList.count > 0) {
+            id propGuideV2 = [self valueForKey:@"propGuideV2"]; // 运行时访问
+            NSString *propName = nil;
+            @try {
+                propName = [propGuideV2 valueForKey:@"propName"];
+            } @catch (__unused NSException *e) {}
+            if (propName.length > 0) {
+                for (NSString *propKeyword in propKeywordsList) {
+                    NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+                        shouldFilterProp = YES;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 过滤全部直播：当 videoFeedTag == "直播中" 时触发
+    if (skipAllLive) {
+        NSString *videoFeedTag = nil;
+        @try {
+            videoFeedTag = [self valueForKey:@"videoFeedTag"];
+        } @catch (__unused NSException *e) {}
+        if ([videoFeedTag isKindOfClass:[NSString class]] && [videoFeedTag isEqualToString:@"直播中"]) {
+            shouldFilterAllLive = YES;
+        }
+    }
+
+    return (shouldFilterAds || shouldFilterRec || shouldFilterAllLive || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime || shouldFilterHDR || shouldFilterProp) ? nil : orig;
 }
 
 - (bool)preventDownload {
