@@ -1,0 +1,12 @@
+Package: com.huami.dyyy
+Name: DYYY
+Version: 2.3-1
+Description: 后续修改作者pxx917144686_遇到问题bug,联系作者
+Homepage: 留空、占位符
+Section: Tweaks
+Depends: firmware (>= 5.0), mobilesubstrate
+Priority: optional
+Maintainer: pxx917144686
+Author: pxx917144686
+Architecture: arm64
+Icon: https://Mieing.Github.io/repo/file/TikTok.png
