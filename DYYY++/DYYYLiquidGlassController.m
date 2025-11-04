@@ -27,7 +27,10 @@
 
 + (void)appWillEnterForeground {
     // 若开关开启，重新启动实时监控
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [defaults boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    BOOL hideBottomBg = [defaults boolForKey:@"DYYYisHiddenBottomBg"];
+    if (enabled && !hideBottomBg) {
         extern void DYYYStartRealTimeInterfaceMonitoring(void);
         DYYYStartRealTimeInterfaceMonitoring();
     }
@@ -38,7 +41,10 @@
 }
 
 + (void)windowDidBecomeKey:(NSNotification *)note {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [defaults boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    BOOL hideBottomBg = [defaults boolForKey:@"DYYYisHiddenBottomBg"];
+    if (enabled && !hideBottomBg) {
         extern void DYYYStartRealTimeInterfaceMonitoring(void);
         DYYYStartRealTimeInterfaceMonitoring();
     }
@@ -80,6 +86,13 @@
 
 // 仅在 iOS 26+ 应用系统原生 Liquid Glass 外观到导航栏/标签栏
 + (void)applySystemAppearanceIfAvailable {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [defaults boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    BOOL hideBottomBg = [defaults boolForKey:@"DYYYisHiddenBottomBg"];
+    // 当隐藏底栏背景或未启用液态玻璃时，跳过系统外观应用
+    if (!(enabled && !hideBottomBg)) {
+        return;
+    }
     if (@available(iOS 26.0, *)) {
         UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
 

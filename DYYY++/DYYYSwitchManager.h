@@ -1,5 +1,8 @@
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+
+// 使用前向声明替代 UIKit 头文件以降低编译依赖
+@class UISwitch;
+@class UITableView;
 
 NS_ASSUME_NONNULL_BEGIN
 

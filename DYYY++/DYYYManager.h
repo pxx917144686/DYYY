@@ -1,4 +1,8 @@
+#if __has_include(<UIKit/UIKit.h>)
 #import <UIKit/UIKit.h>
+#else
+@class UIWindow, UIViewController, UIColor;
+#endif
 #import "AwemeHeaders.h"
 
 // 主题管理类（外部类声明）

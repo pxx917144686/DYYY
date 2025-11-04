@@ -18,7 +18,8 @@ public class LiquidGlassAvailability: NSObject {
     }
 
     @objc public static func shouldActivate() -> Bool {
-        return isSupported() && isEnabled()
+        let hideBottomBg = UserDefaults.standard.bool(forKey: "DYYYisHiddenBottomBg")
+        return isSupported() && isEnabled() && !hideBottomBg
     }
 }
 

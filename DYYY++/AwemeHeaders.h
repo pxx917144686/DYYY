@@ -1,5 +1,25 @@
+#if __has_include(<UIKit/UIKit.h>)
 #import <UIKit/UIKit.h>
+#else
+#import <Foundation/Foundation.h>
+
+#ifndef CGFLOAT_DEFINED
+typedef double CGFloat;
+#define CGFLOAT_DEFINED 1
+#endif
+
+@interface UIView : NSObject @end
+@interface UIViewController : NSObject @end
+@interface UIColor : NSObject @end
+@interface UIFont : NSObject @end
+@interface UIButton : UIView @end
+@interface UILabel : UIView @end
+@interface UITextView : UIView @end
+#endif
+
+#if __has_include(<Photos/Photos.h>)
 #import <Photos/Photos.h>
+#endif
 
 #define DYYYGetBool(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
 #define DYYYGetFloat(key) [[NSUserDefaults standardUserDefaults] floatForKey:key]

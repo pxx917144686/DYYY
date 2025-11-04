@@ -1,7 +1,12 @@
 #import "DYYYSwitchManager.h"
 #import "DYYYManager.h"
+#if __has_include(<UIKit/UIKit.h>)
+#import <UIKit/UIKit.h>
+#else
+@class UISwitch, UITableView, UITableViewCell, UIView;
+#endif
 
-// 前向声明
+// 消除 forward class 错误
 @interface DYYYSettingItem : NSObject
 @property (nonatomic, strong) NSString *title;
 @property (nonatomic, strong) NSString *key;
@@ -42,7 +47,7 @@ static NSLock *settingsLock = nil;
     
     @try {
         // 保存设置值
-        [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:item.key];
+        [[NSUserDefaults standardUserDefaults] setBool:[sender isOn] forKey:item.key];
         [[NSUserDefaults standardUserDefaults] synchronize];
 
         // 处理特殊开关类型
@@ -51,7 +56,7 @@ static NSLock *settingsLock = nil;
         // 互斥逻辑：按钮大/中/小只能选一个
         if (([item.key isEqualToString:@"DYYYCustomAlbumSizeLarge"] ||
              [item.key isEqualToString:@"DYYYCustomAlbumSizeMedium"] ||
-             [item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"]) && sender.isOn) {
+             [item.key isEqualToString:@"DYYYCustomAlbumSizeSmall"]) && [sender isOn]) {
             [self updateMutuallyExclusiveSwitches:section 
                                   excludingItemKey:item.key 
                                          tableView:tableView 
@@ -59,7 +64,7 @@ static NSLock *settingsLock = nil;
         }
 
         // 清屏功能总开关 - 只在从关闭变为打开时自动开启所有子功能
-        if ([item.key isEqualToString:@"DYYYEnableFloatClearButton"] && sender.isOn) {
+        if ([item.key isEqualToString:@"DYYYEnableFloatClearButton"] && [sender isOn]) {
             NSArray<NSString *> *subKeys = @[
                 @"DYYYHideDanmaku",
                 @"DYYYEnabshijianjindu",
@@ -76,22 +81,22 @@ static NSLock *settingsLock = nil;
         }
 
         // 处理功能提示
-        [self showToastForItem:item enabled:sender.isOn];
+        [self showToastForItem:item enabled:[sender isOn]];
 
         // 处理开关依赖关系
         [self updateSwitchDependencies:item.key 
-                             isEnabled:sender.isOn 
+                             isEnabled:[sender isOn] 
                                section:section
                              tableView:tableView 
                       settingSections:settingSections];
 
         // 发送设置变更通知
-        [self postSettingChangeNotification:item.key enabled:sender.isOn];
+        [self postSettingChangeNotification:item.key enabled:[sender isOn]];
 
     } @catch (NSException *exception) {
         NSLog(@"开关切换失败: %@", exception);
         // 恢复开关状态
-        sender.on = !sender.on;
+        [sender setOn:![sender isOn] animated:NO];
     }
 }
 
@@ -104,7 +109,7 @@ static NSLock *settingsLock = nil;
     // 处理属地显示子开关的特殊逻辑
     if ([item.key hasPrefix:@"DYYYisEnableArea"] && ![item.key isEqualToString:@"DYYYisEnableArea"]) {
         BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
-        sender.enabled = parentEnabled;
+        [sender setEnabled:parentEnabled];
         
         NSArray<NSString *> *areaSubKeys = @[
             @"DYYYisEnableAreaProvince",
@@ -125,19 +130,19 @@ static NSLock *settingsLock = nil;
             
             if (anyEnabled && parentEnabled) {
                 [[NSUserDefaults standardUserDefaults] setBool:YES forKey:item.key];
-                sender.on = YES;
+                [sender setOn:YES animated:NO];
             } else {
                 [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-                sender.on = NO;
+                [sender setOn:NO animated:NO];
             }
         } else {
             BOOL isOn = parentEnabled ? [[NSUserDefaults standardUserDefaults] boolForKey:item.key] : NO;
-            sender.on = isOn;
+            [sender setOn:isOn animated:NO];
         }
     }
     
     // 处理日期时间格式的互斥逻辑
-    if ([item.key hasPrefix:@"DYYYDateTimeFormat_"] && sender.isOn) {
+    if ([item.key hasPrefix:@"DYYYDateTimeFormat_"] && [sender isOn]) {
         [self updateDateTimeFormatExclusiveSwitch:section currentKey:item.key tableView:tableView settingSections:settingSections];
         
         // 确保主开关也开启
@@ -147,9 +152,9 @@ static NSLock *settingsLock = nil;
     
     // 处理ABTest功能
     if ([item.key isEqualToString:@"DYYYABTestBlockEnabled"]) {
-        [self handleABTestBlockEnabled:sender.isOn];
+        [self handleABTestBlockEnabled:[sender isOn]];
     } else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
-        [self handleABTestPatchEnabled:sender.isOn];
+        [self handleABTestPatchEnabled:[sender isOn]];
     }
 }
 
@@ -178,10 +183,11 @@ static NSLock *settingsLock = nil;
             // 再更新UI（如果cell可见）
             NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *cellSwitch = (UISwitch *)cell.accessoryView;
-                cellSwitch.on = NO;
-            }
+                id accessoryView = cell ? [cell valueForKey:@"accessoryView"] : nil;
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *cellSwitch = (UISwitch *)accessoryView;
+                    [cellSwitch setOn:NO animated:NO];
+                }
         }
     }
     [defaults synchronize];
@@ -218,9 +224,10 @@ static NSLock *settingsLock = nil;
                 NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
                 UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
                 
-                if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                    UISwitch *switchControl = (UISwitch *)cell.accessoryView;
-                    switchControl.on = enabled;
+                id accessoryView = cell ? [cell valueForKey:@"accessoryView"] : nil;
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *switchControl = (UISwitch *)accessoryView;
+                    [switchControl setOn:enabled animated:NO];
                 }
             }
         }
@@ -281,6 +288,7 @@ static NSLock *settingsLock = nil;
                                tableView:tableView 
                         settingSections:settingSections];
     }
+
     // 处理时间属地显示的子选项
     else if ([key isEqualToString:@"DYYYisEnableArea"]) {
         [self updateAreaSubSwitchesUI:section enabled:enabled tableView:tableView settingSections:settingSections];
@@ -309,6 +317,13 @@ static NSLock *settingsLock = nil;
         ];
         [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled tableView:tableView settingSections:settingSections];
     }
+    // 液态玻璃UI 联动 隐藏底栏背景
+    else if ([key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+        [self syncLinkedSwitch:@"DYYYisHiddenBottomBg"
+                       enabled:enabled
+                      tableView:tableView
+               settingSections:settingSections];
+    }
     // 处理主页自定义总开关
     else if ([key isEqualToString:@"DYYYEnableSocialStatsCustom"]) {
         // 这里不需要更新子开关，因为它们是文本框，不是开关
@@ -316,6 +331,37 @@ static NSLock *settingsLock = nil;
     // 处理视频自定义总开关
     else if ([key isEqualToString:@"DYYYEnableVideoStatsCustom"]) {
         // 这里不需要更新子开关，因为它们是文本框，不是开关
+    }
+}
+
+// 将目标开关与当前开关联动：更新默认值并刷新对应 UI（若 cell 可见）
+- (void)syncLinkedSwitch:(NSString *)targetKey
+                 enabled:(BOOL)enabled
+                tableView:(UITableView *)tableView
+         settingSections:(NSArray<NSArray<DYYYSettingItem *> *> *)settingSections {
+    @try {
+        [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:targetKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+
+        // 遍历所有 section，找到对应的开关并刷新 UI
+        for (NSInteger sec = 0; sec < (NSInteger)settingSections.count; sec++) {
+            NSArray<DYYYSettingItem *> *items = settingSections[sec];
+            for (NSUInteger row = 0; row < items.count; row++) {
+                DYYYSettingItem *item = items[row];
+                if ([item.key isEqualToString:targetKey]) {
+                    NSIndexPath *cellPath = [NSIndexPath indexPathForRow:(NSInteger)row inSection:sec];
+                    UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
+                    id accessoryView = cell ? [cell valueForKey:@"accessoryView"] : nil;
+                    if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                        UISwitch *switchControl = (UISwitch *)accessoryView;
+                        [switchControl setOn:enabled animated:NO];
+                    }
+                    return; // 找到并更新一次即可
+                }
+            }
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"DYYY: syncLinkedSwitch 异常: %@", exception);
     }
 }
 
@@ -368,9 +414,12 @@ static NSLock *settingsLock = nil;
             NSIndexPath *cellPath = [NSIndexPath indexPathForRow:row inSection:section];
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
             
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *switchControl = (UISwitch *)cell.accessoryView;
-                switchControl.on = enabled;
+            if (cell) {
+                id accessoryView = [cell valueForKey:@"accessoryView"];
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *switchControl = (UISwitch *)accessoryView;
+                    [switchControl setOn:enabled animated:NO];
+                }
             }
         }
     }
@@ -390,10 +439,13 @@ static NSLock *settingsLock = nil;
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
             
             // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *mainSwitch = (UISwitch *)cell.accessoryView;
-                BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
-                mainSwitch.on = shouldBeOn;
+            if (cell) {
+                id accessoryView = [cell valueForKey:@"accessoryView"];
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *mainSwitch = (UISwitch *)accessoryView;
+                    BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
+                    [mainSwitch setOn:shouldBeOn animated:NO];
+                }
             }
             break;
         }
@@ -419,9 +471,12 @@ static NSLock *settingsLock = nil;
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
             
             // 添加保护
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                subSwitch.on = enabled;
+            if (cell) {
+                id accessoryView = [cell valueForKey:@"accessoryView"];
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *subSwitch = (UISwitch *)accessoryView;
+                    [subSwitch setOn:enabled animated:NO];
+                }
             }
         }
     }
@@ -444,10 +499,13 @@ static NSLock *settingsLock = nil;
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
             
             // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *mainSwitch = (UISwitch *)cell.accessoryView;
-                BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"];
-                mainSwitch.on = shouldBeOn;
+            if (cell) {
+                id accessoryView = [cell valueForKey:@"accessoryView"];
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *mainSwitch = (UISwitch *)accessoryView;
+                    BOOL shouldBeOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"];
+                    [mainSwitch setOn:shouldBeOn animated:NO];
+                }
             }
             break;
         }
@@ -481,9 +539,12 @@ static NSLock *settingsLock = nil;
             UITableViewCell *cell = [tableView cellForRowAtIndexPath:cellPath];
             
             // 增加nil检查
-            if (cell && [cell.accessoryView isKindOfClass:[UISwitch class]]) {
-                UISwitch *subSwitch = (UISwitch *)cell.accessoryView;
-                subSwitch.on = [item.key isEqualToString:currentKey];
+            if (cell) {
+                id accessoryView = [cell valueForKey:@"accessoryView"];
+                if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
+                    UISwitch *subSwitch = (UISwitch *)accessoryView;
+                    [subSwitch setOn:[item.key isEqualToString:currentKey] animated:NO];
+                }
             }
         }
     }
@@ -538,7 +599,16 @@ static NSLock *settingsLock = nil;
         message = enabled ? @"已启用ABTest补丁模式" : @"已关闭ABTest补丁模式";
     }
     else if ([item.key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-        message = enabled ? @"液态玻璃UI-重启APP生效" : @"液态玻璃UI功能-已关闭";
+        if (enabled) {
+            BOOL hideBottomBg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenBottomBg"];
+            if (hideBottomBg) {
+                message = @"液态玻璃UI-重启APP生效";
+            } else {
+                message = @"液态玻璃UI-重启APP生效";
+            }
+        } else {
+            message = @"液态玻璃UI功能-已关闭";
+        }
     }
     
     if (message) {
@@ -560,6 +630,8 @@ static NSLock *settingsLock = nil;
         @"DYYYHideTabBar",
         @"DYYYHideDanmaku",
         @"DYYYHideSlider",
+        // 隐藏底栏背景联动
+        @"DYYYisHiddenBottomBg",
         // 倍速相关
         @"DYYYEnableFloatSpeedButton",
         @"DYYYSpeedSettings",

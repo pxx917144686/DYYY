@@ -1760,7 +1760,7 @@ static NSLock *downloadCountLock = nil;
     // 背景和分隔线处理
     BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
     BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
-    BOOL liquidGlassEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    BOOL liquidGlassEnabled = ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) && !hideBottomBg;
 
     if (hideBottomBg || enableFullScreen) {
         if (self.skinContainerView) {

@@ -43,11 +43,13 @@ import UIKit
 struct LiquidGlassBridgeView: View {
     @AppStorage("com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck")
     private var liquidGlassEnabled: Bool = false
+    @AppStorage("DYYYisHiddenBottomBg")
+    private var hideBottomBg: Bool = false
     
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        if liquidGlassEnabled {
+        if liquidGlassEnabled && !hideBottomBg {
             SystemLiquidGlassView()
         } else {
             Color.clear
@@ -60,6 +62,8 @@ struct LiquidGlassBridgeView: View {
 struct TabBarLiquidGlassView: View {
     @AppStorage("com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck")
     private var liquidGlassEnabled: Bool = false
+    @AppStorage("DYYYisHiddenBottomBg")
+    private var hideBottomBg: Bool = false
     
     @Environment(\.colorScheme) private var colorScheme
     
@@ -78,7 +82,7 @@ struct TabBarLiquidGlassView: View {
     @State private var hiddenElementsCount: Int = 0
     
     var body: some View {
-        if liquidGlassEnabled {
+        if liquidGlassEnabled && !hideBottomBg {
             SystemLiquidGlassView()
             .onAppear {
                 updateDouyinInterfaceInfo()
@@ -118,6 +122,8 @@ struct TabBarLiquidGlassView: View {
 struct EnhancedLiquidGlassView: View {
     @AppStorage("com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck")
     private var liquidGlassEnabled: Bool = false
+    @AppStorage("DYYYisHiddenBottomBg")
+    private var hideBottomBg: Bool = false
     
     @Environment(\.colorScheme) private var colorScheme
     
@@ -142,7 +148,7 @@ struct EnhancedLiquidGlassView: View {
     @State private var hiddenElementsCount: Int = 0
     
     var body: some View {
-        if liquidGlassEnabled {
+        if liquidGlassEnabled && !hideBottomBg {
             SystemLiquidGlassView()
             .onAppear {
                 updateDouyinInterfaceInfo()

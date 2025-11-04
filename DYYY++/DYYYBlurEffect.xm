@@ -12,7 +12,11 @@
 
 // 统一判断是否启用"液态玻璃UI"
 static inline BOOL DYYYIsLiquidGlassEnabled(void) {
-    return [[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [defaults boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"];
+    BOOL hideBottomBg = [defaults boolForKey:@"DYYYisHiddenBottomBg"];
+    // 当隐藏底栏背景时，不启用液态玻璃效果
+    return enabled && !hideBottomBg;
 }
 
 // 全局定时器与停止函数（供控制器调用）
@@ -142,7 +146,7 @@ static void DYYYStartRealTimeInterfaceMonitoring(void);
     NSLog(@"[DYYY] Liquid Glass 模块初始化开始");
     
     // 检查是否启用 Liquid Glass UI（自动启用 SDK 26 补丁）
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
+    if (DYYYIsLiquidGlassEnabled()) {
         NSLog(@"[DYYY] 检测到 Liquid Glass UI 已启用，自动应用 SDK 26 补丁");
         
         // 应用 Mach-O 二进制修改
