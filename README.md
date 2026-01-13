@@ -1,3 +1,10 @@
+## 大白话： Unlicense 许可证—— 你用、改、卖，都不用跟我打招呼，也不用留任何声明！
+```js
+”社区的核心精神“
+—— 如果每份公开的代码都要附加一堆条条框框，劝退很多人主动分享。
+
+——“代码能用、能被改进” 比 “内容归属” 重要得多。
+```
 
 🔴 <font color="red">遵循 [Unlicense 许可证](https://unlicense.org/#unlicensed-free-software)</font>
 
@@ -5,28 +12,17 @@
 
 🔵 <font color="blue">[早期 UNIX](https://en.wikipedia.org/wiki/History_of_Unix) 是"无限制"的</font>
 
-🟣 <font color="purple">无需保留署名</font>
 
-🟠 <font color="orange">自由使用、修改、分发</font>
 
 ---
-# [看看 👉 theos](https://theos.dev/docs/)
-
-### Logos: 文件扩展名
-
-| **扩展名** | **处理顺序**                                                                 |
-|------------|-----------------------------------------------------------------------------|
-| **.x**     | Logos 处理并编译为 Objective-C                               |
-| **.xm**    | Logos 处理并编译为 Objective-C++                            |
-| **.xi**    | 先预处理，Logos 再处理结果，然后编译为 Objective-C                          |
-| **.xmi**   | 先预处理，Logos 再处理结果，然后编译为 Objective-C++                       |
-
 ### Theos: 编译
+```js
+cd 文件夹（源代码）
 
 make clean && make package
+```
 
-
-
+# [看看 👉 theos](https://theos.dev/docs/)
 
 ```js
 终端执行 克隆 Theos 仓库
@@ -41,6 +37,8 @@ export PATH=$THEOS/bin:$PATH
 
 终端执行  重新 加载配置：
 source ~/.zshrc
+
+----------------------------------------------------------
 
 另一种方法：
 终端执行 打开配置文件 .zshrc
