@@ -117,8 +117,6 @@ NSDictionary *getCurrentABTestData(void) {
 	return currentData;
 }
 
-static NSMutableDictionary *gCaseCache = nil;
-
 %hook AWEABTestManager
 
 // 拦截设置 ABTest 数据的方法

@@ -96,11 +96,6 @@
                        completion:(void (^)(BOOL success, NSURL *fileURL))completion;
 
 /**
- * 根据媒体类型获取友好描述
- */
- + (NSString *)getMediaTypeDescription:(MediaType)mediaType;
-
-/**
  * 下载实况照片
  * @param imageURL 图片URL
  * @param videoURL 视频URL
@@ -155,14 +150,6 @@
  */
 + (void)parseAndDownloadVideoWithShareLink:(NSString *)shareLink 
                                     apiKey:(NSString *)apiKey;
-
-/**
- * 批量下载视频和图片资源
- * @param videos 视频资源数组
- * @param images 图片资源数组
- */
-+ (void)batchDownloadResources:(NSArray *)videos 
-                        images:(NSArray *)images;
 
 /**
  * 从多种媒体源创建视频

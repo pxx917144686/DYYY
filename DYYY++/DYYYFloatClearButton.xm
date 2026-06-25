@@ -127,12 +127,6 @@ static void forceResetAllUIElements(void) {
 		}
 	}
 }
-static void reapplyHidingToAllElements(HideUIButton *button) {
-	if (!button || !button.isElementsHidden)
-		return;
-	[button hideUIElements];
-}
-
 // 实现浮动按钮的创建和配置逻辑
 static void setupFloatClearButton(void) {
     BOOL isEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFloatClearButton"];

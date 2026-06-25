@@ -16,6 +16,13 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (UIViewController *)topView;
 
+/**
+ * 从指定视图沿 responder 链查找最近的 UIViewController
+ * @param view 起始视图
+ * @return 找到的视图控制器，未找到返回 nil
+ */
++ (UIViewController *)findViewControllerFromView:(UIView *)view;
+
 + (NSUInteger)clearDirectoryContents:(NSString *)directoryPath;
 
 /**
@@ -64,12 +71,6 @@ extern "C" {
  * @return 清理后的URL字符串
  */
 NSString * _Nullable cleanShareURL(NSString * _Nullable url);
-
-/**
- * 获取当前显示的顶层视图控制器
- * @return 顶层视图控制器
- */
-UIViewController * _Nullable topView(void);
 
 #ifdef __cplusplus
 }

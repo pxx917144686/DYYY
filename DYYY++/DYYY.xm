@@ -16,8 +16,6 @@
 #import "DYYYManager.h"
 #import "DYYYSettingViewController.h"
 
-// 前向声明 SwiftUI 注入函数
-extern void DYYYInjectSwiftUIToTabBar(AWENormalModeTabBar *tabBar);
 #import "DYYYToast.h"
 #import "DYYYBottomAlertView.h"
 #import "DYYYConfirmCloseView.h"
@@ -118,11 +116,6 @@ extern FloatingSpeedButton *speedButton;
 
 @interface AWELiveAutoEnterStyleAView : UIView
 @end
-
-#define DYYY_IGNORE_GLOBAL_ALPHA_TAG 8888
-static NSMutableSet *downloadingURLs = nil;
-static dispatch_queue_t downloadQueue = nil;
-static NSLock *downloadCountLock = nil;
 
 @interface CityManager (DYYYExt)
 - (NSString *)generateRandomFourLevelAddressForCityCode:(NSString *)cityCode;
@@ -291,7 +284,7 @@ static NSLock *downloadCountLock = nil;
 - (void)layoutSubviews {
 	%orig;
 
-	UIViewController *vc = [self firstAvailableUIViewController];
+	UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
 
 	if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
 		if (self.markLabel) {
@@ -415,7 +408,10 @@ static NSLock *downloadCountLock = nil;
 - (void)closeSettings:(UIButton *)button {
 	[button.superview.window.rootViewController dismissViewControllerAnimated:YES completion:nil];
 }
+
+
 %end
+
 %end
 
 %hook AWEFeedLiveMarkView
@@ -621,7 +617,7 @@ static NSLock *downloadCountLock = nil;
         return;
     }
 
-    UIViewController *vc = [self firstAvailableUIViewController];
+    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
     if ([vc isKindOfClass:%c(AWEAwemePlayVideoViewController)]) {
 
         if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && frame.origin.x != 0) {
@@ -646,19 +642,8 @@ static NSLock *downloadCountLock = nil;
     %orig;
 }
 
-%new
-- (UIViewController *)yy_viewController {
-    UIResponder *responder = self;
-    while ((responder = [responder nextResponder])) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return (UIViewController *)responder;
-        }
-    }
-    return nil;
-}
-
 - (void)setAlpha:(CGFloat)alpha {
-    UIViewController *vc = [self firstAvailableUIViewController];
+    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
     
     if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
         NSString *transparentValue = [[NSUserDefaults standardUserDefaults] stringForKey:@"DYYYGlobalTransparency"];
@@ -671,18 +656,6 @@ static NSLock *downloadCountLock = nil;
         }
     }
     %orig;
-}
-
-%new
-- (UIViewController *)firstAvailableUIViewController {
-    UIResponder *responder = [self nextResponder];
-    while (responder != nil) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return (UIViewController *)responder;
-        }
-        responder = [responder nextResponder];
-    }
-    return nil;
 }
 
 %end
@@ -1155,6 +1128,10 @@ static NSLock *downloadCountLock = nil;
 }
 %end
 
+// 前向声明：%new 方法编译时可见性
+@interface AWEAwemeModel (DYYYFilterPrivate)
+- (BOOL)shouldFilterAweme;
+@end
 
 %hook AWEAwemeModel
 
@@ -1181,9 +1158,8 @@ static NSLock *downloadCountLock = nil;
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"] ? nil : %orig;
 }
 
-- (id)initWithDictionary:(id)arg1 error:(id *)arg2 {
-	id orig = %orig;
-
+%new
+- (BOOL)shouldFilterAweme {
 	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
 	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
 	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
@@ -1194,7 +1170,6 @@ static NSLock *downloadCountLock = nil;
 
 	BOOL shouldFilterLowLikes = NO;
 	BOOL shouldFilterKeywords = NO;
-
 	BOOL shouldFilterTime = NO;
 
 	// 获取用户设置的需要过滤的关键词
@@ -1265,95 +1240,18 @@ static NSLock *downloadCountLock = nil;
 			}
 		}
 	}
-	return (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime) ? nil : orig;
+
+	return shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime;
+}
+
+- (id)initWithDictionary:(id)arg1 error:(id *)arg2 {
+	id orig = %orig;
+	return [self shouldFilterAweme] ? nil : orig;
 }
 
 - (id)init {
 	id orig = %orig;
-
-	BOOL noAds = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYNoAds"];
-	BOOL skipLive = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipLive"];
-	BOOL skipHotSpot = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisSkipHotSpot"];
-
-	BOOL shouldFilterAds = noAds && (self.hotSpotLynxCardModel || self.isAds);
-	BOOL shouldFilterRec = skipLive && (self.liveReason != nil);
-	BOOL shouldFilterHotSpot = skipHotSpot && self.hotSpotLynxCardModel;
-
-	BOOL shouldFilterLowLikes = NO;
-	BOOL shouldFilterKeywords = NO;
-
-	BOOL shouldFilterTime = NO;
-
-	// 获取用户设置的需要过滤的关键词
-	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
-	NSArray *keywordsList = nil;
-
-	if (filterKeywords.length > 0) {
-		keywordsList = [filterKeywords componentsSeparatedByString:@","];
-	}
-
-	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
-
-	// 只有当shareRecExtra不为空时才过滤
-	if (self.shareRecExtra && ![self.shareRecExtra isEqual:@""]) {
-		// 过滤低点赞量视频
-		if (filterLowLikesThreshold > 0) {
-			AWESearchAwemeExtraModel *searchExtraModel = [self searchExtraModel];
-			if (!searchExtraModel) {
-				AWEAwemeStatisticsModel *statistics = self.statistics;
-				if (statistics && statistics.diggCount) {
-					shouldFilterLowLikes = statistics.diggCount.integerValue < filterLowLikesThreshold;
-				}
-			}
-		}
-
-		// 过滤包含特定关键词的视频
-		if (keywordsList.count > 0) {
-			// 检查视频标题
-			if (self.itemTitle.length > 0) {
-				for (NSString *keyword in keywordsList) {
-					NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-					if (trimmedKeyword.length > 0 && [self.itemTitle containsString:trimmedKeyword]) {
-						shouldFilterKeywords = YES;
-						break;
-					}
-				}
-			}
-
-			// 如果标题中没有关键词，检查标签(textExtras)
-			if (!shouldFilterKeywords && self.textExtras.count > 0) {
-				for (AWEAwemeTextExtraModel *textExtra in self.textExtras) {
-					NSString *hashtagName = textExtra.hashtagName;
-					if (hashtagName.length > 0) {
-						for (NSString *keyword in keywordsList) {
-							NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-							if (trimmedKeyword.length > 0 && [hashtagName containsString:trimmedKeyword]) {
-								shouldFilterKeywords = YES;
-								break;
-							}
-						}
-						if (shouldFilterKeywords)
-							break;
-					}
-				}
-			}
-		}
-
-		// 过滤视频发布时间
-		long long currentTimestamp = (long long)[[NSDate date] timeIntervalSince1970];
-		NSInteger daysThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfiltertimelimit"];
-		if (daysThreshold > 0) {
-			NSTimeInterval videoTimestamp = [self.createTime doubleValue];
-			if (videoTimestamp > 0) {
-				NSTimeInterval threshold = daysThreshold * 86400.0;
-				NSTimeInterval current = (NSTimeInterval)currentTimestamp;
-				NSTimeInterval timeDifference = current - videoTimestamp;
-				shouldFilterTime = (timeDifference > threshold);
-			}
-		}
-	}
-
-	return (shouldFilterAds || shouldFilterRec || shouldFilterHotSpot || shouldFilterLowLikes || shouldFilterKeywords || shouldFilterTime) ? nil : orig;
+	return [self shouldFilterAweme] ? nil : orig;
 }
 
 - (bool)preventDownload {
@@ -1628,15 +1526,6 @@ static NSLock *downloadCountLock = nil;
 - (void)layoutSubviews {
     %orig;
     
-    // 注入 SwiftUI 渲染管线到底部标签栏
-    if (@available(iOS 15.0, *)) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                DYYYInjectSwiftUIToTabBar(self);
-            });
-        }
-    }
-
     if (originalTabHeight == 0 && self.frame.size.height > 30) {
         originalTabHeight = self.frame.size.height;
     }
@@ -1760,7 +1649,6 @@ static NSLock *downloadCountLock = nil;
     // 背景和分隔线处理
     BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
     BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
-    BOOL liquidGlassEnabled = ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) && !hideBottomBg;
 
     if (hideBottomBg || enableFullScreen) {
         if (self.skinContainerView) {
@@ -1769,35 +1657,6 @@ static NSLock *downloadCountLock = nil;
     } else {
         if (self.skinContainerView) {
             self.skinContainerView.hidden = NO;
-        }
-    }
-    
-    // 液态玻璃UI背景处理：当启用液态玻璃时，调整背景透明度
-    if (@available(iOS 15.0, *)) {
-        if (liquidGlassEnabled) {
-            // 查找背景视图并调整透明度以配合 SwiftUI 效果
-            UIView *backgroundView = nil;
-            for (UIView *subview in self.subviews) {
-                if ([subview class] == [UIView class]) {
-                    BOOL hasImageView = NO;
-                    for (UIView *childView in subview.subviews) {
-                        if ([childView isKindOfClass:[UIImageView class]]) {
-                            hasImageView = YES;
-                            break;
-                        }
-                    }
-                    if (hasImageView) {
-                        backgroundView = subview;
-                        break;
-                    }
-                }
-            }
-            
-            if (backgroundView) {
-                // 设置背景为半透明，让 SwiftUI 液态玻璃效果透出
-                backgroundView.alpha = 0.3;
-                backgroundView.backgroundColor = [UIColor clearColor];
-            }
         }
     }
 
@@ -1885,35 +1744,21 @@ static NSLock *downloadCountLock = nil;
     }
 }
 
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    %orig(previousTraitCollection);
+}
+
 %end
 
 // Hook 标签按钮状态变化，为 SwiftUI 提供状态响应
 %hook AWENormalModeTabBarGeneralButton
 
+- (void)layoutSubviews {
+    %orig;
+}
+
 - (void)setStatus:(NSInteger)status {
     %orig(status);
-    
-    // 标签按钮状态改变时，更新 SwiftUI 效果
-    if (@available(iOS 15.0, *)) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                // 查找父标签栏并更新 SwiftUI 效果
-                UIView *parentView = self.superview;
-                while (parentView && ![parentView isKindOfClass:NSClassFromString(@"AWENormalModeTabBar")]) {
-                    parentView = parentView.superview;
-                }
-                if (parentView) {
-                    AWENormalModeTabBar *tabBar = (AWENormalModeTabBar *)parentView;
-                    // 重新注入 SwiftUI 以响应状态变化
-                    UIView *existingSwiftUI = [tabBar viewWithTag:987658];
-                    if (existingSwiftUI) {
-                        [existingSwiftUI removeFromSuperview];
-                    }
-                    DYYYInjectSwiftUIToTabBar(tabBar);
-                }
-            });
-        }
-    }
 }
 
 %end
@@ -5035,15 +4880,6 @@ static BOOL isIncognitoModeActive() {
 	
 	// 设置默认启用表情包下载功能
 	[[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYForceDownloadEmotion"];
-	
-	// 初始化防重复下载集合
-	downloadingURLs = [NSMutableSet new];
-	
-	// 创建专用的串行下载队列
-	downloadQueue = dispatch_queue_create("com.dyyy.sticker.download_queue", DISPATCH_QUEUE_SERIAL);
-	
-	// 创建下载计数锁
-	downloadCountLock = [[NSLock alloc] init];
 	
 	// 表情保存菜单钩子组
 	%init(EnableStickerSaveMenu);

@@ -317,13 +317,6 @@ static NSLock *settingsLock = nil;
         ];
         [self updateSubSwitchesInSection:section withKeys:subKeys enabled:enabled tableView:tableView settingSections:settingSections];
     }
-    // 液态玻璃UI 联动 隐藏底栏背景
-    else if ([key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-        [self syncLinkedSwitch:@"DYYYisHiddenBottomBg"
-                       enabled:enabled
-                      tableView:tableView
-               settingSections:settingSections];
-    }
     // 处理主页自定义总开关
     else if ([key isEqualToString:@"DYYYEnableSocialStatsCustom"]) {
         // 这里不需要更新子开关，因为它们是文本框，不是开关
@@ -597,18 +590,6 @@ static NSLock *settingsLock = nil;
     }
     else if ([item.key isEqualToString:@"DYYYABTestPatchEnabled"]) {
         message = enabled ? @"已启用ABTest补丁模式" : @"已关闭ABTest补丁模式";
-    }
-    else if ([item.key isEqualToString:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck"]) {
-        if (enabled) {
-            BOOL hideBottomBg = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenBottomBg"];
-            if (hideBottomBg) {
-                message = @"液态玻璃UI-重启APP生效";
-            } else {
-                message = @"液态玻璃UI-重启APP生效";
-            }
-        } else {
-            message = @"液态玻璃UI功能-已关闭";
-        }
     }
     
     if (message) {

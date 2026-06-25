@@ -103,9 +103,6 @@
     }
 }
 
-static CGFloat leftLabelLeftMargin = -1;
-static CGFloat rightLabelRightMargin = -1;
-
 - (void)setLimitUpperActionArea:(BOOL)arg1 {
     %orig;
 

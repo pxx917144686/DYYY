@@ -619,19 +619,6 @@
 
 @end
 
-// UIView 快照扩展
-@implementation UIView (DYYYSnapshot)
-
-- (UIImage *)dyyy_snapshotImage {
-    UIGraphicsBeginImageContextWithOptions(self.bounds.size, NO, [UIScreen mainScreen].scale);
-    [self drawViewHierarchyInRect:self.bounds afterScreenUpdates:NO];
-    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    return image;
-}
-
-@end
-
 // 添加长按面板相关的方法
 @implementation DYYYPipManager (LongPressPanel)
 

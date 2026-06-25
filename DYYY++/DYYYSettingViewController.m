@@ -493,167 +493,7 @@ NSDictionary *getCurrentABTestData(void) {
     return currentData;
 }
 
-static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NSString *title, NSString *svgIconName, NSString *saveFilename) {
-    AWESettingItemModel *item = [[NSClassFromString(@"AWESettingItemModel") alloc] init];
-    item.identifier = identifier;
-    item.title = title;
 
-    // 检查图片是否存在，使用saveFilename
-    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
-    NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
-
-    BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
-    item.detail = fileExists ? @"已设置" : @"默认";
-
-    item.type = 0;
-    item.svgIconImageName = svgIconName; // 使用传入的SVG图标名称
-    item.cellType = 26;
-    item.colorStyle = 0;
-    item.isEnable = YES;
-    item.cellTappedBlock = ^{
-        // 创建文件夹（如果不存在）
-        if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {
-            [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
-        }
-
-        UIViewController *topVC = topView();
-
-        // 加载预览图片(如果存在)
-        UIImage *previewImage = nil;
-        if (fileExists) {
-            previewImage = [UIImage imageWithContentsOfFile:imagePath];
-        }
-
-        // 显示选项对话框 - 使用saveFilename作为参数传递
-        showIconOptionsDialog(
-            title, previewImage, saveFilename,
-            ^{
-                // 清除按钮回调
-                if ([[NSFileManager defaultManager] fileExistsAtPath:imagePath]) {
-                    NSError *error = nil;
-                    [[NSFileManager defaultManager] removeItemAtPath:imagePath error:&error];
-                    if (!error) {
-                        item.detail = @"默认";
-
-                        UIViewController *topVC = topView();
-                        AWESettingBaseViewController *settingsVC = nil;
-                        UITableView *tableView = nil;
-
-                        UIView *firstLevelView = [topVC.view.subviews firstObject];
-                        UIView *secondLevelView = [firstLevelView.subviews firstObject];
-                        UIView *thirdLevelView = [secondLevelView.subviews firstObject];
-
-                        UIResponder *responder = thirdLevelView;
-                        while (responder) {
-                            if ([responder isKindOfClass:NSClassFromString(@"AWESettingBaseViewController")]) {
-                                settingsVC = (AWESettingBaseViewController *)responder;
-                                break;
-                            }
-                            responder = [responder nextResponder];
-                        }
-
-                        if (settingsVC) {
-                            for (UIView *subview in settingsVC.view.subviews) {
-                                if ([subview isKindOfClass:[UITableView class]]) {
-                                    tableView = (UITableView *)subview;
-                                    break;
-                                }
-                            }
-
-                            if (tableView) {
-                                [tableView reloadData];
-                            }
-                        }
-                    }
-                }
-            },
-            ^{
-                // 选择按钮回调 - 打开图片选择器
-                UIImagePickerController *picker = [[UIImagePickerController alloc] init];
-                picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-                picker.allowsEditing = NO;
-                picker.mediaTypes = @[ @"public.image" ];
-
-                // 创建并设置代理
-                DYYYImagePickerDelegate *pickerDelegate = [[DYYYImagePickerDelegate alloc] init];
-                pickerDelegate.completionBlock = ^(NSDictionary *info) {
-                    // 1. 正确声明变量，作用域在块内
-                    NSURL *originalImageURL = info[UIImagePickerControllerImageURL];
-                    if (!originalImageURL) {
-                        originalImageURL = info[UIImagePickerControllerReferenceURL];
-                    }
-
-                    // 2. 确保变量在非nil时使用
-                    if (originalImageURL) {
-                        // 路径构建
-                        NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-                        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
-                        NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
-
-                        // 获取原始数据
-                        NSData *imageData = [NSData dataWithContentsOfURL:originalImageURL];
-
-                        // GIF检测（带类型转换）
-                        const char *bytes = (const char *)imageData.bytes;
-                        BOOL isGIF = (imageData.length >= 6 && (memcmp(bytes, "GIF87a", 6) == 0 || memcmp(bytes, "GIF89a", 6) == 0));
-
-                        // 保存逻辑
-                        if (isGIF) {
-                            [imageData writeToFile:imagePath atomically:YES];
-                        } else {
-                            UIImage *selectedImage = [UIImage imageWithData:imageData];
-                            imageData = UIImagePNGRepresentation(selectedImage);
-                            [imageData writeToFile:imagePath atomically:YES];
-                        }
-
-                        // 文件存在时更新UI（在同一个块内）
-                        if ([[NSFileManager defaultManager] fileExistsAtPath:imagePath]) {
-                            item.detail = @"已设置";
-                            dispatch_async(dispatch_get_main_queue(), ^{
-                                UIViewController *topVC = topView();
-                                AWESettingBaseViewController *settingsVC = nil;
-                                UITableView *tableView = nil;
-
-                                UIView *firstLevelView = [topVC.view.subviews firstObject];
-                                UIView *secondLevelView = [firstLevelView.subviews firstObject];
-                                UIView *thirdLevelView = [secondLevelView.subviews firstObject];
-
-                                UIResponder *responder = thirdLevelView;
-                                while (responder) {
-                                    if ([responder isKindOfClass:NSClassFromString(@"AWESettingBaseViewController")]) {
-                                        settingsVC = (AWESettingBaseViewController *)responder;
-                                        break;
-                                    }
-                                    responder = [responder nextResponder];
-                                }
-
-                                if (settingsVC) {
-                                    for (UIView *subview in settingsVC.view.subviews) {
-                                        if ([subview isKindOfClass:[UITableView class]]) {
-                                            tableView = (UITableView *)subview;
-                                            break;
-                                        }
-                                    }
-
-                                    if (tableView) {
-                                        [tableView reloadData];
-                                    }
-                                }
-                            });
-                        }
-                    }
-                };
-
-                static char kDYYYPickerDelegateKey;
-                picker.delegate = pickerDelegate;
-                objc_setAssociatedObject(picker, &kDYYYPickerDelegateKey, pickerDelegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                [topVC presentViewController:picker animated:YES completion:nil];
-            });
-    };
-
-    return item;
-}
 
 @interface DYYYSettingViewController ()
 @end
@@ -1267,7 +1107,6 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
             
                 // 第五部分 - 增强功能
                 @[
-                [DYYYSettingItem itemWithTitle:@"液态玻璃UI(重启APP生效)" key:@"com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"启用新版玻璃面板" key:@"DYYYisEnableModern" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"屏蔽-HDR视频" key:@"DYYYFilterFeedHDR" type:DYYYSettingItemTypeSwitch],            
                 [DYYYSettingItem itemWithTitle:@"启用保存他人头像" key:@"DYYYEnableSaveAvatar" type:DYYYSettingItemTypeSwitch],
@@ -3161,15 +3000,6 @@ static AWESettingItemModel *createIconCustomizationItem(NSString *identifier, NS
                                                           enabled:enabled 
                                                         tableView:self.tableView 
                                                  settingSections:self.settingSections];
-}
-
-// 全局锁来保护设置修改
-static NSLock *settingsLock = nil;
-
-+ (void)initialize {
-    if (self == [DYYYSettingViewController class]) {
-        settingsLock = [[NSLock alloc] init];
-    }
 }
 
 - (void)textFieldDidChange:(UITextField *)textField {

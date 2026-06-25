@@ -38,11 +38,6 @@ typedef void (^DYYYAlertActionHandler)(void);
                             cancelAction:(nullable DYYYAlertActionHandler)cancelAction
                            confirmAction:(nullable DYYYAlertActionHandler)confirmAction;
 
-/**
- * 关闭警告框
- */
-- (void)dismiss;
-
 + (void)showAlertWithTitle:(NSString *)title 
                    message:(NSString *)message 
              confirmButton:(NSString *)confirmButtonTitle 

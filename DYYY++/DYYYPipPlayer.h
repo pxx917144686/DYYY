@@ -49,8 +49,4 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)awemeID;
 @end
 
-@interface UIView (DYYYSnapshot)
-- (UIImage *)dyyy_snapshotImage;
-@end
-
 NS_ASSUME_NONNULL_END

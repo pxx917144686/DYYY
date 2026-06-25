@@ -56,6 +56,18 @@
     return topViewController;
 }
 
++ (UIViewController *)findViewControllerFromView:(UIView *)view {
+    if (!view) return nil;
+    UIResponder *responder = view;
+    while (responder) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            return (UIViewController *)responder;
+        }
+        responder = responder.nextResponder;
+    }
+    return nil;
+}
+
 + (NSUInteger)clearDirectoryContents:(NSString *)directoryPath {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSUInteger totalSize = 0;

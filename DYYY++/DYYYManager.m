@@ -3679,25 +3679,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
     return transform;
 }
 
-// 计算图片的变换（保持原始比例）
-+ (CGAffineTransform)transformForImage:(UIImage *)image targetSize:(CGSize)targetSize {
-    CGSize imageSize = image.size;
-    
-    CGFloat xScale = targetSize.width / imageSize.width;
-    CGFloat yScale = targetSize.height / imageSize.height;
-    CGFloat scale = MIN(xScale, yScale);
-    
-    CGAffineTransform transform = CGAffineTransformIdentity;
-    transform = CGAffineTransformScale(transform, scale, scale);
-    
-    // 居中显示
-    CGFloat xOffset = (targetSize.width - imageSize.width * scale) / 2.0;
-    CGFloat yOffset = (targetSize.height - imageSize.height * scale) / 2.0;
-    transform = CGAffineTransformTranslate(transform, xOffset / scale, yOffset / scale);
-    
-    return transform;
-}
-
 + (UIViewController *)topViewControllerFrom:(UIViewController *)viewController {
     if (!viewController) {
         return nil;
