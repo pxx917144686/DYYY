@@ -9,12 +9,12 @@ PACKAGE_DEPENDS = firmware (>= 14.0), mobilesubstrate
 PACKAGE_DESCRIPTION = DYYY （原作者：huami1314；魔改：pxx917144686）
 
 # 插件：编译时，引用的信息
-define Package/DYYY
+define Package/$(PACKAGE_IDENTIFIER)
   Package: com.huami.dyyy
   Name: DYYY++
   Version: 2.1-7++
   Architecture: iphoneos-arm64 iphoneos-arm64e
-  Author: huami <huami@example.com>
+  Author: pxx917144686
   Section: Tweaks
   Depends: firmware (>= 14.0), mobilesubstrate
 endef
@@ -44,10 +44,10 @@ INSTALL_TARGET_PROCESSES = Aweme
 include $(THEOS)/makefiles/common.mk
 
 # 插件名称
-TWEAK_NAME = DYYY
+TWEAK_NAME = DYYY++
 
 # 源代码文件
-DYYY_FILES = DYYY.xm \
+$(TWEAK_NAME)_FILES = DYYY.xm \
             DYYYFloatSpeedButton.xm \
             DYYYFloatClearButton.xm \
             AWEPlayInteractionViewController.xm \
@@ -59,17 +59,17 @@ DYYY_FILES = DYYY.xm \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
-DYYY_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
-DYYY_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
-DYYY_FILES += DYYYSystemVersionSpoof.xm
+$(TWEAK_NAME)_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
+$(TWEAK_NAME)_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
+$(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
 
 # Swift 源文件
-DYYY_FILES += DYYYSDKPatch.m
+$(TWEAK_NAME)_FILES += DYYYSDKPatch.m
 
 # 添加 FLEX 源文件
 FLEX_FILES := $(shell find FLEX -name '*.m' -o -name '*.mm')
-DYYY_FILES += $(FLEX_FILES) FLEX/flex_fishhook.c
-DYYY_FILES += $(shell find FLEX/x/capstone -name '*.c')
+$(TWEAK_NAME)_FILES += $(FLEX_FILES) FLEX/flex_fishhook.c
+$(TWEAK_NAME)_FILES += $(shell find FLEX/x/capstone -name '*.c')
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
