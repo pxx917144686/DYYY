@@ -171,8 +171,8 @@ static BOOL g_capstoneInitialized = NO;
         UCDisasmInstruction *di = [[UCDisasmInstruction alloc] init];
         di.address = insn->address;
         di.size = insn->size;
-        di.mnemonic = insn->mnemonic ? [NSString stringWithUTF8String:insn->mnemonic] : @"";
-        di.operands = insn->op_str ? [NSString stringWithUTF8String:insn->op_str] : @"";
+        di.mnemonic = [NSString stringWithUTF8String:insn->mnemonic];
+        di.operands = [NSString stringWithUTF8String:insn->op_str];
         di.fullText = [NSString stringWithFormat:@"%@ %@", di.mnemonic, di.operands];
         di.isValid = YES;
         
