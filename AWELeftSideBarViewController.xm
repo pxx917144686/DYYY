@@ -50,6 +50,15 @@
 
 // 用于保存需要保留的单元格信息的字典
 static NSMutableDictionary *keepCellsInfo;
+static dispatch_once_t keepCellsInfoOnceToken;
+
+static void ensureKeepCellsInfoInitialized(void) {
+    dispatch_once(&keepCellsInfoOnceToken, ^{
+        if (!keepCellsInfo) {
+            keepCellsInfo = [NSMutableDictionary dictionary];
+        }
+    });
+}
 
 // 定义需要处理的视图类名常量
 static NSString *const kAWELeftSideBarTopRightLayoutView = @"AWELeftSideBarTopRightLayoutView";
@@ -100,9 +109,7 @@ static void adjustContainerViewLayout(AWELeftSideBarViewController *controller, 
         return;
     }
 
-    if (!keepCellsInfo) {
-        keepCellsInfo = [NSMutableDictionary dictionary];
-    }
+    ensureKeepCellsInfoInitialized();
 }
 
 // 视图消失时清理数据
@@ -113,7 +120,10 @@ static void adjustContainerViewLayout(AWELeftSideBarViewController *controller, 
         return;
     }
 
-    [keepCellsInfo removeAllObjects];
+    ensureKeepCellsInfoInitialized();
+    @synchronized(keepCellsInfo) {
+        [keepCellsInfo removeAllObjects];
+    }
 }
 
 // 自定义集合视图单元格，隐藏不需要的元素
@@ -134,7 +144,10 @@ static void adjustContainerViewLayout(AWELeftSideBarViewController *controller, 
 
         // 记录当前单元格的保留状态
         NSString *key = [NSString stringWithFormat:@"%ld-%ld", (long)indexPath.section, (long)indexPath.row];
-        keepCellsInfo[key] = @(shouldKeep);
+        ensureKeepCellsInfoInitialized();
+        @synchronized(keepCellsInfo) {
+            keepCellsInfo[key] = @(shouldKeep);
+        }
 
         // 处理不需要保留的单元格，将其隐藏并设置大小为零
         if (!shouldKeep) {
@@ -165,7 +178,11 @@ static void adjustContainerViewLayout(AWELeftSideBarViewController *controller, 
 
     // 检查单元格是否应该保留
     NSString *key = [NSString stringWithFormat:@"%ld-%ld", (long)indexPath.section, (long)indexPath.row];
-    NSNumber *shouldKeep = keepCellsInfo[key];
+    ensureKeepCellsInfoInitialized();
+    NSNumber *shouldKeep;
+    @synchronized(keepCellsInfo) {
+        shouldKeep = keepCellsInfo[key];
+    }
 
     // 不需要保留的单元格大小设为零
     if (shouldKeep != nil && ![shouldKeep boolValue]) {
@@ -185,10 +202,13 @@ static void adjustContainerViewLayout(AWELeftSideBarViewController *controller, 
 
     // 检查该分区是否有需要保留的单元格
     BOOL hasKeepCells = NO;
-    for (NSString *key in keepCellsInfo.allKeys) {
-        if ([key hasPrefix:[NSString stringWithFormat:@"%ld-", (long)section]] && [keepCellsInfo[key] boolValue]) {
-            hasKeepCells = YES;
-            break;
+    ensureKeepCellsInfoInitialized();
+    @synchronized(keepCellsInfo) {
+        for (NSString *key in keepCellsInfo.allKeys) {
+            if ([key hasPrefix:[NSString stringWithFormat:@"%ld-", (long)section]] && [keepCellsInfo[key] boolValue]) {
+                hasKeepCells = YES;
+                break;
+            }
         }
     }
 

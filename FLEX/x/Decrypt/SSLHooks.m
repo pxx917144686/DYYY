@@ -13,6 +13,7 @@ extern NSString *HexStringFromBytes(const void *bytes, size_t length);
 static CFDictionaryRef (*orig_CFNetworkCopySystemProxySettings)(void);
 
 CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
+    if (!orig_CFNetworkCopySystemProxySettings) return NULL;
     CFDictionaryRef original = orig_CFNetworkCopySystemProxySettings();
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -65,6 +66,7 @@ void ssl3_kill(void) {
 
 static const char* (*orig_SSL_get_psk_identity)(void *ssl);
 const char* replaced_SSL_get_psk_identity(void *ssl) {
+    if (!orig_SSL_get_psk_identity) return NULL;
     const char* identity = orig_SSL_get_psk_identity(ssl);
     if (identity) {
         NSString *bundleID = CurrentBundleID();

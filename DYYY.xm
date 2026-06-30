@@ -4612,6 +4612,15 @@ static CLLocationManager *locationManager = nil;
 
 // 在全局定义无痕模式状态字典
 static NSMutableDictionary *incognitoStateDict = nil;
+static dispatch_once_t incognitoStateDictOnceToken;
+
+static void ensureIncognitoStateDictInitialized(void) {
+    dispatch_once(&incognitoStateDictOnceToken, ^{
+        if (!incognitoStateDict) {
+            incognitoStateDict = [NSMutableDictionary dictionary];
+        }
+    });
+}
 
 %hook AWETabViewController
 
@@ -4621,16 +4630,16 @@ static NSMutableDictionary *incognitoStateDict = nil;
     %orig;
     
     // 初始化无痕模式状态
-    if (!incognitoStateDict) {
-        incognitoStateDict = [NSMutableDictionary dictionary];
-    }
+    ensureIncognitoStateDictInitialized();
     
     // 检查是否启用无痕模式
     BOOL enableIncognito = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableIncognitoMode"];
     
     // 同步设置无痕模式状态
     self.isIncognitoModeActive = enableIncognito;
-    [incognitoStateDict setObject:@(enableIncognito) forKey:@"isIncognitoActive"];
+    @synchronized(incognitoStateDict) {
+        [incognitoStateDict setObject:@(enableIncognito) forKey:@"isIncognitoActive"];
+    }
     
     // 如果启用了无痕模式，显示提示
     if (enableIncognito) {
@@ -4838,12 +4847,16 @@ static BOOL isIncognitoModeActive() {
 
 %ctor {
 	// 初始化无痕模式状态字典
-	incognitoStateDict = [NSMutableDictionary dictionary];
-	[incognitoStateDict setObject:@(NO) forKey:@"isIncognitoActive"];
+	ensureIncognitoStateDictInitialized();
+	@synchronized(incognitoStateDict) {
+		[incognitoStateDict setObject:@(NO) forKey:@"isIncognitoActive"];
+	}
 	
 	// 检查初始状态
 	BOOL initialState = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableIncognitoMode"];
-	[incognitoStateDict setObject:@(initialState) forKey:@"isIncognitoActive"];
+	@synchronized(incognitoStateDict) {
+		[incognitoStateDict setObject:@(initialState) forKey:@"isIncognitoActive"];
+	}
 	
 	%init;
 	

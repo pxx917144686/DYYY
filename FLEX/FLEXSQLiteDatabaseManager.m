@@ -158,6 +158,7 @@ kQuery(ROWIDS, @"SELECT rowid FROM \"%@\" ORDER BY rowid ASC");
         
         // 绑定参数（如果有）
         if (![self bindParameters:args toStatement:pstmt]) {
+            sqlite3_finalize(pstmt);
             return self.lastResult;
         }
         

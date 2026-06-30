@@ -130,7 +130,9 @@
     });
     IMP didReceiveRemoteNotification = imp_implementationWithBlock(^(id _, id app, NSDictionary *payload, id handler) {
         // TODO: notify when new notifications are added
-        [self.remoteNotifications addObject:payload];
+        @synchronized(_flexAPNSLock) {
+            [self.remoteNotifications addObject:payload];
+        }
         orig(didReceiveRemoteNotification, _, nil, app, payload, handler);
     });
     
@@ -163,7 +165,9 @@
         sel_didReceiveNotification, delegate, void, id, SEL, id, id, id);
     // Our hook (ignores self and other unneeded parameters)
     IMP didReceiveNotification = imp_implementationWithBlock(^(id _, id __, UNNotification *notification, id ___) {
-        [self.userNotifications addObject:notification];
+        @synchronized(_flexAPNSLock) {
+            [self.userNotifications addObject:notification];
+        }
         // This macro is a no-op if there is no original implementation
         orig(didReceiveNotification, _, nil, __, notification, ___);
     });
@@ -178,6 +182,13 @@
 }
 
 #pragma mark Class Properties
+
+static id _flexAPNSLock = nil;
++ (void)initialize {
+    if (self == [FLEXAPNSViewController class]) {
+        _flexAPNSLock = [NSObject new];
+    }
+}
 
 static Class _appDelegateClass = nil;
 + (Class)appDelegateClass {
@@ -221,20 +232,22 @@ static NSError *_apnsRegistrationError = nil;
     _apnsRegistrationError = error;
 }
 
-+ (NSMutableArray<NSDictionary *> *)userNotifications {
++ (NSMutableArray<UNNotification *> *)userNotifications API_AVAILABLE(ios(10.0)) {
     static NSMutableArray *_userNotifications = nil;
-    if (!_userNotifications) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
         _userNotifications = [NSMutableArray new];
-    }
+    });
     
     return _userNotifications;
 }
 
 + (NSMutableArray<NSDictionary *> *)remoteNotifications {
     static NSMutableArray *_remoteNotifications = nil;
-    if (!_remoteNotifications) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
         _remoteNotifications = [NSMutableArray new];
-    }
+    });
     
     return _remoteNotifications;
 }

@@ -1072,27 +1072,12 @@ void RegisterURLInterceptHooks(void) {
         gInterceptQueue = dispatch_queue_create("com.iosnixiangzhushou.urlintercept",
                                                  DISPATCH_QUEUE_SERIAL);
 
-        HookTaskResume();
-
-        Class localSession = NSClassFromString(@"__NSURLSessionLocal");
-        if (localSession) {
-            HookSessionAsyncMethods(localSession);
-            HookUploadMethods(localSession);
-        }
-
-        HookSessionAsyncMethods([NSURLSession class]);
-        HookUploadMethods([NSURLSession class]);
-
         HookNSURLConnectionClassMethods();
 
         RegisterFishhookHooks();
 
-        NSLog(@"[URLIntercept] 全部拦截 hooks 已注册:");
-        NSLog(@"  - resume swizzle (所有 task URL)");
-        NSLog(@"  - __NSURLSessionLocal + NSURLSession (data/download/upload)");
+        NSLog(@"[URLIntercept] 底层拦截 hooks 已注册:");
         NSLog(@"  - NSURLConnection (同步/异步)");
         NSLog(@"  - fishhook (connect/getaddrinfo/CFStream)");
-        NSLog(@"  - KVO task.state (响应状态/头捕获)");
-        NSLog(@"  - Delegate swizzle (委托模式响应 body 累积)");
     });
 }

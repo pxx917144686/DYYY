@@ -335,6 +335,7 @@
                 void * val = malloc(self.signature.methodReturnLength);
                 [self getReturnValue:val forMessageSend:target arguments:args];
                 ret = [NSValue valueWithBytes:val objCType:self.signature.methodReturnType];
+                free(val);
             } else {
                 [self getReturnValue:NULL forMessageSend:target arguments:args];
             }

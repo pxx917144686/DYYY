@@ -100,6 +100,8 @@
     
     // 搜索栏
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    [self.searchBar sizeToFit];
+    self.searchBar.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.searchBar.frame.size.height);
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"搜索指令、地址...";
     self.searchBar.backgroundColor = FLEXColor.primaryBackgroundColor;

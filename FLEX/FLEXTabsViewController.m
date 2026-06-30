@@ -194,7 +194,7 @@
 }
 
 - (void)addTabButtonPressed:(UIBarButtonItem *)sender {
-    if (FLEXBookmarkManager.bookmarks.count) {
+    if (FLEXBookmarkManager.bookmarkCount > 0) {
         [FLEXAlert makeSheet:^(FLEXAlert *make) {
             make.title(@"新标签");
             make.button(@"主菜单").handler(^(NSArray<NSString *> *strings) {

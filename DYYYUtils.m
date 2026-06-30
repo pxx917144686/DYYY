@@ -93,7 +93,11 @@
         NSString *fullPath = [directoryPath stringByAppendingPathComponent:item];
         
         // 获取文件属性
-        NSDictionary<NSFileAttributeKey, id> *attrs = [fileManager attributesOfItemAtPath:fullPath error:nil];
+        NSError *attrError = nil;
+        NSDictionary<NSFileAttributeKey, id> *attrs = [fileManager attributesOfItemAtPath:fullPath error:&attrError];
+        if (!attrs && attrError) {
+            NSLog(@"[DYYYUtils] 获取文件属性失败: %@", attrError);
+        }
         NSUInteger fileSize = attrs ? [attrs fileSize] : 0;
         
         // 判断是文件还是目录

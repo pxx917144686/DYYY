@@ -10,7 +10,20 @@
 #import <malloc/malloc.h>
 #import <mach/mach.h>
 
+static NSMutableSet *leakedObjects = nil;
+static id _flexMemoryAnalyzerLock = nil;
+
 @implementation FLEXMemoryAnalyzer
+
++ (void)initialize {
+    if (self == [FLEXMemoryAnalyzer class]) {
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            leakedObjects = [NSMutableSet set];
+        });
+        _flexMemoryAnalyzerLock = [NSObject new];
+    }
+}
 
 + (instancetype)sharedAnalyzer {
     static FLEXMemoryAnalyzer *analyzer = nil;
@@ -61,13 +74,23 @@
     }
     
     // 检查是否在已知的泄漏对象列表中
-    static NSMutableSet *leakedObjects = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        leakedObjects = [NSMutableSet set];
-    });
-    
-    return [leakedObjects containsObject:object];
+    @synchronized(_flexMemoryAnalyzerLock) {
+        return [leakedObjects containsObject:object];
+    }
+}
+
+- (void)addLeakedObject:(id)object {
+    if (!object) return;
+    @synchronized(_flexMemoryAnalyzerLock) {
+        [leakedObjects addObject:object];
+    }
+}
+
+- (void)removeLeakedObject:(id)object {
+    if (!object) return;
+    @synchronized(_flexMemoryAnalyzerLock) {
+        [leakedObjects removeObject:object];
+    }
 }
 
 - (NSDictionary *)getHeapSnapshot {

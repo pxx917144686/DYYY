@@ -12,6 +12,7 @@
 #import "../Disassembler/UCDisasmViewController.h"
 #import "FLEXColor.h"
 #import "FLEXResources.h"
+#import "FLEXActivityViewController.h"
 #import <objc/runtime.h>
 
 #pragma mark - 头文件详情视图控制器
@@ -71,7 +72,8 @@
     self.navigationItem.rightBarButtonItems = @[share, copy, font];
     
     // 搜索栏 - 放在tableHeaderView位置（这里用textView的inputView不合适，直接放顶部）
-    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectZero];
+    [self.searchBar sizeToFit];
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"搜索头文件内容...";
     self.searchBar.backgroundColor = FLEXColor.primaryBackgroundColor;
@@ -114,17 +116,18 @@
     [super viewDidLayoutSubviews];
     CGFloat width = self.view.bounds.size.width;
     CGFloat height = self.view.bounds.size.height;
+    CGFloat safeTop = self.view.safeAreaInsets.top;
     
     // 更新搜索栏
-    CGRect searchFrame = self.searchBar.frame;
-    searchFrame.size.width = width;
-    self.searchBar.frame = searchFrame;
+    [self.searchBar sizeToFit];
+    CGFloat searchBarHeight = self.searchBar.frame.size.height;
+    self.searchBar.frame = CGRectMake(0, safeTop, width, searchBarHeight);
     
     // 更新加载指示器位置
     self.loadingIndicator.center = CGPointMake(width / 2, height / 2);
     
     // 更新文本视图
-    CGFloat topOffset = 44;
+    CGFloat topOffset = safeTop + searchBarHeight;
     CGRect textFrame = CGRectMake(0, topOffset, width, height - topOffset);
     self.textView.frame = textFrame;
 }
@@ -183,13 +186,15 @@
     
     NSString *fileName = [NSString stringWithFormat:@"%@.h", self.className];
     NSString *tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
-    [self.headerContent writeToFile:tmpPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSError *writeError = nil;
+    BOOL success = [self.headerContent writeToFile:tmpPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+    if (!success) {
+        NSLog(@"Failed to write file: %@", writeError);
+        return;
+    }
     NSURL *fileURL = [NSURL fileURLWithPath:tmpPath];
     
-    UIActivityViewController *activityVC = [[UIActivityViewController alloc]
-        initWithActivityItems:@[fileURL] applicationActivities:nil];
-    
-    activityVC.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    UIViewController *activityVC = [FLEXActivityViewController sharing:@[fileURL] source:self.navigationItem.rightBarButtonItems.firstObject];
     [self presentViewController:activityVC animated:YES completion:nil];
 }
 
@@ -368,7 +373,9 @@
     [self.view addSubview:self.statusLabel];
     
     // 搜索栏
-    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectZero];
+    [self.searchBar sizeToFit];
+    self.searchBar.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.searchBar.frame.size.height);
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"输入类名，如 AppDelegate、ViewController...";
     self.searchBar.backgroundColor = FLEXColor.primaryBackgroundColor;
@@ -619,6 +626,7 @@
 }
 
 - (void)showMethodListForClass:(NSString *)className isClassMethod:(BOOL)isClassMethod {
+    if (className.length == 0) return;
     Class cls = objc_getClass(className.UTF8String);
     if (!cls) {
         UIAlertController *alert = [UIAlertController

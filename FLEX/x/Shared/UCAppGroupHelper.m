@@ -14,7 +14,10 @@ static NSArray<NSString *> *UCProvisioningAppGroupIdentifiers(void) {
     NSUInteger length = NSMaxRange(end) - start.location;
     NSData *plistData = [[text substringWithRange:NSMakeRange(start.location, length)] dataUsingEncoding:NSUTF8StringEncoding];
     NSDictionary *profilePlist = [NSPropertyListSerialization propertyListWithData:plistData options:0 format:nil error:nil];
-    id value = profilePlist[@"Entitlements"][@"com.apple.security.application-groups"];
+    if (![profilePlist isKindOfClass:NSDictionary.class]) return @[];
+    NSDictionary *entitlements = profilePlist[@"Entitlements"];
+    if (![entitlements isKindOfClass:NSDictionary.class]) return @[];
+    id value = entitlements[@"com.apple.security.application-groups"];
     return [value isKindOfClass:NSArray.class] ? value : @[];
 }
 

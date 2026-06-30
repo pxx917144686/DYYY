@@ -50,7 +50,7 @@
 - (void)reloadData {
     // 我们假设书签不会在我们不知情的情况下被改变，因为
     // 通过键盘快捷键呈现的其他工具应该先将我们关闭
-    self.bookmarks = FLEXBookmarkManager.bookmarks;
+    self.bookmarks = FLEXBookmarkManager.allBookmarks;
     self.title = [NSString stringWithFormat:@"书签 (%@)", @(self.bookmarks.count)];
 }
 
@@ -140,7 +140,7 @@
         
         if (selected.count) {
             // 关闭书签并更新数据源
-            [FLEXBookmarkManager.bookmarks removeObjectsAtIndexes:indexes];
+            [FLEXBookmarkManager removeBookmarksAtIndexes:indexes];
             [self reloadData];
             
             // 删除已删除的行
@@ -165,7 +165,7 @@
     NSInteger rowCount = self.bookmarks.count;
     
     // 关闭书签并更新数据源
-    [FLEXBookmarkManager.bookmarks removeAllObjects];
+    [FLEXBookmarkManager removeAllBookmarks];
     [self reloadData];
     
     // 从表视图中删除行
@@ -225,7 +225,7 @@ forRowAtIndexPath:(NSIndexPath *)indexPath {
     NSParameterAssert(edit == UITableViewCellEditingStyleDelete);
     
     // 删除书签并更新数据源
-    [FLEXBookmarkManager.bookmarks removeObjectAtIndex:indexPath.row];
+    [FLEXBookmarkManager removeBookmarkAtIndex:indexPath.row];
     [self reloadData];
     
     // 从表视图中删除行

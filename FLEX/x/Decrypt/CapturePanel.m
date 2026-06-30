@@ -10,6 +10,7 @@
 #import "FLEXResources.h"
 #import "UIBarButtonItem+FLEX.h"
 #import "FLEXHTTPTransactionDetailController.h"
+#import "FLEXActivityViewController.h"
 #import "DatabaseManager.h"
 #import "UCDecryptTool.h"
 
@@ -126,6 +127,14 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     [self.view addSubview:self.textView];
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGFloat topInset = self.view.safeAreaInsets.top;
+    [self.searchBar sizeToFit];
+    self.searchBar.frame = CGRectMake(0, topInset, self.view.bounds.size.width, self.searchBar.frame.size.height);
+    self.textView.frame = CGRectMake(0, topInset + self.searchBar.frame.size.height, self.view.bounds.size.width, self.view.bounds.size.height - topInset - self.searchBar.frame.size.height);
+}
+
 #pragma mark - 操作
 
 - (void)copyAction {
@@ -157,10 +166,11 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)shareAction {
     NSArray *items = @[self.textContent];
-    UIActivityViewController *activityVC = [[UIActivityViewController alloc]
-        initWithActivityItems:items applicationActivities:nil];
-    
-    activityVC.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    UIBarButtonItem *sourceItem = nil;
+    if (self.navigationItem.rightBarButtonItems.count > 0) {
+        sourceItem = self.navigationItem.rightBarButtonItems.firstObject;
+    }
+    UIViewController *activityVC = [FLEXActivityViewController sharing:items source:sourceItem];
     [self presentViewController:activityVC animated:YES completion:nil];
 }
 

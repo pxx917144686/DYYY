@@ -228,7 +228,7 @@
 - (void)shareButtonPressed:(UIBarButtonItem *)sender {
     [FLEXAlert makeSheet:^(FLEXAlert *make) {
         make.button(@"添加到书签").handler(^(NSArray<NSString *> *strings) {
-            [FLEXBookmarkManager.bookmarks addObject:self.object];
+            [FLEXBookmarkManager addBookmark:self.object];
         });
         make.button(@"复制描述").handler(^(NSArray<NSString *> *strings) {
             UIPasteboard.generalPasteboard.string = self.explorer.objectDescription;

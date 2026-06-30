@@ -333,42 +333,49 @@ static void CaptureDigest(const void *data, size_t len, const unsigned char *res
 }
 
 unsigned char* my_CC_MD5(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_MD5) return NULL;
     unsigned char* result = orig_CC_MD5(data, len, md);
     CaptureDigest(data, len, result, CC_MD5_DIGEST_LENGTH, "MD5");
     return result;
 }
 
 unsigned char* my_CC_SHA1(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_SHA1) return NULL;
     unsigned char* result = orig_CC_SHA1(data, len, md);
     CaptureDigest(data, len, result, CC_SHA1_DIGEST_LENGTH, "SHA1");
     return result;
 }
 
 unsigned char* my_CC_SHA256(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_SHA256) return NULL;
     unsigned char* result = orig_CC_SHA256(data, len, md);
     CaptureDigest(data, len, result, CC_SHA256_DIGEST_LENGTH, "SHA256");
     return result;
 }
 
 unsigned char* my_CC_SHA384(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_SHA384) return NULL;
     unsigned char* result = orig_CC_SHA384(data, len, md);
     CaptureDigest(data, len, result, CC_SHA384_DIGEST_LENGTH, "SHA384");
     return result;
 }
 
 unsigned char* my_CC_SHA512(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_SHA512) return NULL;
     unsigned char* result = orig_CC_SHA512(data, len, md);
     CaptureDigest(data, len, result, CC_SHA512_DIGEST_LENGTH, "SHA512");
     return result;
 }
 
 unsigned char* my_CC_SHA224(const void *data, CC_LONG len, unsigned char *md) {
+    if (!orig_CC_SHA224) return NULL;
     unsigned char* result = orig_CC_SHA224(data, len, md);
     CaptureDigest(data, len, result, CC_SHA224_DIGEST_LENGTH, "SHA224");
     return result;
 }
 
 void my_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLen, const void *data, size_t dataLen, void *macOut) {
+    if (!orig_CCHmac) return;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
 
@@ -388,6 +395,7 @@ void my_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLen, const 
 }
 
 CCCryptorStatus my_CCCrypt(CCOperation op, CCAlgorithm alg, CCOptions options, const void *key, size_t keyLen, const void *iv, const void *dataIn, size_t dataInLen, void *dataOut, size_t dataOutAvailable, size_t *dataOutMoved) {
+    if (!orig_CCCrypt) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -447,6 +455,7 @@ CCCryptorStatus my_CCCryptorCreateWithMode(CCOperation op, CCMode mode, CCAlgori
                                            const void *iv, const void *key, size_t keyLen,
                                            const void *tweak, size_t tweakLen, int numRounds,
                                            CCModeOptions options, CCCryptorRef *cryptorRef) {
+    if (!orig_CCCryptorCreateWithMode) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -499,6 +508,7 @@ CCCryptorStatus my_CCCryptorCreateWithMode(CCOperation op, CCMode mode, CCAlgori
 CCCryptorStatus my_CCCryptorCreate(CCOperation op, CCAlgorithm alg, CCOptions options,
                                    const void *key, size_t keyLength, const void *iv,
                                    CCCryptorRef *cryptorRef) {
+    if (!orig_CCCryptorCreate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -547,6 +557,7 @@ CCCryptorStatus my_CCCryptorUpdate(CCCryptorRef cryptorRef,
                                    const void *dataIn, size_t dataInLength,
                                    void *dataOut, size_t dataOutAvailable,
                                    size_t *dataOutMoved) {
+    if (!orig_CCCryptorUpdate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -582,6 +593,7 @@ CCCryptorStatus my_CCCryptorUpdate(CCCryptorRef cryptorRef,
 CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
                                   void *dataOut, size_t dataOutAvailable,
                                   size_t *dataOutMoved) {
+    if (!orig_CCCryptorFinal) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -625,6 +637,7 @@ CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
 }
 
 CCCryptorStatus my_CCCryptorRelease(CCCryptorRef cryptorRef) {
+    if (!orig_CCCryptorRelease) return kCCUnimplemented;
     RemoveCryptorContext(cryptorRef);
     return orig_CCCryptorRelease(cryptorRef);
 }
@@ -902,6 +915,7 @@ NSString *IZXTryAutoDecryptData(NSData *encryptedData, NSString *source) {
 }
 
 OSStatus my_SecKeyEncrypt(SecKeyRef key, SecPadding padding, const uint8_t *plainText, size_t plainTextLen, uint8_t *cipherText, size_t *cipherTextLen) {
+    if (!orig_SecKeyEncrypt) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db getSwitch:@"rsa_encrypt" bundleID:bundleID defaultValue:NO];
@@ -921,6 +935,7 @@ OSStatus my_SecKeyEncrypt(SecKeyRef key, SecPadding padding, const uint8_t *plai
 }
 
 OSStatus my_SecKeyDecrypt(SecKeyRef key, SecPadding padding, const uint8_t *cipherText, size_t cipherTextLen, uint8_t *plainText, size_t *plainTextLen) {
+    if (!orig_SecKeyDecrypt) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db getSwitch:@"rsa_decrypt" bundleID:bundleID defaultValue:NO];
@@ -943,6 +958,7 @@ OSStatus my_SecKeyDecrypt(SecKeyRef key, SecPadding padding, const uint8_t *ciph
 }
 
 OSStatus my_SecKeyRawSign(SecKeyRef key, SecPadding padding, const uint8_t *dataToSign, size_t dataToSignLen, uint8_t *sig, size_t *sigLen) {
+    if (!orig_SecKeyRawSign) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
 
@@ -959,6 +975,7 @@ int my_CCKeyDerivationPBKDF(uint32_t algorithm, const char *password, size_t pas
                              const uint8_t *salt, size_t saltLen,
                              uint32_t prf, uint32_t rounds,
                              uint8_t *derivedKey, size_t derivedKeyLen) {
+    if (!orig_CCKeyDerivationPBKDF) return -1;
     int result = orig_CCKeyDerivationPBKDF(algorithm, password, passwordLen, salt, saltLen, prf, rounds, derivedKey, derivedKeyLen);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1002,6 +1019,7 @@ int my_CCKeyDerivationPBKDF(uint32_t algorithm, const char *password, size_t pas
 }
 
 CFDataRef my_SecKeyCreateDecryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef ciphertext, CFErrorRef *error) {
+    if (!orig_SecKeyCreateDecryptedData) return NULL;
     CFDataRef result = orig_SecKeyCreateDecryptedData(key, algorithm, ciphertext, error);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1028,6 +1046,7 @@ CFDataRef my_SecKeyCreateDecryptedData(SecKeyRef key, SecKeyAlgorithm algorithm,
 }
 
 CFDataRef my_SecKeyCreateEncryptedData(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef plaintext, CFErrorRef *error) {
+    if (!orig_SecKeyCreateEncryptedData) return NULL;
     CFDataRef result = orig_SecKeyCreateEncryptedData(key, algorithm, plaintext, error);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1050,6 +1069,7 @@ CFDataRef my_SecKeyCreateEncryptedData(SecKeyRef key, SecKeyAlgorithm algorithm,
 }
 
 CFDataRef my_SecKeyCreateSignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef dataToSign, CFErrorRef *error) {
+    if (!orig_SecKeyCreateSignature) return NULL;
     CFDataRef result = orig_SecKeyCreateSignature(key, algorithm, dataToSign, error);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1071,6 +1091,7 @@ CFDataRef my_SecKeyCreateSignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFD
 }
 
 Boolean my_SecKeyVerifySignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDataRef signedData, CFDataRef signature, CFErrorRef *error) {
+    if (!orig_SecKeyVerifySignature) return false;
     Boolean result = orig_SecKeyVerifySignature(key, algorithm, signedData, signature, error);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1090,6 +1111,7 @@ Boolean my_SecKeyVerifySignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDat
 }
 
 CCCryptorStatus my_CCCryptorGCMAddIV(CCCryptorRef cryptorRef, const void *iv, size_t ivLen) {
+    if (!orig_CCCryptorGCMAddIV) return kCCUnimplemented;
     CCCryptorStatus status = orig_CCCryptorGCMAddIV(cryptorRef, iv, ivLen);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1112,6 +1134,7 @@ CCCryptorStatus my_CCCryptorGCMAddIV(CCCryptorRef cryptorRef, const void *iv, si
 }
 
 CCCryptorStatus my_CCCryptorGCMAddAAD(CCCryptorRef cryptorRef, const void *aData, size_t aDataLen) {
+    if (!orig_CCCryptorGCMAddAAD) return kCCUnimplemented;
     CCCryptorStatus status = orig_CCCryptorGCMAddAAD(cryptorRef, aData, aDataLen);
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
@@ -1133,6 +1156,7 @@ CCCryptorStatus my_CCCryptorGCMAddAAD(CCCryptorRef cryptorRef, const void *aData
 }
 
 CCCryptorStatus my_CCCryptorGCMUpdate(CCCryptorRef cryptorRef, const void *dataIn, size_t dataInLength, void *dataOut) {
+    if (!orig_CCCryptorGCMUpdate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
@@ -1165,6 +1189,7 @@ CCCryptorStatus my_CCCryptorGCMUpdate(CCCryptorRef cryptorRef, const void *dataI
 }
 
 CCCryptorStatus my_CCCryptorGCMFinal(CCCryptorRef cryptorRef, void *dataOut, void *tagOut, size_t *tagLength) {
+    if (!orig_CCCryptorGCMFinal) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];

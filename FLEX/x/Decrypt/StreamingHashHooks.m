@@ -246,108 +246,127 @@ static void (*orig_CCHmacFinal)(CCHmacContext *ctx, void *macOut);
 #pragma mark - Hook 函数
 
 int my_CC_MD5_Init(CC_MD5_CTX *c) {
+    if (!orig_CC_MD5_Init) return -1;
     int result = orig_CC_MD5_Init(c);
     StoreHashCtx(c, @"MD5", CC_MD5_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_MD5_Update(CC_MD5_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_MD5_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_MD5_Update(c, data, len);
 }
 
 int my_CC_MD5_Final(unsigned char *md, CC_MD5_CTX *c) {
+    if (!orig_CC_MD5_Final) return -1;
     int result = orig_CC_MD5_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CC_SHA1_Init(CC_SHA1_CTX *c) {
+    if (!orig_CC_SHA1_Init) return -1;
     int result = orig_CC_SHA1_Init(c);
     StoreHashCtx(c, @"SHA1", CC_SHA1_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_SHA1_Update(CC_SHA1_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_SHA1_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_SHA1_Update(c, data, len);
 }
 
 int my_CC_SHA1_Final(unsigned char *md, CC_SHA1_CTX *c) {
+    if (!orig_CC_SHA1_Final) return -1;
     int result = orig_CC_SHA1_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CC_SHA256_Init(CC_SHA256_CTX *c) {
+    if (!orig_CC_SHA256_Init) return -1;
     int result = orig_CC_SHA256_Init(c);
     StoreHashCtx(c, @"SHA256", CC_SHA256_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_SHA256_Update(CC_SHA256_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_SHA256_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_SHA256_Update(c, data, len);
 }
 
 int my_CC_SHA256_Final(unsigned char *md, CC_SHA256_CTX *c) {
+    if (!orig_CC_SHA256_Final) return -1;
     int result = orig_CC_SHA256_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CC_SHA512_Init(CC_SHA512_CTX *c) {
+    if (!orig_CC_SHA512_Init) return -1;
     int result = orig_CC_SHA512_Init(c);
     StoreHashCtx(c, @"SHA512", CC_SHA512_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_SHA512_Update(CC_SHA512_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_SHA512_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_SHA512_Update(c, data, len);
 }
 
 int my_CC_SHA512_Final(unsigned char *md, CC_SHA512_CTX *c) {
+    if (!orig_CC_SHA512_Final) return -1;
     int result = orig_CC_SHA512_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CC_SHA224_Init(CC_SHA256_CTX *c) {
+    if (!orig_CC_SHA224_Init) return -1;
     int result = orig_CC_SHA224_Init(c);
     StoreHashCtx(c, @"SHA224", CC_SHA224_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_SHA224_Update(CC_SHA256_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_SHA224_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_SHA224_Update(c, data, len);
 }
 
 int my_CC_SHA224_Final(unsigned char *md, CC_SHA256_CTX *c) {
+    if (!orig_CC_SHA224_Final) return -1;
     int result = orig_CC_SHA224_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CC_SHA384_Init(CC_SHA512_CTX *c) {
+    if (!orig_CC_SHA384_Init) return -1;
     int result = orig_CC_SHA384_Init(c);
     StoreHashCtx(c, @"SHA384", CC_SHA384_DIGEST_LENGTH);
     return result;
 }
 
 int my_CC_SHA384_Update(CC_SHA512_CTX *c, const void *data, CC_LONG len) {
+    if (!orig_CC_SHA384_Update) return -1;
     AppendHashCtx(c, data, len);
     return orig_CC_SHA384_Update(c, data, len);
 }
 
 int my_CC_SHA384_Final(unsigned char *md, CC_SHA512_CTX *c) {
+    if (!orig_CC_SHA384_Final) return -1;
     int result = orig_CC_SHA384_Final(md, c);
     FinalizeHashCtx(c, md);
     return result;
 }
 
 int my_CCDigest(uint32_t algorithm, const void *data, size_t dataLength, void *output) {
+    if (!orig_CCDigest) return -1;
     int result = orig_CCDigest(algorithm, data, dataLength, output);
     NSString *algoName = DigestAlgoName(algorithm);
     NSUInteger digestLen = DigestOutputLen(algorithm);
@@ -377,16 +396,19 @@ int my_CCDigest(uint32_t algorithm, const void *data, size_t dataLength, void *o
 }
 
 void my_CCHmacInit(CCHmacContext *ctx, CCHmacAlgorithm algorithm, const void *key, size_t keyLength) {
+    if (!orig_CCHmacInit) return;
     StoreHMACCtx(ctx, algorithm, key, keyLength);
     orig_CCHmacInit(ctx, algorithm, key, keyLength);
 }
 
 void my_CCHmacUpdate(CCHmacContext *ctx, const void *data, size_t dataLength) {
+    if (!orig_CCHmacUpdate) return;
     AppendHMACCtx(ctx, data, dataLength);
     orig_CCHmacUpdate(ctx, data, dataLength);
 }
 
 void my_CCHmacFinal(CCHmacContext *ctx, void *macOut) {
+    if (!orig_CCHmacFinal) return;
     orig_CCHmacFinal(ctx, macOut);
     FinalizeHMACCtx(ctx, macOut);
 }

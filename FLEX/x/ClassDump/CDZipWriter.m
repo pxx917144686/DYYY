@@ -71,7 +71,11 @@ static NSData *CDCentralHeader(NSData *nameData, uint32_t crc, uint32_t size, ui
 
     NSString *parent = [zipPath stringByDeletingLastPathComponent];
     if (parent.length) {
-        [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:nil];
+        NSError *dirError = nil;
+        BOOL success = [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:&dirError];
+        if (!success && dirError) {
+            NSLog(@"[CDZipWriter] 创建目录失败: %@", dirError);
+        }
     }
 
     [fm removeItemAtPath:zipPath error:nil];

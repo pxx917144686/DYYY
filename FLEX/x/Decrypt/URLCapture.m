@@ -52,7 +52,14 @@ static NSData *CaptureDecompressBody(NSData *data, NSString *contentEncoding) {
         static dispatch_once_t once;
         dispatch_once(&once, ^{
             void *h = dlopen("/System/Library/Frameworks/Compression.framework/Compression", RTLD_LAZY);
-            if (h) p_fn = (compression_decode_buffer_t)dlsym(h, "compression_decode_buffer");
+            if (h) {
+                p_fn = (compression_decode_buffer_t)dlsym(h, "compression_decode_buffer");
+                if (!p_fn) {
+                    NSLog(@"[URLCapture] dlsym加载compression_decode_buffer失败: %s", dlerror());
+                }
+            } else {
+                NSLog(@"[URLCapture] dlopen加载Compression.framework失败: %s", dlerror());
+            }
         });
         if (p_fn) {
             size_t outCap = data.length * 20;
@@ -109,13 +116,16 @@ static BOOL URLCaptureEnabled(void) {
 static NSString *PrettyBodyDescription(NSData *data) {
     if (data.length == 0) return @"(空响应)";
 
-    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSError *jsonError = nil;
+    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
     if (json && [NSJSONSerialization isValidJSONObject:json]) {
         NSData *prettyData = [NSJSONSerialization dataWithJSONObject:json
                                                               options:NSJSONWritingPrettyPrinted
                                                                 error:nil];
         NSString *pretty = [[NSString alloc] initWithData:prettyData encoding:NSUTF8StringEncoding];
         if (pretty) return pretty;
+    } else if (jsonError) {
+        NSLog(@"[URLCapture] JSON解析失败: %@", jsonError);
     }
 
     NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
@@ -177,7 +187,11 @@ static void IZXCollectStringsFromJSON(id obj, NSMutableArray<NSString *> *out) {
 static NSArray<NSData *> *IZXPossibleEncryptedPayloadsFromBody(NSData *body) {
     if (body.length == 0) return @[];
     NSMutableArray<NSData *> *items = [NSMutableArray arrayWithObject:body];
-    id json = [NSJSONSerialization JSONObjectWithData:body options:0 error:nil];
+    NSError *jsonError = nil;
+    id json = [NSJSONSerialization JSONObjectWithData:body options:0 error:&jsonError];
+    if (!json && jsonError) {
+        NSLog(@"[URLCapture] JSON解析失败(候选载荷): %@", jsonError);
+    }
     NSMutableArray<NSString *> *strings = [NSMutableArray array];
     IZXCollectStringsFromJSON(json, strings);
     NSString *plain = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
@@ -253,64 +267,72 @@ static void SaveURLResponse(NSURLRequest *request,
         headers = http.allHeaderFields ?: @{};
     }
 
-    NSString *contentEncoding = headers[@"Content-Encoding"] ?: headers[@"content-encoding"];
-    NSData *displayBody = CaptureDecompressBody(capturedBody, contentEncoding);
-    NSString *decompressNote = @"";
-    if (displayBody != capturedBody && displayBody.length != capturedBody.length) {
-        decompressNote = [NSString stringWithFormat:@"[已解压: %@, %lu → %lu 字节]\n",
-                          contentEncoding ?: @"auto",
-                          (unsigned long)capturedBody.length,
-                          (unsigned long)displayBody.length];
-    }
+    NSString *MIMEType = response.MIMEType;
+    NSString *URLString = URL.absoluteString;
+    NSString *HTTPMethod = request.HTTPMethod;
 
-    NSString *bodyDescription = [decompressNote stringByAppendingString:PrettyBodyDescription(displayBody)];
-    NSString *sourceLine = [NSString stringWithFormat:@"%@ %@", source ?: @"URL", URL.absoluteString ?: @""];
-    NSString *autoDecrypt = IZXAutoDecryptBodyAndFields(displayBody, sourceLine);
-    if (autoDecrypt.length) {
-        bodyDescription = [NSString stringWithFormat:@"%@\n\n%@", bodyDescription ?: @"", autoDecrypt];
-    }
-    NSString *scriptText = [[NSString alloc] initWithData:displayBody encoding:NSUTF8StringEncoding];
-    BOOL mayBeScript = [response.MIMEType.lowercaseString containsString:@"javascript"] ||
-                       [response.MIMEType.lowercaseString containsString:@"text"] ||
-                       [URL.pathExtension.lowercaseString isEqualToString:@"js"] ||
-                       [scriptText rangeOfString:@"eval(" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                       [scriptText rangeOfString:@"_0x" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                       [scriptText rangeOfString:@"jsjiami" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                       [scriptText rangeOfString:@"awsc" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                       [scriptText rangeOfString:@"jjencode" options:NSCaseInsensitiveSearch].location != NSNotFound;
-    if (mayBeScript && scriptText.length > 0) {
-        NSString *scriptDecoded = IZXDecodeScriptText(scriptText, sourceLine);
-        if (scriptDecoded.length) {
-            [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:scriptDecoded];
-            bodyDescription = [NSString stringWithFormat:@"%@\n\n%@", bodyDescription ?: @"", scriptDecoded];
+    dispatch_async(gResponseQueue, ^{
+        @autoreleasepool {
+            NSString *contentEncoding = headers[@"Content-Encoding"] ?: headers[@"content-encoding"];
+            NSData *displayBody = CaptureDecompressBody(capturedBody, contentEncoding);
+            NSString *decompressNote = @"";
+            if (displayBody != capturedBody && displayBody.length != capturedBody.length) {
+                decompressNote = [NSString stringWithFormat:@"[已解压: %@, %lu → %lu 字节]\n",
+                                  contentEncoding ?: @"auto",
+                                  (unsigned long)capturedBody.length,
+                                  (unsigned long)displayBody.length];
+            }
+
+            NSString *bodyDescription = [decompressNote stringByAppendingString:PrettyBodyDescription(displayBody)];
+            NSString *sourceLine = [NSString stringWithFormat:@"%@ %@", source ?: @"URL", URLString ?: @""];
+            NSString *autoDecrypt = IZXAutoDecryptBodyAndFields(displayBody, sourceLine);
+            if (autoDecrypt.length) {
+                bodyDescription = [NSString stringWithFormat:@"%@\n\n%@", bodyDescription ?: @"", autoDecrypt];
+            }
+            NSString *scriptText = [[NSString alloc] initWithData:displayBody encoding:NSUTF8StringEncoding];
+            BOOL mayBeScript = [MIMEType.lowercaseString containsString:@"javascript"] ||
+                               [MIMEType.lowercaseString containsString:@"text"] ||
+                               [URL.pathExtension.lowercaseString isEqualToString:@"js"] ||
+                               [scriptText rangeOfString:@"eval(" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                               [scriptText rangeOfString:@"_0x" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                               [scriptText rangeOfString:@"jsjiami" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                               [scriptText rangeOfString:@"awsc" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                               [scriptText rangeOfString:@"jjencode" options:NSCaseInsensitiveSearch].location != NSNotFound;
+            if (mayBeScript && scriptText.length > 0) {
+                NSString *scriptDecoded = IZXDecodeScriptText(scriptText, sourceLine);
+                if (scriptDecoded.length) {
+                    [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:scriptDecoded];
+                    bodyDescription = [NSString stringWithFormat:@"%@\n\n%@", bodyDescription ?: @"", scriptDecoded];
+                }
+            }
+            NSString *errorLine = error ? [NSString stringWithFormat:@"\nError: %@", error] : @"";
+            NSString *info = [NSString stringWithFormat:
+                              @"[URL Response · %@]\n%@ %@\nStatus: %ld\nMIME: %@\nHeaders: %@\n"
+                               "Length: %lu%@%@\n\nBody:\n%@",
+                              source ?: @"NSURLSession", HTTPMethod ?: @"GET", URLString,
+                              (long)statusCode, MIMEType ?: @"(unknown)", headers,
+                              (unsigned long)originalLength, truncated ? @"（仅保存前 1 MB）" : @"",
+                              errorLine, bodyDescription];
+
+            NSString *bundleID = CurrentBundleID();
+            DatabaseManager *db = [DatabaseManager sharedManager];
+            [db insertDataIntoTable:@"url_responses" bundleID:bundleID text:info];
+            [db insertLogText:[NSString stringWithFormat:@"URL响应已抓取: %ld %@", (long)statusCode, URLString]];
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] postNotificationName:IZXURLResponseCapturedNotification
+                                                                    object:nil
+                                                                  userInfo:@{IZXURLResponseCapturedTextKey: info ?: @""}];
+            });
+
+            if ([URL.scheme.lowercaseString isEqualToString:@"https"]) {
+                NSString *decrypted = [NSString stringWithFormat:@"[HTTPS TLS 解密后响应]\n%@", info];
+                [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:decrypted];
+            }
+            NSLog(@"[URLCapture] %@ %ld (%lu bytes)", URLString,
+                  (long)statusCode, (unsigned long)originalLength);
         }
-    }
-    NSString *errorLine = error ? [NSString stringWithFormat:@"\nError: %@", error] : @"";
-    NSString *info = [NSString stringWithFormat:
-                      @"[URL Response · %@]\n%@ %@\nStatus: %ld\nMIME: %@\nHeaders: %@\n"
-                       "Length: %lu%@%@\n\nBody:\n%@",
-                      source ?: @"NSURLSession", request.HTTPMethod ?: @"GET", URL.absoluteString,
-                      (long)statusCode, response.MIMEType ?: @"(unknown)", headers,
-                      (unsigned long)originalLength, truncated ? @"（仅保存前 1 MB）" : @"",
-                      errorLine, bodyDescription];
-
-    NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
-    [db insertDataIntoTable:@"url_responses" bundleID:bundleID text:info];
-    [db insertLogText:[NSString stringWithFormat:@"URL响应已抓取: %ld %@", (long)statusCode, URL.absoluteString]];
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[NSNotificationCenter defaultCenter] postNotificationName:IZXURLResponseCapturedNotification
-                                                            object:nil
-                                                          userInfo:@{IZXURLResponseCapturedTextKey: info ?: @""}];
     });
-
-    if ([URL.scheme.lowercaseString isEqualToString:@"https"]) {
-        NSString *decrypted = [NSString stringWithFormat:@"[HTTPS TLS 解密后响应]\n%@", info];
-        [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:decrypted];
-    }
-    NSLog(@"[URLCapture] %@ %ld (%lu bytes)", URL.absoluteString,
-          (long)statusCode, (unsigned long)originalLength);
 }
 
 static IMP OriginalIMP(id object, const void *key, IMP wrapper) {
@@ -645,24 +667,17 @@ void RegisterURLResponseHooks(void) {
         HookClassMethod([NSURLSessionConfiguration class], @selector(ephemeralSessionConfiguration),
                         (IMP)HookedEphemeralSessionConfiguration, &kEphemeralConfigOriginalKey, NULL);
 
-        // Hook 基类
         Class baseClass = [NSURLSession class];
         HookNSURLSessionClass(baseClass);
-        
-        // Hook 所有已知的子类
-        HookAllSessionSubclasses();
-        
-        // Hook NSURLSessionTask 的 resume，用于兜底捕获 delegate 模式
+
+        Class localSession = NSClassFromString(@"__NSURLSessionLocal");
+        if (localSession && localSession != baseClass) {
+            HookNSURLSessionClass(localSession);
+        }
+
         Class taskClass = [NSURLSessionTask class];
         HookMethod(taskClass, @selector(resume),
                    (IMP)HookedTaskResume, &kTaskResumeOriginalKey, "v@:", YES);
-        
-        // 延迟再 hook 一次，确保动态加载的类也被覆盖
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            HookAllSessionSubclasses();
-            NSLog(@"[URLCapture] Second pass subclass hook completed");
-        });
 
         NSLog(@"[URLCapture] NSURLSession + NSURLProtocol response hooks registered successfully");
     });

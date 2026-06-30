@@ -168,7 +168,9 @@
     [self hideViewsCoveringView:view doWhileHidden:^{
         image = [self drawView:view];
         CGRect cropRect = [view.window convertRect:view.bounds fromView:view];
-        image = [UIImage imageWithCGImage:CGImageCreateWithImageInRect(image.CGImage, cropRect)];
+        CGImageRef croppedImage = CGImageCreateWithImageInRect(image.CGImage, cropRect);
+        image = [UIImage imageWithCGImage:croppedImage];
+        CFRelease(croppedImage);
     }];
 
     return image;

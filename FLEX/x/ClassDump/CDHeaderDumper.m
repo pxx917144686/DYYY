@@ -233,6 +233,7 @@ static NSString *CDHeaderForClass(Class cls, NSString *imageName) {
         [h appendString:@"\n@end\n"];
         return h;
     } @catch (__unused NSException *e) {
+        NSLog(@"[CDHeaderDumper] Exception: %@", e);
         return nil;
     }
 }
@@ -276,6 +277,7 @@ static NSString *CDProtocolHeader(Protocol *protocol) {
         [h appendString:@"\n@end\n"];
         return h;
     } @catch (__unused NSException *e) {
+        NSLog(@"[CDHeaderDumper] Exception: %@", e);
         return nil;
     }
 }
@@ -393,11 +395,16 @@ static uint32_t _cachedImageCount = 0;
 
                         NSString *pname = CDSafeFileName([NSString stringWithUTF8String:pn]);
                         NSString *path = [protocolsDir stringByAppendingPathComponent:[pname stringByAppendingString:@".h"]];
-                        [ph writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                        NSError *writeError = nil;
+                        BOOL writeOk = [ph writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+                        if (!writeOk) {
+                            NSLog(@"[CDHeaderDumper] 写入文件失败: %@, error: %@", path, writeError);
+                        }
                         [writtenFiles addObject:path];
                     }
                     if (protocols) free(protocols);
                 } @catch (__unused NSException *e) {
+                    NSLog(@"[CDHeaderDumper] Exception: %@", e);
                 }
 
                 progress(0.82, @"正在导出 Swift 类...");
@@ -420,12 +427,20 @@ static uint32_t _cachedImageCount = 0;
                                    NSDate.date];
 
                 NSString *indexPath = [rootDir stringByAppendingPathComponent:@"README.txt"];
-                [index writeToFile:indexPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                NSError *writeError = nil;
+                BOOL writeOk = [index writeToFile:indexPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+                if (!writeOk) {
+                    NSLog(@"[CDHeaderDumper] 写入文件失败: %@, error: %@", indexPath, writeError);
+                }
                 [writtenFiles addObject:indexPath];
 
                 if (writtenFiles.count == 0) {
                     NSString *emptyPath = [rootDir stringByAppendingPathComponent:@"EMPTY.txt"];
-                    [@"没有发现可导出的 ObjC/Swift 符号，但插件运行正常。\n" writeToFile:emptyPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                    NSError *writeError = nil;
+                    BOOL writeOk = [@"没有发现可导出的 ObjC/Swift 符号，但插件运行正常。\n" writeToFile:emptyPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+                    if (!writeOk) {
+                        NSLog(@"[CDHeaderDumper] 写入文件失败: %@, error: %@", emptyPath, writeError);
+                    }
                     [writtenFiles addObject:emptyPath];
                 }
 
@@ -447,7 +462,11 @@ static uint32_t _cachedImageCount = 0;
                     if (!ok || zipError) {
                         NSString *errorPath = [rootDir stringByAppendingPathComponent:@"ZIP_ERROR.txt"];
                         NSString *msg = zipError.localizedDescription ?: @"ZIP失败，未知错误";
-                        [msg writeToFile:errorPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                        NSError *writeError = nil;
+                        BOOL writeOk = [msg writeToFile:errorPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+                        if (!writeOk) {
+                            NSLog(@"[CDHeaderDumper] 写入文件失败: %@, error: %@", errorPath, writeError);
+                        }
                         if (![writtenFiles containsObject:errorPath]) [writtenFiles addObject:errorPath];
 
                         zipError = nil;
@@ -507,10 +526,15 @@ static uint32_t _cachedImageCount = 0;
                             if (header.length) {
                                 NSString *fileName = [CDSafeFileName(className) stringByAppendingString:@".h"];
                                 NSString *path = [imageDir stringByAppendingPathComponent:fileName];
-                                [header writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                                NSError *writeError = nil;
+                                BOOL writeOk = [header writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&writeError];
+                                if (!writeOk) {
+                                    NSLog(@"[CDHeaderDumper] 写入文件失败: %@, error: %@", path, writeError);
+                                }
                                 [writtenFiles addObject:path];
                             }
                         } @catch (__unused NSException *e) {
+                            NSLog(@"[CDHeaderDumper] Exception: %@", e);
                         }
                     }
 

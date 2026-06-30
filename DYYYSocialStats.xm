@@ -11,6 +11,15 @@
 
 #define DYYY_VIDEO_SPECIFIC_STATS_KEY @"DYYYVideoSpecificStats"
 static NSMutableDictionary *videoSpecificStats = nil;
+static dispatch_once_t videoSpecificStatsOnceToken;
+
+static void ensureVideoSpecificStatsInitialized(void) {
+    dispatch_once(&videoSpecificStatsOnceToken, ^{
+        if (!videoSpecificStats) {
+            videoSpecificStats = [NSMutableDictionary dictionary];
+        }
+    });
+}
 
 static void refreshAwemeStatisticsModels(void);
 static void refreshVideoStatsForKeyPath(NSString *keyPath);
@@ -36,12 +45,16 @@ static char BlockDictionaryKey;
 }
 
 static id getCustomStatForVideo(NSString *videoId, NSString *statKey) {
-    if (!videoId || !statKey || !videoSpecificStats) return nil;
+    if (!videoId || !statKey) return nil;
     
-    NSDictionary *videoStats = videoSpecificStats[videoId];
-    if (!videoStats) return nil;
+    ensureVideoSpecificStatsInitialized();
     
-    return videoStats[statKey];
+    @synchronized(videoSpecificStats) {
+        NSDictionary *videoStats = videoSpecificStats[videoId];
+        if (!videoStats) return nil;
+        
+        return videoStats[statKey];
+    }
 }
 
 - (void)forwardInvocation:(NSInvocation *)invocation {
@@ -183,7 +196,10 @@ static void loadCustomSocialStats() {
     }
     
     // 移除特定视频数据加载
-    videoSpecificStats = nil;
+    ensureVideoSpecificStatsInitialized();
+    @synchronized(videoSpecificStats) {
+        [videoSpecificStats removeAllObjects];
+    }
 }
 
 static void findAndRefreshSocialStatsViews(UIView *rootView) {
@@ -478,7 +494,14 @@ void showVideoStatsContextMenu(UIViewController *viewController) {
 
 // 显示已修改视频列表的控制器
 void showVideoStatsListController(UIViewController *parentVC) {
-    if (!videoSpecificStats || [videoSpecificStats count] == 0) {
+    ensureVideoSpecificStatsInitialized();
+    
+    NSUInteger statsCount;
+    @synchronized(videoSpecificStats) {
+        statsCount = [videoSpecificStats count];
+    }
+    
+    if (statsCount == 0) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"没有数据" 
                                                                       message:@"尚未对任何特定视频进行数据修改" 
                                                                preferredStyle:UIAlertControllerStyleAlert];
@@ -491,7 +514,10 @@ void showVideoStatsListController(UIViewController *parentVC) {
     listVC.title = @"已修改视频列表";
     
     // 获取所有已修改视频的ID
-    NSArray *videoIds = [videoSpecificStats allKeys];
+    NSArray *videoIds;
+    @synchronized(videoSpecificStats) {
+        videoIds = [videoSpecificStats allKeys];
+    }
     
     // 自定义显示数据
     listVC.tableView.dataSource = [[NSObject alloc] initWithDictionary:@{
@@ -507,7 +533,10 @@ void showVideoStatsListController(UIViewController *parentVC) {
             }
             
             NSString *videoId = videoIds[indexPath.row];
-            NSDictionary *stats = videoSpecificStats[videoId];
+            NSDictionary *stats;
+            @synchronized(videoSpecificStats) {
+                stats = videoSpecificStats[videoId];
+            }
             
             cell.textLabel.text = [NSString stringWithFormat:@"视频ID: %@", videoId];
             
@@ -560,17 +589,25 @@ void showVideoStatsListController(UIViewController *parentVC) {
                                                                 style:UIAlertActionStyleDestructive 
                                                               handler:^(UIAlertAction *action) {
                     // 删除该视频的自定义数据
-                    [videoSpecificStats removeObjectForKey:videoId];
+                    @synchronized(videoSpecificStats) {
+                        [videoSpecificStats removeObjectForKey:videoId];
+                    }
                     
                     // 保存更新后的数据
                     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-                    [defaults setObject:videoSpecificStats forKey:DYYY_VIDEO_SPECIFIC_STATS_KEY];
+                    @synchronized(videoSpecificStats) {
+                        [defaults setObject:videoSpecificStats forKey:DYYY_VIDEO_SPECIFIC_STATS_KEY];
+                    }
                     [defaults synchronize];
                     
                     // 刷新列表
                     [listVC dismissViewControllerAnimated:YES completion:^{
                         // 如果列表为空，直接返回
-                        if ([videoSpecificStats count] == 0) {
+                        NSUInteger count;
+                        @synchronized(videoSpecificStats) {
+                            count = [videoSpecificStats count];
+                        }
+                        if (count == 0) {
                             return;
                         }
                         // 否则重新显示列表

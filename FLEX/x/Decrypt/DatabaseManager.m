@@ -106,10 +106,19 @@
 
         NSString *sql = [NSString stringWithFormat:@"INSERT INTO %@ (bundleID, longText) VALUES (?, ?)", table];
         sqlite3_stmt *stmt = NULL;
-        if (sqlite3_prepare_v2(self.db, sql.UTF8String, -1, &stmt, NULL) == SQLITE_OK) {
-            sqlite3_bind_text(stmt, 1, bundleID.UTF8String, -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 2, text.UTF8String, -1, SQLITE_TRANSIENT);
-            sqlite3_step(stmt);
+        int rc = sqlite3_prepare_v2(self.db, sql.UTF8String, -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
+            int bind1 = sqlite3_bind_text(stmt, 1, bundleID.UTF8String, -1, SQLITE_TRANSIENT);
+            int bind2 = sqlite3_bind_text(stmt, 2, text.UTF8String, -1, SQLITE_TRANSIENT);
+            if (bind1 != SQLITE_OK || bind2 != SQLITE_OK) {
+                NSLog(@"[DatabaseManager] bind failed for table %@: %s", table, sqlite3_errmsg(self.db));
+            }
+            int step = sqlite3_step(stmt);
+            if (step != SQLITE_DONE) {
+                NSLog(@"[DatabaseManager] insert step failed for table %@: %d (%s)", table, step, sqlite3_errmsg(self.db));
+            }
+        } else {
+            NSLog(@"[DatabaseManager] prepare failed for table %@: %d (%s)", table, rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(stmt);
     });
@@ -221,20 +230,32 @@
         if (![self openDatabase]) return;
 
         sqlite3_stmt *insertStmt = NULL;
-        if (sqlite3_prepare_v2(self.db,
+        int rc = sqlite3_prepare_v2(self.db,
                                "INSERT OR IGNORE INTO kaiguan (bundleID) VALUES (?)",
-                               -1, &insertStmt, NULL) == SQLITE_OK) {
+                               -1, &insertStmt, NULL);
+        if (rc == SQLITE_OK) {
             sqlite3_bind_text(insertStmt, 1, bundleID.UTF8String, -1, SQLITE_TRANSIENT);
-            sqlite3_step(insertStmt);
+            int step = sqlite3_step(insertStmt);
+            if (step != SQLITE_DONE) {
+                NSLog(@"[DatabaseManager] insert switch step failed: %d (%s)", step, sqlite3_errmsg(self.db));
+            }
+        } else {
+            NSLog(@"[DatabaseManager] insert switch prepare failed: %d (%s)", rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(insertStmt);
 
         NSString *sql = [NSString stringWithFormat:@"UPDATE kaiguan SET %@ = ? WHERE bundleID = ?", switchName];
         sqlite3_stmt *stmt = NULL;
-        if (sqlite3_prepare_v2(self.db, sql.UTF8String, -1, &stmt, NULL) == SQLITE_OK) {
+        rc = sqlite3_prepare_v2(self.db, sql.UTF8String, -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
             sqlite3_bind_int(stmt, 1, value ? 1 : 0);
             sqlite3_bind_text(stmt, 2, bundleID.UTF8String, -1, SQLITE_TRANSIENT);
-            sqlite3_step(stmt);
+            int step = sqlite3_step(stmt);
+            if (step != SQLITE_DONE) {
+                NSLog(@"[DatabaseManager] update switch step failed: %d (%s)", step, sqlite3_errmsg(self.db));
+            }
+        } else {
+            NSLog(@"[DatabaseManager] update switch prepare failed: %d (%s)", rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(stmt);
     });
@@ -275,9 +296,15 @@
         if (![self openDatabase]) return;
 
         sqlite3_stmt *stmt = NULL;
-        if (sqlite3_prepare_v2(self.db, "INSERT INTO yunxingrizhi (logText) VALUES (?)", -1, &stmt, NULL) == SQLITE_OK) {
+        int rc = sqlite3_prepare_v2(self.db, "INSERT INTO yunxingrizhi (logText) VALUES (?)", -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
             sqlite3_bind_text(stmt, 1, logText.UTF8String, -1, SQLITE_TRANSIENT);
-            sqlite3_step(stmt);
+            int step = sqlite3_step(stmt);
+            if (step != SQLITE_DONE) {
+                NSLog(@"[DatabaseManager] insert log step failed: %d (%s)", step, sqlite3_errmsg(self.db));
+            }
+        } else {
+            NSLog(@"[DatabaseManager] insert log prepare failed: %d (%s)", rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(stmt);
     });

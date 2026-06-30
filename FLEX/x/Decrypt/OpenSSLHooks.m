@@ -70,6 +70,8 @@ static NSString *PtrKey(const void *ptr) {
 }
 
 static void UpdateEVPCtx(const void *ctx, const void *cipher, const unsigned char *key, const unsigned char *iv, int enc) {
+    if (!ctx) return;
+
     @synchronized (EVPCtxMap()) {
         NSMutableDictionary *entry = EVPCtxMap()[PtrKey(ctx)];
         if (!entry) {
@@ -85,21 +87,23 @@ static void UpdateEVPCtx(const void *ctx, const void *cipher, const unsigned cha
             entry[@"ivLen"] = @(GetCipherIVLength(cipher));
             entry[@"blockSize"] = @(GetCipherBlockSize(cipher));
         }
-        if (key) {
-            int keyLen = cipher ? GetCipherKeyLength(cipher) : ([entry[@"keyLen"] intValue] ?: 32);
-            if (keyLen <= 0) keyLen = 32;
-            NSData *keyData = [NSData dataWithBytes:key length:keyLen];
-            entry[@"keyData"] = keyData;
-            entry[@"keyHex"] = HexStringFromBytes(key, keyLen);
-            entry[@"keyB64"] = Base64StringFromBytes(key, keyLen);
+        if (key && cipher) {
+            int keyLen = GetCipherKeyLength(cipher);
+            if (keyLen > 0 && keyLen <= 128) {
+                NSData *keyData = [NSData dataWithBytes:key length:keyLen];
+                entry[@"keyData"] = keyData;
+                entry[@"keyHex"] = HexStringFromBytes(key, keyLen);
+                entry[@"keyB64"] = Base64StringFromBytes(key, keyLen);
+            }
         }
-        if (iv) {
-            int ivLen = cipher ? GetCipherIVLength(cipher) : ([entry[@"ivLen"] intValue] ?: 16);
-            if (ivLen <= 0) ivLen = 16;
-            NSData *ivData = [NSData dataWithBytes:iv length:ivLen];
-            entry[@"ivData"] = ivData;
-            entry[@"ivHex"] = HexStringFromBytes(iv, ivLen);
-            entry[@"ivB64"] = Base64StringFromBytes(iv, ivLen);
+        if (iv && cipher) {
+            int ivLen = GetCipherIVLength(cipher);
+            if (ivLen > 0 && ivLen <= 64) {
+                NSData *ivData = [NSData dataWithBytes:iv length:ivLen];
+                entry[@"ivData"] = ivData;
+                entry[@"ivHex"] = HexStringFromBytes(iv, ivLen);
+                entry[@"ivB64"] = Base64StringFromBytes(iv, ivLen);
+            }
         }
     }
 }
@@ -197,21 +201,28 @@ static void (*orig_AES_decrypt)(const unsigned char *in, unsigned char *out, con
 #pragma mark - Hook 函数
 
 int my_EVP_CipherInit_ex(void *ctx, const void *cipher, void *impl, const unsigned char *key, const unsigned char *iv, int enc) {
+    if (!orig_EVP_CipherInit_ex) return 0;
     UpdateEVPCtx(ctx, cipher, key, iv, enc);
     return orig_EVP_CipherInit_ex(ctx, cipher, impl, key, iv, enc);
 }
 
 int my_EVP_EncryptInit_ex(void *ctx, const void *cipher, void *impl, const unsigned char *key, const unsigned char *iv) {
+    if (!orig_EVP_EncryptInit_ex) return 0;
     UpdateEVPCtx(ctx, cipher, key, iv, 1);
     return orig_EVP_EncryptInit_ex(ctx, cipher, impl, key, iv);
 }
 
 int my_EVP_DecryptInit_ex(void *ctx, const void *cipher, void *impl, const unsigned char *key, const unsigned char *iv) {
+    if (!orig_EVP_DecryptInit_ex) return 0;
     UpdateEVPCtx(ctx, cipher, key, iv, 0);
     return orig_EVP_DecryptInit_ex(ctx, cipher, impl, key, iv);
 }
 
 int my_EVP_CipherUpdate(void *ctx, unsigned char *out, int *outl, const unsigned char *in, int inl) {
+    if (!orig_EVP_CipherUpdate) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_CipherUpdate(ctx, out, outl, in, inl);
     size_t outLen = (result == 1 && outl) ? *outl : 0;
     AppendEVPIO(ctx, in, inl, out, outLen);
@@ -219,6 +230,10 @@ int my_EVP_CipherUpdate(void *ctx, unsigned char *out, int *outl, const unsigned
 }
 
 int my_EVP_EncryptUpdate(void *ctx, unsigned char *out, int *outl, const unsigned char *in, int inl) {
+    if (!orig_EVP_EncryptUpdate) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_EncryptUpdate(ctx, out, outl, in, inl);
     size_t outLen = (result == 1 && outl) ? *outl : 0;
     AppendEVPIO(ctx, in, inl, out, outLen);
@@ -226,6 +241,10 @@ int my_EVP_EncryptUpdate(void *ctx, unsigned char *out, int *outl, const unsigne
 }
 
 int my_EVP_DecryptUpdate(void *ctx, unsigned char *out, int *outl, const unsigned char *in, int inl) {
+    if (!orig_EVP_DecryptUpdate) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_DecryptUpdate(ctx, out, outl, in, inl);
     size_t outLen = (result == 1 && outl) ? *outl : 0;
     AppendEVPIO(ctx, in, inl, out, outLen);
@@ -233,6 +252,10 @@ int my_EVP_DecryptUpdate(void *ctx, unsigned char *out, int *outl, const unsigne
 }
 
 int my_EVP_CipherFinal(void *ctx, unsigned char *outm, int *outl) {
+    if (!orig_EVP_CipherFinal) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_CipherFinal(ctx, outm, outl);
     size_t finalLen = (result == 1 && outl) ? *outl : 0;
     FinalizeEVPCtx(ctx, outm, finalLen);
@@ -240,6 +263,10 @@ int my_EVP_CipherFinal(void *ctx, unsigned char *outm, int *outl) {
 }
 
 int my_EVP_EncryptFinal_ex(void *ctx, unsigned char *outm, int *outl) {
+    if (!orig_EVP_EncryptFinal_ex) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_EncryptFinal_ex(ctx, outm, outl);
     size_t finalLen = (result == 1 && outl) ? *outl : 0;
     FinalizeEVPCtx(ctx, outm, finalLen);
@@ -247,6 +274,10 @@ int my_EVP_EncryptFinal_ex(void *ctx, unsigned char *outm, int *outl) {
 }
 
 int my_EVP_DecryptFinal_ex(void *ctx, unsigned char *outm, int *outl) {
+    if (!orig_EVP_DecryptFinal_ex) {
+        if (outl) *outl = 0;
+        return 0;
+    }
     int result = orig_EVP_DecryptFinal_ex(ctx, outm, outl);
     size_t finalLen = (result == 1 && outl) ? *outl : 0;
     FinalizeEVPCtx(ctx, outm, finalLen);
@@ -254,7 +285,9 @@ int my_EVP_DecryptFinal_ex(void *ctx, unsigned char *outm, int *outl) {
 }
 
 void my_AES_cbc_encrypt(const unsigned char *in, unsigned char *out, size_t length, const void *key, unsigned char *ivec, const int enc) {
+    if (!orig_AES_cbc_encrypt) return;
     orig_AES_cbc_encrypt(in, out, length, key, ivec, enc);
+    if (!in || !out || !key || !ivec) return;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
     BOOL isDecrypt = (enc == 0);
@@ -273,7 +306,9 @@ void my_AES_cbc_encrypt(const unsigned char *in, unsigned char *out, size_t leng
 }
 
 void my_AES_encrypt(const unsigned char *in, unsigned char *out, const void *key) {
+    if (!orig_AES_encrypt) return;
     orig_AES_encrypt(in, out, key);
+    if (!in || !out || !key) return;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
 
@@ -285,7 +320,9 @@ void my_AES_encrypt(const unsigned char *in, unsigned char *out, const void *key
 }
 
 void my_AES_decrypt(const unsigned char *in, unsigned char *out, const void *key) {
+    if (!orig_AES_decrypt) return;
     orig_AES_decrypt(in, out, key);
+    if (!in || !out || !key) return;
     NSString *bundleID = CurrentBundleID();
     DatabaseManager *db = [DatabaseManager sharedManager];
 
