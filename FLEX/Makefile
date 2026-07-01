@@ -47,7 +47,7 @@ $(LIBRARY_NAME)_FILES = $(shell find . \( -name '*.m' -o -name '*.mm' -o -name '
 
 # Capstone核心文件（只包含ARM/ARM64架构）
 CAPSTONE_CORE = $(shell find x/capstone -maxdepth 1 -name "*.c")
-CAPSTONE_ARCH = $(shell find x/capstone/arch/AArch64 x/capstone/arch/ARM -name "*.c")
+CAPSTONE_ARCH = $(shell find x/capstone/arch/AArch64 -name "*.c")
 $(LIBRARY_NAME)_FILES += $(CAPSTONE_CORE) $(CAPSTONE_ARCH)
 
 # 必要的框架和库
@@ -77,8 +77,6 @@ $(LIBRARY_NAME)_CFLAGS = -fobjc-arc -include flex_fishhook.h \
                  -Wno-nonnull \
                  -Wno-format \
                  -Wno-shift-op-parentheses \
-                 -DCAPSTONE_HAS_ARM \
-                 -DCAPSTONE_HAS_ARM64 \
                  -DCAPSTONE_HAS_AARCH64 \
                  -DCAPSTONE_USE_SYS_DYN_MEM \
                  -I./x \

@@ -57,11 +57,11 @@ void MCInst_clear(MCInst *inst)
 // does not free @Op
 void MCInst_insert0(MCInst *inst, int index, MCOperand *Op)
 {
-	CS_ASSERT_RET(index < MAX_MC_OPS);
+	CS_ASSERT_RET(index < MAX_MC_OPS && index <= inst->size &&
+		      inst->size < MAX_MC_OPS);
 	int i;
 
 	for (i = inst->size; i > index; i--)
-		//memcpy(&(inst->Operands[i]), &(inst->Operands[i-1]), sizeof(MCOperand));
 		inst->Operands[i] = inst->Operands[i - 1];
 
 	inst->Operands[index] = *Op;
@@ -90,7 +90,10 @@ unsigned MCInst_getOpcodePub(const MCInst *inst)
 
 MCOperand *MCInst_getOperand(MCInst *inst, unsigned i)
 {
-	assert(i < MAX_MC_OPS);
+	// 运行时边界检查，防止 Release 构建中越界读取
+	if (i >= MAX_MC_OPS) {
+		return &inst->Operands[0];
+	}
 	return &inst->Operands[i];
 }
 
@@ -193,6 +196,10 @@ MCOperand *MCOperand_CreateReg1(MCInst *mcInst, unsigned Reg)
 
 void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
 {
+	// 缓冲区溢出保护：防止 size >= MAX_MC_OPS 时越界写入
+	if (mcInst->size >= MAX_MC_OPS) {
+		return;
+	}
 	MCOperand *op = &(mcInst->Operands[mcInst->size]);
 	mcInst->size++;
 
@@ -214,7 +221,10 @@ MCOperand *MCOperand_CreateImm1(MCInst *mcInst, int64_t Val)
 
 void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
 {
-	assert(mcInst->size < MAX_MC_OPS);
+	// 缓冲区溢出保护：将 assert 改为运行时检查
+	if (mcInst->size >= MAX_MC_OPS) {
+		return;
+	}
 	MCOperand *op = &(mcInst->Operands[mcInst->size]);
 	mcInst->size++;
 
@@ -259,9 +269,9 @@ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDescTable,
 				continue;
 
 			if (i >= MAX_MC_OPS) {
-				assert(0 &&
-				       "Maximum number of MC operands reached.");
-			}
+			// 越界保护：跳过而非继续写入
+			continue;
+		}
 			MI->tied_op_idx[i] = idx;
 
 			if (MI->flat_insn->detail)
@@ -286,27 +296,32 @@ bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum)
 /// (operand is tying src).
 bool MCInst_opIsTying(const MCInst *MI, unsigned OpNum)
 {
-	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
+	if (OpNum >= MAX_MC_OPS) {
+		return false;
+	}
 	return MI->tied_op_idx[OpNum] != -1;
 }
 
 /// Returns the value of the @MCInst operand at index @OpNum.
 uint64_t MCInst_getOpVal(MCInst *MI, unsigned OpNum)
 {
-	assert(OpNum < MAX_MC_OPS);
+	if (OpNum >= MAX_MC_OPS) {
+		return 0;
+	}
 	MCOperand *op = MCInst_getOperand(MI, OpNum);
 	if (MCOperand_isReg(op))
 		return MCOperand_getReg(op);
 	else if (MCOperand_isImm(op))
 		return MCOperand_getImm(op);
 	else
-		assert(0 && "Operand type not handled in this getter.");
-	return MCOperand_getImm(op);
+		return 0;
 }
 
 void MCInst_setIsAlias(MCInst *MI, bool Flag)
 {
-	assert(MI);
+	if (!MI || !MI->flat_insn) {
+		return;
+	}
 	MI->isAliasInstr = Flag;
 	MI->flat_insn->is_alias = Flag;
 }
@@ -331,6 +346,8 @@ void MCInst_updateWithTmpMI(MCInst *MI, MCInst *TmpMI)
 /// @param MI The MCInst holding the cs_insn currently decoded.
 void MCInst_setSoftFail(MCInst *MI)
 {
-	assert(MI && MI->flat_insn);
+	if (!MI || !MI->flat_insn) {
+		return;
+	}
 	MI->flat_insn->illegal = true;
 }

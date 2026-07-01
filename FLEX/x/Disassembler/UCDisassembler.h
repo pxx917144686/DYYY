@@ -1,117 +1,147 @@
-//
-//  UCDisassembler.h
-//  FLEX++
-//
-//  反汇编引擎封装
-//  支持 ARM64 架构的反汇编
-//  优先使用 Capstone 引擎，如不可用则提供基础功能
-//
-
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 反汇编指令信息
+typedef NS_ENUM(NSInteger, UCDisasmOperandType) {
+    UCDisasmOperandTypeUnknown = 0,
+    UCDisasmOperandTypeRegister,
+    UCDisasmOperandTypeImmediate,
+    UCDisasmOperandTypeMemory,
+    UCDisasmOperandTypeFPRegister,
+};
+
+typedef NS_ENUM(NSInteger, UCBasicBlockType) {
+    UCBasicBlockTypeNormal = 0,
+    UCBasicBlockTypeEntry,
+    UCBasicBlockTypeExit,
+    UCBasicBlockTypeConditionalTrue,
+    UCBasicBlockTypeConditionalFalse,
+};
+
+@class UCDisasmInstruction;
+@class UCBasicBlock;
+@class UCFunction;
+
+@interface UCDisasmOperand : NSObject
+@property (nonatomic, assign) UCDisasmOperandType type;
+@property (nonatomic, copy) NSString *text;
+@property (nonatomic, assign) uint64_t immediateValue;
+@property (nonatomic, copy) NSString *registerName;
+@property (nonatomic, assign) int64_t memoryOffset;
+@property (nonatomic, copy) NSString *memoryBaseReg;
+@property (nonatomic, copy) NSString *memoryIndexReg;
+@property (nonatomic, assign) uint32_t memoryScale;
+@end
+
 @interface UCDisasmInstruction : NSObject
-
-/// 指令地址
 @property (nonatomic, assign) uint64_t address;
-
-/// 指令大小（字节）
 @property (nonatomic, assign) NSUInteger size;
-
-/// 指令助记符 (如 "add", "bl", "str")
 @property (nonatomic, copy) NSString *mnemonic;
-
-/// 操作数字符串
 @property (nonatomic, copy) NSString *operands;
-
-/// 完整指令字符串
 @property (nonatomic, copy) NSString *fullText;
-
-/// 原始字节 (十六进制)
 @property (nonatomic, copy) NSString *bytesHex;
-
-/// 是否是分支指令 (b, bl, br, b.xx, cbz, cbnz, tbz, tbnz 等)
 @property (nonatomic, assign) BOOL isBranch;
-
-/// 是否是调用指令 (bl, blr)
 @property (nonatomic, assign) BOOL isCall;
-
-/// 是否是返回指令 (ret)
 @property (nonatomic, assign) BOOL isReturn;
-
-/// 分支目标地址（如果是分支指令）
+@property (nonatomic, assign) BOOL isConditionalBranch;
+@property (nonatomic, assign) BOOL isUnconditionalBranch;
 @property (nonatomic, assign) uint64_t branchTarget;
-
-/// 是否是有效指令
 @property (nonatomic, assign) BOOL isValid;
-
+@property (nonatomic, assign) BOOL isNop;
+@property (nonatomic, assign) BOOL setsFramePointer;
+@property (nonatomic, strong) NSArray<UCDisasmOperand *> *operandList;
+@property (nonatomic, copy, nullable) NSString *comment;
+@property (nonatomic, copy, nullable) NSString *xrefComment;
+@property (nonatomic, strong, nullable) NSArray<NSNumber *> *xrefFrom;
+@property (nonatomic, assign) BOOL isFunctionStart;
+@property (nonatomic, copy, nullable) NSString *functionName;
+@property (nonatomic, assign) BOOL isBasicBlockStart;
+@property (nonatomic, weak, nullable) UCBasicBlock *basicBlock;
 @end
 
-/// 反汇编结果
 @interface UCDisasmResult : NSObject
-
-/// 起始地址
 @property (nonatomic, assign) uint64_t startAddress;
-
-/// 反汇编的指令数
 @property (nonatomic, assign) NSUInteger instructionCount;
-
-/// 指令列表
 @property (nonatomic, strong) NSArray<UCDisasmInstruction *> *instructions;
-
-/// 反汇编使用的引擎
 @property (nonatomic, copy) NSString *engineName;
-
+@property (nonatomic, strong, nullable) NSArray<UCFunction *> *functions;
+@property (nonatomic, strong, nullable) NSDictionary<NSNumber *, UCDisasmInstruction *> *addressMap;
 @end
 
-/// 反汇编引擎
+@interface UCBasicBlock : NSObject
+@property (nonatomic, assign) uint64_t startAddress;
+@property (nonatomic, assign) uint64_t endAddress;
+@property (nonatomic, assign) NSUInteger instructionCount;
+@property (nonatomic, strong) NSArray<UCDisasmInstruction *> *instructions;
+@property (nonatomic, assign) UCBasicBlockType type;
+@property (nonatomic, strong, nullable) NSMutableArray<UCBasicBlock *> *successors;
+@property (nonatomic, strong, nullable) NSMutableArray<UCBasicBlock *> *predecessors;
+@property (nonatomic, weak, nullable) UCFunction *function;
+@property (nonatomic, assign) NSInteger blockId;
+@property (nonatomic, assign) CGPoint layoutPosition;
+@property (nonatomic, assign) CGSize layoutSize;
+@end
+
+@interface UCFunction : NSObject
+@property (nonatomic, assign) uint64_t startAddress;
+@property (nonatomic, assign) uint64_t endAddress;
+@property (nonatomic, assign) NSUInteger size;
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy, nullable) NSString *demangledName;
+@property (nonatomic, strong) NSArray<UCDisasmInstruction *> *instructions;
+@property (nonatomic, strong) NSArray<UCBasicBlock *> *basicBlocks;
+@property (nonatomic, assign) NSUInteger basicBlockCount;
+@property (nonatomic, strong, nullable) NSSet<NSNumber *> *callSites;
+@property (nonatomic, strong, nullable) NSSet<NSNumber *> *calledFrom;
+@end
+
+@interface UCSymbolInfo : NSObject
+@property (nonatomic, assign) uint64_t address;
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *type;
+@property (nonatomic, copy, nullable) NSString *imageName;
++ (instancetype)infoWithAddress:(uint64_t)address name:(NSString *)name type:(NSString *)type;
+@end
+
 @interface UCDisassembler : NSObject
 
-/// 单例
 + (instancetype)sharedInstance;
 
-/// 是否可用（Capstone 引擎是否加载成功）
 @property (nonatomic, readonly) BOOL isAvailable;
-
-/// 引擎名称
 @property (nonatomic, readonly) NSString *engineName;
 
-/// 反汇编指定地址的代码
-/// @param address 起始地址
-/// @param size 数据大小（字节）
-/// @param isThumb 是否是 Thumb 模式（仅 ARM32）
-/// @return 反汇编结果
 - (nullable UCDisasmResult *)disassembleAtAddress:(uint64_t)address
                                              size:(NSUInteger)size;
 
-/// 反汇编指定方法的代码
-/// @param method Method 指针
-/// @return 反汇编结果
 - (nullable UCDisasmResult *)disassembleMethod:(Method)method;
 
-/// 反汇编指定类方法的代码
-/// @param cls 类
-/// @param selector 方法选择子
-/// @param isClassMethod 是否是类方法
-/// @return 反汇编结果
 - (nullable UCDisasmResult *)disassembleClass:(Class)cls
                                      selector:(SEL)selector
                                 isClassMethod:(BOOL)isClassMethod;
 
-/// 从地址查找函数符号名
-/// @param address 地址
-/// @return 符号名，如果找不到则返回 nil
+- (nullable UCFunction *)analyzeFunctionAtAddress:(uint64_t)address
+                                        maxSize:(NSUInteger)maxSize;
+
+- (nullable NSArray<UCBasicBlock *> *)buildCFG:(NSArray<UCDisasmInstruction *> *)instructions;
+
+- (nullable NSArray<UCFunction *> *)scanFunctionsInRange:(uint64_t)start
+                                                    size:(NSUInteger)size;
+
 + (nullable NSString *)symbolNameAtAddress:(uint64_t)address;
 
-/// 验证地址是否可读
-/// @param address 地址
-/// @param size 大小
-/// @return 是否可读
++ (nullable UCSymbolInfo *)symbolInfoAtAddress:(uint64_t)address;
+
++ (nullable NSString *)objcMethodNameAtAddress:(uint64_t)address;
+
++ (nullable NSString *)stringAtAddress:(uint64_t)address maxLength:(NSUInteger)maxLen;
+
++ (nullable NSString *)objcClassNameFromClassRef:(uint64_t)address;
+
 + (BOOL)isAddressReadable:(uint64_t)address size:(NSUInteger)size;
+
+- (void)analyzeAndAnnotateResult:(UCDisasmResult *)result;
 
 @end
 

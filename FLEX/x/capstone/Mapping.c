@@ -354,7 +354,7 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
 #define DEFINE_get_detail_op(arch, ARCH, ARCH_UPPER) \
 	cs_##arch##_op *ARCH##_get_detail_op(MCInst *MI, int offset) \
 	{ \
-		if (!MI->flat_insn->detail) \
+		if (!MI || !MI->flat_insn || !MI->flat_insn->detail) \
 			return NULL; \
 		int OpIdx = MI->flat_insn->detail->arch.op_count + offset; \
 		if (OpIdx < 0 || OpIdx >= NUM_##ARCH_UPPER##_OPS) { \
@@ -383,7 +383,7 @@ DEFINE_get_detail_op(sparc, Sparc, SPARC);
 #define DEFINE_get_detail_op_at(arch, ARCH, ARCH_UPPER) \
 	cs_##arch##_op *ARCH##_get_detail_op_at(MCInst *MI, int index) \
 	{ \
-		if (!MI->flat_insn->detail) \
+		if (!MI || !MI->flat_insn || !MI->flat_insn->detail) \
 			return NULL; \
 		if (index < 0 || index >= NUM_##ARCH_UPPER##_OPS) { \
 			return NULL; \

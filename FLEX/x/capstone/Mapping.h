@@ -205,7 +205,8 @@ static inline void set_doing_mem(const MCInst *MI, bool status)
 #define DEFINE_get_arch_detail(arch, ARCH) \
 	static inline cs_##arch *ARCH##_get_detail(const MCInst *MI) \
 	{ \
-		assert(MI && MI->flat_insn && MI->flat_insn->detail); \
+		if (!MI || !MI->flat_insn || !MI->flat_insn->detail) \
+			return NULL; \
 		return &MI->flat_insn->detail->arch; \
 	}
 
@@ -247,13 +248,15 @@ DEFINE_check_safe_inc(Sparc, SPARC);
 
 static inline bool detail_is_set(const MCInst *MI)
 {
-	assert(MI && MI->flat_insn);
+	if (!MI || !MI->flat_insn || !MI->csh)
+		return false;
 	return MI->flat_insn->detail != NULL && MI->csh->detail_opt & CS_OPT_ON;
 }
 
 static inline cs_detail *get_detail(const MCInst *MI)
 {
-	assert(MI && MI->flat_insn);
+	if (!MI || !MI->flat_insn)
+		return NULL;
 	return MI->flat_insn->detail;
 }
 

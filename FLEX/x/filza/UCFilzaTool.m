@@ -7,6 +7,11 @@
 #import <QuickLook/QuickLook.h>
 #import <dlfcn.h>
 #import <limits.h>
+#import <mach-o/loader.h>
+#import <mach-o/dyld.h>
+#import <mach/vm_statistics.h>
+#import <sys/sysctl.h>
+#import <Security/Security.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <string.h>
@@ -362,7 +367,7 @@ static uint16_t UCFilzaReadUInt16LE(const uint8_t *bytes) {
 }
 
 static uint32_t UCFilzaReadUInt32LE(const uint8_t *bytes) {
-    return (uint32_t)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+    return (uint32_t)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | ((uint32_t)bytes[3] << 24));
 }
 
 static NSString *UCFilzaStableHexDigestForString(NSString *string) {
@@ -660,15 +665,38 @@ static NSData *UCFilzaDataFromHexString(NSString *hexString, NSError **error) {
 
 @end
 
+@interface UCFilzaAppInfoViewController : UITableViewController
+@end
+
 @interface UCFilzaRootViewController : UITableViewController
 @end
 
 @interface UCFilzaRootViewController ()
 
 @property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *rootEntries;
+@property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *quickPathEntries;
 @property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *appGroupEntries;
+@property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *toolEntries;
 
 @end
+
+static uint64_t UCFilzaDirectorySize(NSString *path) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL isDir = NO;
+    if (![fm fileExistsAtPath:path isDirectory:&isDir] || !isDir) return 0;
+    
+    uint64_t totalSize = 0;
+    NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:path];
+    for (NSString *file in enumerator) {
+        NSString *fullPath = [path stringByAppendingPathComponent:file];
+        NSError *error = nil;
+        NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:&error];
+        if (!error && attrs) {
+            totalSize += attrs.fileSize;
+        }
+    }
+    return totalSize;
+}
 
 static UIViewController *UCFilzaViewControllerForPath(NSString *path, NSString *titleOverride) {
     NSString *normalizedPath = path.stringByStandardizingPath ?: path;
@@ -999,6 +1027,7 @@ static void UCFilzaInstallCoreUIHooks(void) {
 
     self.title = @"Filza文件";
     self.view.backgroundColor = UIColor.systemBackgroundColor;
+    self.tableView.sectionHeaderTopPadding = 0;
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
         initWithBarButtonSystemItem:UIBarButtonSystemItemClose
                              target:self
@@ -1006,11 +1035,29 @@ static void UCFilzaInstallCoreUIHooks(void) {
 
     NSString *bundlePath = NSBundle.mainBundle.bundlePath.stringByStandardizingPath ?: @"";
     NSString *homePath = NSHomeDirectory().stringByStandardizingPath ?: @"";
+    NSString *docsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject.stringByStandardizingPath ?: @"";
+    NSString *libPath = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES).firstObject.stringByStandardizingPath ?: @"";
+    NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject.stringByStandardizingPath ?: @"";
+    NSString *tmpPath = NSTemporaryDirectory().stringByStandardizingPath ?: @"";
+
     self.rootEntries = @[
-        @{@"title": @"浏览 App 目录", @"subtitle": bundlePath, @"path": bundlePath},
-        @{@"title": @"浏览数据目录", @"subtitle": homePath, @"path": homePath},
+        @{@"title": @"App 目录", @"subtitle": bundlePath, @"path": bundlePath, @"icon": @"app.badge"},
+        @{@"title": @"数据目录", @"subtitle": homePath, @"path": homePath, @"icon": @"folder"},
     ];
+
+    self.quickPathEntries = @[
+        @{@"title": @"Documents", @"subtitle": docsPath, @"path": docsPath, @"icon": @"doc.text"},
+        @{@"title": @"Library", @"subtitle": libPath, @"path": libPath, @"icon": @"books.vertical"},
+        @{@"title": @"Caches", @"subtitle": cachePath, @"path": cachePath, @"icon": @"tray"},
+        @{@"title": @"tmp", @"subtitle": tmpPath, @"path": tmpPath, @"icon": @"clock"},
+    ];
+
     self.appGroupEntries = [UCAppGroupHelper accessibleAppGroups] ?: @[];
+
+    self.toolEntries = @[
+        @{@"title": @"应用信息", @"subtitle": @"查看应用详情、存储信息", @"action": @"appInfo", @"icon": @"info.circle"},
+        @{@"title": @"清除缓存", @"subtitle": @"清除 Caches 和 tmp 目录", @"action": @"clearCache", @"icon": @"trash"},
+    ];
 
     [self.tableView registerClass:UITableViewCell.class forCellReuseIdentifier:@"rootCell"];
 }
@@ -1020,23 +1067,33 @@ static void UCFilzaInstallCoreUIHooks(void) {
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 2;
+    return 4;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return self.rootEntries.count;
-    return MAX(self.appGroupEntries.count, 1);
+    if (section == 1) return self.quickPathEntries.count;
+    if (section == 2) return MAX(self.appGroupEntries.count, 1);
+    if (section == 3) return self.toolEntries.count;
+    return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return section == 0 ? @"基础目录" : @"应用组目录";
+    if (section == 0) return @"基础目录";
+    if (section == 1) return @"快捷路径";
+    if (section == 2) return @"应用组目录";
+    if (section == 3) return @"工具";
+    return nil;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0) {
         return @"支持读取 App 目录、数据目录、应用组目录下文件；图片 / 音频 / PDF / 视频专门预览；assets.car 内容浏览与单图替换；sqlite 直接查看编辑；zip 直接浏览与解压。";
     }
-    return UCFilzaJoinedPathSummary(self.appGroupEntries);
+    if (section == 2) {
+        return UCFilzaJoinedPathSummary(self.appGroupEntries);
+    }
+    return nil;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -1048,34 +1105,60 @@ static void UCFilzaInstallCoreUIHooks(void) {
     cell.textLabel.numberOfLines = 1;
     cell.detailTextLabel.numberOfLines = 2;
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.textLabel.textColor = UIColor.labelColor;
+    cell.userInteractionEnabled = YES;
 
     NSDictionary<NSString *, NSString *> *entry = nil;
+
     if (indexPath.section == 0) {
         entry = self.rootEntries[indexPath.row];
         cell.textLabel.text = entry[@"title"];
         cell.detailTextLabel.text = entry[@"subtitle"];
-        cell.userInteractionEnabled = YES;
-        cell.textLabel.textColor = UIColor.labelColor;
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    } else if (self.appGroupEntries.count > 0) {
-        entry = self.appGroupEntries[indexPath.row];
-        cell.textLabel.text = entry[@"identifier"] ?: @"应用组目录";
-        cell.detailTextLabel.text = entry[@"path"];
-        cell.userInteractionEnabled = YES;
-        cell.textLabel.textColor = UIColor.labelColor;
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    } else {
-        cell.textLabel.text = @"未发现可访问的应用组目录";
-        cell.detailTextLabel.text = @"当前 App 没有声明应用组，或当前进程无法访问。";
-        cell.userInteractionEnabled = NO;
-        cell.textLabel.textColor = UIColor.secondaryLabelColor;
-        cell.accessoryType = UITableViewCellAccessoryNone;
+    } else if (indexPath.section == 1) {
+        entry = self.quickPathEntries[indexPath.row];
+        cell.textLabel.text = entry[@"title"];
+        cell.detailTextLabel.text = entry[@"subtitle"];
+    } else if (indexPath.section == 2) {
+        if (self.appGroupEntries.count > 0) {
+            entry = self.appGroupEntries[indexPath.row];
+            cell.textLabel.text = entry[@"identifier"] ?: @"应用组目录";
+            cell.detailTextLabel.text = entry[@"path"];
+        } else {
+            cell.textLabel.text = @"未发现可访问的应用组目录";
+            cell.detailTextLabel.text = @"当前 App 没有声明应用组，或当前进程无法访问。";
+            cell.userInteractionEnabled = NO;
+            cell.textLabel.textColor = UIColor.secondaryLabelColor;
+            cell.accessoryType = UITableViewCellAccessoryNone;
+        }
+    } else if (indexPath.section == 3) {
+        entry = self.toolEntries[indexPath.row];
+        cell.textLabel.text = entry[@"title"];
+        cell.detailTextLabel.text = entry[@"subtitle"];
+        if ([entry[@"action"] isEqualToString:@"clearCache"]) {
+            cell.textLabel.textColor = UIColor.systemRedColor;
+        }
     }
 
     if (@available(iOS 13.0, *)) {
-        NSString *symbolName = indexPath.section == 0 ? @"folder" : @"person.2";
-        cell.imageView.image = [UIImage systemImageNamed:symbolName];
-        cell.imageView.tintColor = UIColor.systemBlueColor;
+        NSString *symbolName = entry[@"icon"];
+        if (!symbolName) {
+            if (indexPath.section == 2) {
+                symbolName = @"person.2";
+            } else {
+                symbolName = @"folder";
+            }
+        }
+        UIImage *image = [UIImage systemImageNamed:symbolName];
+        if (image) {
+            cell.imageView.image = image;
+            if ([entry[@"action"] isEqualToString:@"clearCache"]) {
+                cell.imageView.tintColor = UIColor.systemRedColor;
+            } else if ([entry[@"action"] isEqualToString:@"appInfo"]) {
+                cell.imageView.tintColor = UIColor.systemBlueColor;
+            } else {
+                cell.imageView.tintColor = UIColor.systemBlueColor;
+            }
+        }
     }
 
     return cell;
@@ -1086,12 +1169,31 @@ static void UCFilzaInstallCoreUIHooks(void) {
 
     NSDictionary<NSString *, NSString *> *entry = nil;
     NSString *title = nil;
+    NSString *action = nil;
+
     if (indexPath.section == 0) {
         entry = self.rootEntries[indexPath.row];
-        title = [entry[@"title"] stringByReplacingOccurrencesOfString:@"浏览" withString:@""];
-    } else if (self.appGroupEntries.count > 0) {
-        entry = self.appGroupEntries[indexPath.row];
-        title = entry[@"identifier"] ?: @"应用组目录";
+        title = entry[@"title"];
+    } else if (indexPath.section == 1) {
+        entry = self.quickPathEntries[indexPath.row];
+        title = entry[@"title"];
+    } else if (indexPath.section == 2) {
+        if (self.appGroupEntries.count > 0) {
+            entry = self.appGroupEntries[indexPath.row];
+            title = entry[@"identifier"] ?: @"应用组目录";
+        }
+    } else if (indexPath.section == 3) {
+        entry = self.toolEntries[indexPath.row];
+        action = entry[@"action"];
+    }
+
+    if (action.length > 0) {
+        if ([action isEqualToString:@"appInfo"]) {
+            [self showAppInfo];
+        } else if ([action isEqualToString:@"clearCache"]) {
+            [self confirmClearCache];
+        }
+        return;
     }
 
     NSString *path = entry[@"path"];
@@ -1101,6 +1203,1118 @@ static void UCFilzaInstallCoreUIHooks(void) {
     if (controller) {
         [self.navigationController pushViewController:controller animated:YES];
     }
+}
+
+- (void)showAppInfo {
+    UCFilzaAppInfoViewController *appInfoVC = [[UCFilzaAppInfoViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    [self.navigationController pushViewController:appInfoVC animated:YES];
+}
+
+- (void)confirmClearCache {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"清除缓存"
+                                                                   message:@"确定要清除 Caches 和 tmp 目录下的所有文件吗？此操作不可撤销。"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"清除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+        [self clearCache];
+    }]];
+    
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)clearCache {
+    NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *tmpPath = NSTemporaryDirectory();
+    
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSError *error = nil;
+    NSUInteger clearedCount = 0;
+    
+    for (NSString *dirPath in @[cachePath, tmpPath]) {
+        if (dirPath.length == 0) continue;
+        NSArray *contents = [fm contentsOfDirectoryAtPath:dirPath error:&error];
+        if (!contents) continue;
+        
+        for (NSString *item in contents) {
+            NSString *fullPath = [dirPath stringByAppendingPathComponent:item];
+            [fm removeItemAtPath:fullPath error:nil];
+            clearedCount++;
+        }
+    }
+    
+    UCFilzaPresentTransientMessage(self, @"已清除", [NSString stringWithFormat:@"已清除 %lu 个文件", (unsigned long)clearedCount]);
+}
+
+@end
+
+@interface UCFilzaListViewController : UITableViewController
+@property (nonatomic, copy) NSString *listTitle;
+@property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *items;
++ (instancetype)controllerWithTitle:(NSString *)title items:(NSArray<NSDictionary<NSString *, NSString *> *> *)items;
+@end
+
+@implementation UCFilzaListViewController
+
++ (instancetype)controllerWithTitle:(NSString *)title items:(NSArray<NSDictionary<NSString *, NSString *> *> *)items {
+    UCFilzaListViewController *vc = [[UCFilzaListViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    vc.listTitle = title;
+    vc.items = items ?: @[];
+    return vc;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = self.listTitle;
+    self.view.backgroundColor = UIColor.systemBackgroundColor;
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 44;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return self.items.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *identifier = @"ListCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:identifier];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:identifier];
+    }
+    NSDictionary *item = self.items[indexPath.row];
+    cell.textLabel.text = item[@"title"];
+    cell.detailTextLabel.text = item[@"subtitle"];
+    cell.detailTextLabel.numberOfLines = 0;
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    return cell;
+}
+
+@end
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaLoadedDylibsList(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        const char *name = _dyld_get_image_name(i);
+        if (name) {
+            NSString *path = [NSString stringWithUTF8String:name];
+            [list addObject:@{
+                @"title": path.lastPathComponent,
+                @"subtitle": path.stringByDeletingLastPathComponent
+            }];
+        }
+    }
+    NSSortDescriptor *sort = [NSSortDescriptor sortDescriptorWithKey:@"title" ascending:YES selector:@selector(caseInsensitiveCompare:)];
+    return [list sortedArrayUsingDescriptors:@[sort]];
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaEnvironmentList(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSDictionary *env = NSProcessInfo.processInfo.environment;
+    NSArray *sortedKeys = [env.allKeys sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+    for (NSString *key in sortedKeys) {
+        [list addObject:@{
+            @"title": key,
+            @"subtitle": env[key] ?: @""
+        }];
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaArgumentsList(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSArray *args = NSProcessInfo.processInfo.arguments;
+    for (NSUInteger i = 0; i < args.count; i++) {
+        [list addObject:@{
+            @"title": [NSString stringWithFormat:@"argv[%lu]", (unsigned long)i],
+            @"subtitle": args[i]
+        }];
+    }
+    return list.copy;
+}
+
+static NSDictionary *UCFilzaObjCRuntimeStats(void) {
+    unsigned int classCount = 0;
+    Class *classes = objc_copyClassList(&classCount);
+    
+    unsigned int totalMethods = 0;
+    unsigned int totalProtocols = 0;
+    
+    for (unsigned int i = 0; i < classCount; i++) {
+        unsigned int methodCount = 0;
+        Method *methods = class_copyMethodList(classes[i], &methodCount);
+        totalMethods += methodCount;
+        if (methods) free(methods);
+        
+        unsigned int metaclass = class_isMetaClass(classes[i]);
+        if (!metaclass) {
+            Class metaClass = objc_getMetaClass(class_getName(classes[i]));
+            if (metaClass) {
+                unsigned int metaMethodCount = 0;
+                Method *metaMethods = class_copyMethodList(metaClass, &metaMethodCount);
+                totalMethods += metaMethodCount;
+                if (metaMethods) free(metaMethods);
+            }
+        }
+    }
+    
+    if (classes) free(classes);
+    
+    unsigned int protoCount = 0;
+    Protocol * const *protocols = objc_copyProtocolList(&protoCount);
+    totalProtocols = protoCount;
+    if (protocols) free((void *)protocols);
+    
+    return @{
+        @"classes": @(classCount),
+        @"methods": @(totalMethods),
+        @"protocols": @(totalProtocols),
+        @"dylibs": @(_dyld_image_count())
+    };
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaURLSchemesList(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSArray *urlTypes = NSBundle.mainBundle.infoDictionary[@"CFBundleURLTypes"];
+    for (NSDictionary *type in urlTypes) {
+        NSString *name = type[@"CFBundleURLName"] ?: @"";
+        NSArray *schemes = type[@"CFBundleURLSchemes"] ?: @[];
+        for (NSString *scheme in schemes) {
+            [list addObject:@{
+                @"title": scheme,
+                @"subtitle": name.length > 0 ? name : @"无名称"
+            }];
+        }
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaInfoPlistKeys(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+    NSArray *sortedKeys = [info.allKeys sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+    for (NSString *key in sortedKeys) {
+        id value = info[key];
+        NSString *valueStr = [value description];
+        if (valueStr.length > 200) {
+            valueStr = [[valueStr substringToIndex:200] stringByAppendingString:@"..."];
+        }
+        [list addObject:@{
+            @"title": key,
+            @"subtitle": valueStr
+        }];
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaPrivacyPermissions(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+    
+    NSArray *privacyKeys = @[
+        @"NSPhotoLibraryUsageDescription",
+        @"NSPhotoLibraryAddUsageDescription",
+        @"NSCameraUsageDescription",
+        @"NSMicrophoneUsageDescription",
+        @"NSLocationWhenInUseUsageDescription",
+        @"NSLocationAlwaysAndWhenInUseUsageDescription",
+        @"NSLocationAlwaysUsageDescription",
+        @"NSContactsUsageDescription",
+        @"NSCalendarsUsageDescription",
+        @"NSRemindersUsageDescription",
+        @"NSBluetoothAlwaysUsageDescription",
+        @"NSBluetoothPeripheralUsageDescription",
+        @"NSMotionUsageDescription",
+        @"NSHealthShareUsageDescription",
+        @"NSHealthUpdateUsageDescription",
+        @"NSFaceIDUsageDescription",
+        @"NSAppleMusicUsageDescription",
+        @"NSSpeechRecognitionUsageDescription",
+        @"NSLocalNetworkUsageDescription",
+        @"NSUserTrackingUsageDescription"
+    ];
+    
+    for (NSString *key in privacyKeys) {
+        NSString *value = info[key];
+        if (value) {
+            [list addObject:@{
+                @"title": [key stringByReplacingOccurrencesOfString:@"NS" withString:@""],
+                @"subtitle": value
+            }];
+        }
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaBackgroundModes(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSArray *modes = NSBundle.mainBundle.infoDictionary[@"UIBackgroundModes"];
+    for (NSString *mode in modes) {
+        [list addObject:@{
+            @"title": mode,
+            @"subtitle": @""
+        }];
+    }
+    return list.copy;
+}
+
+static NSString *UCFilzaMachOArchitecture(void) {
+    NSString *executable = NSBundle.mainBundle.executablePath;
+    if (!executable) return @"未知";
+    
+    FILE *f = fopen(executable.UTF8String, "r");
+    if (!f) return @"未知";
+    
+    uint32_t magic = 0;
+    if (fread(&magic, sizeof(uint32_t), 1, f) != 1) {
+        fclose(f);
+        return @"未知";
+    }
+    fclose(f);
+    
+    if (magic == MH_MAGIC_64) return @"ARM64";
+    if (magic == MH_CIGAM_64) return @"ARM64 (BE)";
+    if (magic == MH_MAGIC) return @"ARMv7";
+    if (magic == MH_CIGAM) return @"ARMv7 (BE)";
+    if (magic == 0xbebafeca) return @"Fat Binary (BE)";
+    if (magic == 0xcafebabe) return @"Fat Binary";
+    
+    return [NSString stringWithFormat:@"Unknown (0x%08x)", magic];
+}
+
+static NSString *UCFilzaMachOUUID(void) {
+    NSBundle *bundle = NSBundle.mainBundle;
+    NSString *executable = bundle.executablePath;
+    if (!executable) return nil;
+    
+    NSData *data = [NSData dataWithContentsOfFile:executable options:NSDataReadingMappedIfSafe error:nil];
+    if (!data || data.length < sizeof(struct mach_header_64)) return nil;
+    const void *exec = data.bytes;
+    
+    const uint32_t *magicPtr = (const uint32_t *)exec;
+    uint32_t magic = *magicPtr;
+    
+    BOOL is64 = (magic == MH_MAGIC_64);  // 拒绝 MH_CIGAM_64 大端序：后续直接读取字段未做字节交换
+    uint32_t ncmds = 0;
+    const uint8_t *cmds = NULL;
+    
+    if (is64) {
+        const struct mach_header_64 *hdr = (const struct mach_header_64 *)exec;
+        ncmds = hdr->ncmds;
+        cmds = (const uint8_t *)(hdr + 1);
+    } else {
+        const struct mach_header *hdr = (const struct mach_header *)exec;
+        ncmds = hdr->ncmds;
+        cmds = (const uint8_t *)(hdr + 1);
+    }
+    
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < ncmds; i++) {
+        // 边界检查：offset 相对于 cmds(hdr+1)，需减去 header 大小
+        if ((uint64_t)offset + sizeof(struct load_command) > data.length - sizeof(struct mach_header_64)) break;
+        const struct load_command *lc = (const struct load_command *)(cmds + offset);
+        if (lc->cmdsize == 0) break;  // 防止 cmdsize==0 导致死循环
+        if (lc->cmd == LC_UUID) {
+            const struct uuid_command *uuidCmd = (const struct uuid_command *)lc;
+            NSUUID *uuid = [[NSUUID alloc] initWithUUIDBytes:uuidCmd->uuid];
+            return uuid.UUIDString;
+        }
+        offset += lc->cmdsize;
+    }
+    
+    return nil;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaCookieList(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSArray *cookies = NSHTTPCookieStorage.sharedHTTPCookieStorage.cookies;
+    for (NSHTTPCookie *cookie in cookies) {
+        [list addObject:@{
+            @"title": cookie.name ?: @"",
+            @"subtitle": [NSString stringWithFormat:@"%@=%@", cookie.domain ?: @"", cookie.value ?: @""]
+        }];
+    }
+    return list.copy;
+}
+
+#pragma mark - Mach-O 深度解析
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaMachOLoadCommands(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSString *executable = NSBundle.mainBundle.executablePath;
+    if (!executable) return list.copy;
+    NSData *data = [NSData dataWithContentsOfFile:executable options:NSDataReadingMappedIfSafe error:nil];
+    if (!data || data.length < sizeof(struct mach_header_64)) return list.copy;
+    const struct mach_header_64 *hdr = (const struct mach_header_64 *)data.bytes;
+    if (hdr->magic != MH_MAGIC_64) return list.copy;
+    const uint8_t *cmds = (const uint8_t *)(hdr + 1);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < hdr->ncmds; i++) {
+        if ((uint64_t)offset + sizeof(struct load_command) > data.length - sizeof(struct mach_header_64)) break;  // 边界检查修正：offset 相对 cmds(hdr+1)
+        const struct load_command *lc = (const struct load_command *)(cmds + offset);
+        if (lc->cmdsize == 0) break;
+        NSString *cmdName = [NSString stringWithFormat:@"0x%x", lc->cmd];
+        switch (lc->cmd) {
+            case LC_SEGMENT_64: cmdName = @"SEGMENT_64"; break;
+            case LC_SYMTAB: cmdName = @"SYMTAB"; break;
+            case LC_DYSYMTAB: cmdName = @"DYSYMTAB"; break;
+            case LC_LOAD_DYLIB: cmdName = @"LOAD_DYLIB"; break;
+            case LC_LOAD_WEAK_DYLIB: cmdName = @"LOAD_WEAK_DYLIB"; break;
+            case LC_REEXPORT_DYLIB: cmdName = @"REEXPORT_DYLIB"; break;
+            case LC_LOAD_DYLINKER: cmdName = @"LOAD_DYLINKER"; break;
+            case LC_UUID: cmdName = @"UUID"; break;
+            case LC_MAIN: cmdName = @"MAIN"; break;
+            case LC_FUNCTION_STARTS: cmdName = @"FUNCTION_STARTS"; break;
+            case LC_CODE_SIGNATURE: cmdName = @"CODE_SIGNATURE"; break;
+            case LC_DATA_IN_CODE: cmdName = @"DATA_IN_CODE"; break;
+            case LC_DYLIB_CODE_SIGN_DRS: cmdName = @"DYLIB_CODE_SIGN_DRS"; break;
+            case LC_LINKER_OPTIMIZATION_HINT: cmdName = @"LINKER_OPT_HINT"; break;
+            case LC_VERSION_MIN_IPHONEOS: cmdName = @"VERSION_MIN_IPHONEOS"; break;
+            case LC_SOURCE_VERSION: cmdName = @"SOURCE_VERSION"; break;
+            case LC_BUILD_VERSION: cmdName = @"BUILD_VERSION"; break;
+            case LC_ENCRYPTION_INFO_64: cmdName = @"ENCRYPTION_INFO_64"; break;
+            case LC_RPATH: cmdName = @"RPATH"; break;
+            case LC_DYLD_CHAINED_FIXUPS: cmdName = @"DYLD_CHAINED_FIXUPS"; break;
+            case LC_DYLD_EXPORTS_TRIE: cmdName = @"DYLD_EXPORTS_TRIE"; break;
+            case LC_DYLD_INFO_ONLY: cmdName = @"DYLD_INFO_ONLY"; break;
+            case LC_SYMSEG: cmdName = @"SYMSEG"; break;
+            case LC_THREAD: cmdName = @"THREAD"; break;
+            case LC_UNIXTHREAD: cmdName = @"UNIXTHREAD"; break;
+            case LC_LOADFVMLIB: cmdName = @"LOADFVMLIB"; break;
+            case LC_IDFVMLIB: cmdName = @"IDFVMLIB"; break;
+            case LC_IDENT: cmdName = @"IDENT"; break;
+            case LC_FVMFILE: cmdName = @"FVMFILE"; break;
+            case LC_PREPAGE: cmdName = @"PREPAGE"; break;
+            case LC_TWOLEVEL_HINTS: cmdName = @"TWOLEVEL_HINTS"; break;
+            case LC_PREBIND_CKSUM: cmdName = @"PREBIND_CKSUM"; break;
+            default: break;
+        }
+        NSString *subtitle = [NSString stringWithFormat:@"size: %u", lc->cmdsize];
+        if (lc->cmd == LC_SEGMENT_64) {
+            // 验证可完整读取 segment_command_64（72字节），避免越界
+            if ((uint64_t)offset + sizeof(struct segment_command_64) > data.length - sizeof(struct mach_header_64)) break;
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            char name[17] = {0};
+            strncpy(name, seg->segname, 16);
+            subtitle = [NSString stringWithFormat:@"%s | %llu bytes | %u sections", name, seg->vmsize, seg->nsects];
+        } else if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB || lc->cmd == LC_REEXPORT_DYLIB) {
+            const struct dylib_command *dlc = (const struct dylib_command *)lc;
+            const char *name = (const char *)lc + dlc->dylib.name.offset;
+            subtitle = [NSString stringWithUTF8String:name] ?: subtitle;
+        } else if (lc->cmd == LC_LOAD_DYLINKER) {
+            const struct dylinker_command *dlc = (const struct dylinker_command *)lc;
+            const char *name = (const char *)lc + dlc->name.offset;
+            subtitle = [NSString stringWithUTF8String:name] ?: subtitle;
+        } else if (lc->cmd == LC_RPATH) {
+            const struct rpath_command *rpc = (const struct rpath_command *)lc;
+            const char *path = (const char *)lc + rpc->path.offset;
+            subtitle = [NSString stringWithUTF8String:path] ?: subtitle;
+        } else if (lc->cmd == LC_ENCRYPTION_INFO_64) {
+            const struct encryption_info_command_64 *enc = (const struct encryption_info_command_64 *)lc;
+            subtitle = [NSString stringWithFormat:@"offset: %u, size: %u, cryptid: %u", enc->cryptoff, enc->cryptsize, enc->cryptid];
+        } else if (lc->cmd == LC_VERSION_MIN_IPHONEOS) {
+            const struct version_min_command *ver = (const struct version_min_command *)lc;
+            uint8_t major = (ver->version >> 16) & 0xFFFF;
+            uint8_t minor = (ver->version >> 8) & 0xFF;
+            uint8_t patch = ver->version & 0xFF;
+            subtitle = [NSString stringWithFormat:@"%d.%d.%d", major, minor, patch];
+        } else if (lc->cmd == LC_UUID) {
+            const struct uuid_command *uuidCmd = (const struct uuid_command *)lc;
+            NSUUID *uuid = [[NSUUID alloc] initWithUUIDBytes:uuidCmd->uuid];
+            subtitle = uuid.UUIDString;
+        } else if (lc->cmd == LC_MAIN) {
+            const struct entry_point_command *ep = (const struct entry_point_command *)lc;
+            subtitle = [NSString stringWithFormat:@"entryoff: 0x%llx, stacksize: %llu", ep->entryoff, ep->stacksize];
+        }
+        [list addObject:@{@"title": cmdName, @"subtitle": subtitle}];
+        offset += lc->cmdsize;
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaMachOSegments(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSString *executable = NSBundle.mainBundle.executablePath;
+    if (!executable) return list.copy;
+    NSData *data = [NSData dataWithContentsOfFile:executable options:NSDataReadingMappedIfSafe error:nil];
+    if (!data || data.length < sizeof(struct mach_header_64)) return list.copy;
+    const struct mach_header_64 *hdr = (const struct mach_header_64 *)data.bytes;
+    if (hdr->magic != MH_MAGIC_64) return list.copy;
+    const uint8_t *cmds = (const uint8_t *)(hdr + 1);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < hdr->ncmds; i++) {
+        if ((uint64_t)offset + sizeof(struct load_command) > data.length - sizeof(struct mach_header_64)) break;  // 边界检查修正：offset 相对 cmds(hdr+1)
+        const struct load_command *lc = (const struct load_command *)(cmds + offset);
+        if (lc->cmdsize == 0) break;
+        if (lc->cmd == LC_SEGMENT_64) {
+            // 验证可完整读取 segment_command_64（72字节），避免越界
+            if ((uint64_t)offset + sizeof(struct segment_command_64) > data.length - sizeof(struct mach_header_64)) break;
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            char name[17] = {0};
+            strncpy(name, seg->segname, 16);
+            NSMutableString *flags = [NSMutableString string];
+            if (seg->flags & SG_HIGHVM) [flags appendString:@"HIGHVM "];
+            if (seg->flags & SG_FVMLIB) [flags appendString:@"FVMLIB "];
+            if (seg->flags & SG_NORELOC) [flags appendString:@"NORELOC "];
+            if (seg->flags & SG_PROTECTED_VERSION_1) [flags appendString:@"PROTECTED "];
+            if (seg->flags & SG_READ_ONLY) [flags appendString:@"READ_ONLY "];
+            [list addObject:@{
+                @"title": [NSString stringWithFormat:@"%s", name],
+                @"subtitle": [NSString stringWithFormat:@"vm: 0x%016llx-%016llx | file: %llu bytes | %u sections | %@",
+                               seg->vmaddr, seg->vmaddr + seg->vmsize, seg->filesize, seg->nsects,
+                               flags.length > 0 ? flags : @"无特殊 flag"]
+            }];
+        }
+        offset += lc->cmdsize;
+    }
+    return list.copy;
+}
+
+static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaMachOSectionsForSegment(NSString *segName) {
+    NSMutableArray *list = [NSMutableArray array];
+    NSString *executable = NSBundle.mainBundle.executablePath;
+    if (!executable) return list.copy;
+    NSData *data = [NSData dataWithContentsOfFile:executable options:NSDataReadingMappedIfSafe error:nil];
+    if (!data || data.length < sizeof(struct mach_header_64)) return list.copy;
+    const struct mach_header_64 *hdr = (const struct mach_header_64 *)data.bytes;
+    if (hdr->magic != MH_MAGIC_64) return list.copy;
+    const uint8_t *cmds = (const uint8_t *)(hdr + 1);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < hdr->ncmds; i++) {
+        if ((uint64_t)offset + sizeof(struct load_command) > data.length - sizeof(struct mach_header_64)) break;  // 边界检查修正：offset 相对 cmds(hdr+1)
+        const struct load_command *lc = (const struct load_command *)(cmds + offset);
+        if (lc->cmdsize == 0) break;
+        if (lc->cmd == LC_SEGMENT_64) {
+            // 验证可完整读取 segment_command_64（72字节），避免越界
+            if ((uint64_t)offset + sizeof(struct segment_command_64) > data.length - sizeof(struct mach_header_64)) break;
+            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
+            char curSegName[17] = {0};
+            strncpy(curSegName, seg->segname, 16);
+            NSString *curSeg = [NSString stringWithUTF8String:curSegName];
+            if ([curSeg isEqualToString:segName]) {
+                // 验证 sections 数组完整可读，防止 nsects 越界
+                if ((uint8_t *)(seg + 1) + (uint64_t)seg->nsects * sizeof(struct section_64) > (uint8_t *)data.bytes + data.length) break;
+                const struct section_64 *sect = (const struct section_64 *)(seg + 1);
+                for (uint32_t j = 0; j < seg->nsects; j++) {
+                    char sectName[17] = {0};
+                    strncpy(sectName, sect[j].sectname, 16);
+                    [list addObject:@{
+                        @"title": [NSString stringWithUTF8String:sectName],
+                        @"subtitle": [NSString stringWithFormat:@"addr: 0x%016llx | size: %llu | offset: %u | align: %u",
+                                       sect[j].addr, sect[j].size, sect[j].offset, 1 << sect[j].align]
+                    }];
+                }
+                break;
+            }
+        }
+        offset += lc->cmdsize;
+    }
+    return list.copy;
+}
+
+typedef NS_ENUM(NSInteger, UCFilzaAppInfoSection) {
+    UCFilzaAppInfoSectionBasic = 0,
+    UCFilzaAppInfoSectionPaths,
+    UCFilzaAppInfoSectionStorage,
+    UCFilzaAppInfoSectionBinary,
+    UCFilzaAppInfoSectionRuntime,
+    UCFilzaAppInfoSectionEnvironment,
+    UCFilzaAppInfoSectionInfoPlist,
+    UCFilzaAppInfoSectionPermissions,
+    UCFilzaAppInfoSectionData,
+    UCFilzaAppInfoSectionDevice,
+    UCFilzaAppInfoSectionActions,
+    UCFilzaAppInfoSectionAppGroups
+};
+
+static vm_size_t UCFilzaMemoryUsage(void) {
+    struct task_basic_info info;
+    mach_msg_type_number_t size = TASK_BASIC_INFO_COUNT;
+    kern_return_t kerr = task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&info, &size);
+    if (kerr == KERN_SUCCESS) {
+        return info.resident_size;
+    }
+    return 0;
+}
+
+@interface UCFilzaAppInfoViewController ()
+
+@property (nonatomic, strong) NSArray<NSString *> *sectionTitles;
+@property (nonatomic, strong) NSArray<NSArray<NSDictionary *> *> *sectionData;
+
+@property (nonatomic, assign) uint64_t bundleSize;
+@property (nonatomic, assign) uint64_t documentsSize;
+@property (nonatomic, assign) uint64_t librarySize;
+@property (nonatomic, assign) uint64_t cachesSize;
+@property (nonatomic, assign) uint64_t tmpSize;
+@property (nonatomic, assign) uint64_t totalDataSize;
+
+@property (nonatomic, strong) NSArray<NSDictionary *> *appGroups;
+
+@end
+
+@implementation UCFilzaAppInfoViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    self.title = @"应用信息";
+    self.view.backgroundColor = UIColor.systemBackgroundColor;
+
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 44;
+    self.tableView.sectionHeaderTopPadding = 0;
+
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
+        initWithBarButtonSystemItem:UIBarButtonSystemItemClose
+                             target:self
+                             action:@selector(closeTapped)];
+
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithTitle:@"复制全部"
+                style:UIBarButtonItemStylePlain
+               target:self
+               action:@selector(copyAllInfo)];
+
+    [self loadAppInfo];
+    [self calculateSizes];
+    [self loadAppGroups];
+}
+
+- (void)closeTapped {
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)loadAppInfo {
+    NSBundle *bundle = NSBundle.mainBundle;
+    NSDictionary *info = bundle.infoDictionary;
+    
+    NSString *appName = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: @"未知";
+    NSString *bundleId = info[@"CFBundleIdentifier"] ?: @"未知";
+    NSString *executable = info[@"CFBundleExecutable"] ?: @"未知";
+    NSString *version = info[@"CFBundleShortVersionString"] ?: @"未知";
+    NSString *build = info[@"CFBundleVersion"] ?: @"未知";
+    NSString *minOS = info[@"MinimumOSVersion"] ?: @"未知";
+    
+    NSDate *launchDate = [NSDate dateWithTimeIntervalSinceNow:-NSProcessInfo.processInfo.systemUptime];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateStyle = NSDateFormatterMediumStyle;
+    fmt.timeStyle = NSDateFormatterMediumStyle;
+    NSString *launchTime = [fmt stringFromDate:launchDate];
+    
+    NSInteger badge = UIApplication.sharedApplication.applicationIconBadgeNumber;
+    
+    NSString *docsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *libPath = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *tmpPath = NSTemporaryDirectory();
+    
+    UIDevice *device = UIDevice.currentDevice;
+    NSUInteger cpuCount = [NSProcessInfo processInfo].activeProcessorCount;
+    uint64_t totalMemory = [NSProcessInfo processInfo].physicalMemory;
+    
+    NSError *error = nil;
+    NSDictionary *fsAttrs = [NSFileManager.defaultManager attributesOfFileSystemForPath:NSHomeDirectory() error:&error];
+    uint64_t freeDisk = [fsAttrs[NSFileSystemFreeSize] unsignedLongLongValue];
+    uint64_t totalDisk = [fsAttrs[NSFileSystemSize] unsignedLongLongValue];
+    
+    NSMutableArray<NSString *> *titles = [NSMutableArray array];
+    NSMutableArray<NSArray<NSDictionary *> *> *data = [NSMutableArray array];
+    
+    [titles addObject:@"基本信息"];
+    [data addObject:@[
+        @{@"title": @"应用名称", @"value": appName, @"copyable": @YES},
+        @{@"title": @"包标识符", @"value": bundleId, @"copyable": @YES},
+        @{@"title": @"可执行文件", @"value": executable, @"copyable": @YES},
+        @{@"title": @"版本号", @"value": [NSString stringWithFormat:@"%@ (%@)", version, build], @"copyable": @YES},
+        @{@"title": @"最低系统版本", @"value": minOS, @"copyable": @NO},
+        @{@"title": @"启动时间", @"value": launchTime, @"copyable": @NO},
+        @{@"title": @"角标数字", @"value": @(badge).stringValue, @"copyable": @NO, @"action": @"editBadge"}
+    ]];
+    
+    [titles addObject:@"常用路径"];
+    [data addObject:@[
+        @{@"title": @"Bundle 目录", @"value": bundle.bundlePath, @"action": @"browse"},
+        @{@"title": @"沙盒根目录", @"value": NSHomeDirectory(), @"action": @"browse"},
+        @{@"title": @"Documents", @"value": docsPath, @"action": @"browse"},
+        @{@"title": @"Library", @"value": libPath, @"action": @"browse"},
+        @{@"title": @"Caches", @"value": cachePath, @"action": @"browse"},
+        @{@"title": @"tmp", @"value": tmpPath, @"action": @"browse"}
+    ]];
+    
+    [titles addObject:@"存储空间"];
+    [data addObject:@[
+        @{@"title": @"应用大小", @"value": @"计算中...", @"loading": @YES},
+        @{@"title": @"Documents", @"value": @"计算中...", @"loading": @YES},
+        @{@"title": @"Library", @"value": @"计算中...", @"loading": @YES},
+        @{@"title": @"Caches", @"value": @"计算中...", @"loading": @YES},
+        @{@"title": @"tmp", @"value": @"计算中...", @"loading": @YES},
+        @{@"title": @"数据总大小", @"value": @"计算中...", @"loading": @YES}
+    ]];
+    
+    NSString *execPath = bundle.executablePath ?: @"";
+    NSString *arch = UCFilzaMachOArchitecture();
+    NSDictionary *rtStats = UCFilzaObjCRuntimeStats();
+    
+    [titles addObject:@"二进制信息"];
+    [data addObject:@[
+        @{@"title": @"可执行文件", @"value": execPath.lastPathComponent, @"copyable": @YES},
+        @{@"title": @"架构", @"value": arch, @"copyable": @NO},
+        @{@"title": @"Load Commands", @"value": [NSString stringWithFormat:@"%u 个", (unsigned int)[UCFilzaMachOLoadCommands() count]], @"action": @"loadCmds"},
+        @{@"title": @"Segments", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)[UCFilzaMachOSegments() count]], @"action": @"segments"},
+        @{@"title": @"依赖动态库", @"value": [NSString stringWithFormat:@"%u 个", _dyld_image_count()], @"action": @"dylibs"},
+        @{@"title": @"UUID", @"value": @"获取中...", @"loading": @YES}
+    ]];
+    
+    [titles addObject:@"运行时"];
+    [data addObject:@[
+        @{@"title": @"ObjC 类数量", @"value": [rtStats[@"classes"] stringValue], @"copyable": @NO},
+        @{@"title": @"ObjC 方法总数", @"value": [rtStats[@"methods"] stringValue], @"copyable": @NO},
+        @{@"title": @"ObjC 协议数", @"value": [rtStats[@"protocols"] stringValue], @"copyable": @NO},
+        @{@"title": @"加载 image 数", @"value": [NSString stringWithFormat:@"%u", _dyld_image_count()], @"copyable": @NO},
+        @{@"title": @"运行时长", @"value": [self stringFromTimeInterval:NSProcessInfo.processInfo.systemUptime], @"copyable": @NO}
+    ]];
+    
+    [titles addObject:@"环境变量 & 参数"];
+    [data addObject:@[
+        @{@"title": @"环境变量", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)NSProcessInfo.processInfo.environment.count], @"action": @"environment"},
+        @{@"title": @"启动参数", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)NSProcessInfo.processInfo.arguments.count], @"action": @"arguments"}
+    ]];
+    
+    NSArray *urlSchemes = UCFilzaURLSchemesList();
+    NSArray *bgModes = UCFilzaBackgroundModes();
+    
+    [titles addObject:@"Info.plist"];
+    [data addObject:@[
+        @{@"title": @"URL Schemes", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)urlSchemes.count], @"action": @"urlSchemes"},
+        @{@"title": @"后台模式", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)bgModes.count], @"action": @"bgModes"},
+        @{@"title": @"全部键值", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)info.count], @"action": @"infoPlist"}
+    ]];
+    
+    NSArray *perms = UCFilzaPrivacyPermissions();
+    [titles addObject:@"隐私权限声明"];
+    if (perms.count > 0) {
+        NSMutableArray *permItems = [NSMutableArray array];
+        for (NSDictionary *p in perms) {
+            [permItems addObject:@{
+                @"title": p[@"title"] ?: @"",
+                @"value": p[@"subtitle"] ?: @"",
+                @"copyable": @YES
+            }];
+        }
+        [data addObject:permItems.copy];
+    } else {
+        [data addObject:@[
+            @{@"title": @"无隐私权限声明", @"value": @"", @"copyable": @NO}
+        ]];
+    }
+    
+    NSArray *cookies = UCFilzaCookieList();
+    [titles addObject:@"应用数据"];
+    [data addObject:@[
+        @{@"title": @"UserDefaults", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)[NSUserDefaults standardUserDefaults].dictionaryRepresentation.count], @"action": @"userDefaults"},
+        @{@"title": @"Cookie 存储", @"value": [NSString stringWithFormat:@"%lu 个", (unsigned long)cookies.count], @"action": @"cookies"}
+    ]];
+    
+    [titles addObject:@"设备信息"];
+    [data addObject:@[
+        @{@"title": @"设备名称", @"value": device.name, @"copyable": @YES},
+        @{@"title": @"系统版本", @"value": [NSString stringWithFormat:@"%@ %@", device.systemName, device.systemVersion], @"copyable": @YES},
+        @{@"title": @"设备型号", @"value": device.model, @"copyable": @YES},
+        @{@"title": @"内存使用", @"value": UCFilzaByteCountString(UCFilzaMemoryUsage()), @"copyable": @NO},
+        @{@"title": @"总内存", @"value": UCFilzaByteCountString(totalMemory), @"copyable": @NO},
+        @{@"title": @"可用磁盘", @"value": UCFilzaByteCountString(freeDisk), @"copyable": @NO},
+        @{@"title": @"总磁盘", @"value": UCFilzaByteCountString(totalDisk), @"copyable": @NO},
+        @{@"title": @"CPU 核心数", @"value": @(cpuCount).stringValue, @"copyable": @NO}
+    ]];
+    
+    [titles addObject:@"快捷操作"];
+    [data addObject:@[
+        @{@"title": @"清除缓存", @"value": @"Caches + tmp", @"action": @"clearCache", @"destructive": @YES}
+    ]];
+    
+    [titles addObject:@"应用组目录"];
+    [data addObject:@[
+        @{@"title": @"加载中...", @"value": @"", @"loading": @YES}
+    ]];
+    
+    self.sectionTitles = titles.copy;
+    self.sectionData = data.copy;
+    [self.tableView reloadData];
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *uuid = UCFilzaMachOUUID();
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self updateBinaryUUID:uuid];
+        });
+    });
+}
+
+- (NSString *)stringFromTimeInterval:(NSTimeInterval)interval {
+    NSInteger ti = (NSInteger)interval;
+    NSInteger seconds = ti % 60;
+    NSInteger minutes = (ti / 60) % 60;
+    NSInteger hours = (ti / 3600);
+    if (hours > 0) {
+        return [NSString stringWithFormat:@"%02ld:%02ld:%02ld", (long)hours, (long)minutes, (long)seconds];
+    }
+    return [NSString stringWithFormat:@"%02ld:%02ld", (long)minutes, (long)seconds];
+}
+
+- (void)updateBinaryUUID:(NSString *)uuid {
+    if (self.sectionData.count <= UCFilzaAppInfoSectionBinary) return;
+    NSMutableArray *binary = [self.sectionData[UCFilzaAppInfoSectionBinary] mutableCopy];
+    if (binary.count >= 4) {
+        binary[3] = @{@"title": @"UUID", @"value": uuid ?: @"未知", @"copyable": @YES};
+    }
+    NSMutableArray *allData = [self.sectionData mutableCopy];
+    allData[UCFilzaAppInfoSectionBinary] = binary.copy;
+    self.sectionData = allData.copy;
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:UCFilzaAppInfoSectionBinary] withRowAnimation:UITableViewRowAnimationAutomatic];
+}
+
+- (void)calculateSizes {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *docsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *libPath = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *tmpPath = NSTemporaryDirectory();
+        
+        uint64_t bundleSize = UCFilzaDirectorySize(NSBundle.mainBundle.bundlePath);
+        uint64_t docsSize = UCFilzaDirectorySize(docsPath);
+        uint64_t libSize = UCFilzaDirectorySize(libPath);
+        uint64_t cacheSize = UCFilzaDirectorySize(cachePath);
+        uint64_t tmpSize = UCFilzaDirectorySize(tmpPath);
+        uint64_t totalData = docsSize + libSize + tmpSize;
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.bundleSize = bundleSize;
+            self.documentsSize = docsSize;
+            self.librarySize = libSize;
+            self.cachesSize = cacheSize;
+            self.tmpSize = tmpSize;
+            self.totalDataSize = totalData;
+            [self updateStorageSection];
+        });
+    });
+}
+
+- (void)updateStorageSection {
+    if (self.sectionData.count <= UCFilzaAppInfoSectionStorage) return;
+    
+    NSMutableArray<NSDictionary *> *storage = [self.sectionData[UCFilzaAppInfoSectionStorage] mutableCopy];
+    storage[0] = @{@"title": @"应用大小", @"value": UCFilzaByteCountString(self.bundleSize), @"copyable": @NO};
+    storage[1] = @{@"title": @"Documents", @"value": UCFilzaByteCountString(self.documentsSize), @"copyable": @NO};
+    storage[2] = @{@"title": @"Library", @"value": UCFilzaByteCountString(self.librarySize), @"copyable": @NO};
+    storage[3] = @{@"title": @"Caches", @"value": UCFilzaByteCountString(self.cachesSize), @"copyable": @NO};
+    storage[4] = @{@"title": @"tmp", @"value": UCFilzaByteCountString(self.tmpSize), @"copyable": @NO};
+    storage[5] = @{@"title": @"数据总大小", @"value": UCFilzaByteCountString(self.totalDataSize), @"copyable": @NO};
+    
+    NSMutableArray *allData = [self.sectionData mutableCopy];
+    allData[UCFilzaAppInfoSectionStorage] = storage.copy;
+    self.sectionData = allData.copy;
+    
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:UCFilzaAppInfoSectionStorage] withRowAnimation:UITableViewRowAnimationAutomatic];
+}
+
+- (void)loadAppGroups {
+    NSArray<NSDictionary *> *groups = [UCAppGroupHelper accessibleAppGroups] ?: @[];
+    self.appGroups = groups;
+    
+    if (self.sectionData.count <= UCFilzaAppInfoSectionAppGroups) return;
+    
+    NSMutableArray *allData = [self.sectionData mutableCopy];
+    
+    if (groups.count == 0) {
+        allData[UCFilzaAppInfoSectionAppGroups] = @[
+            @{@"title": @"无可用应用组", @"value": @"当前 App 未配置 App Group", @"copyable": @NO}
+        ];
+    } else {
+        NSMutableArray *groupItems = [NSMutableArray array];
+        for (NSDictionary *group in groups) {
+            [groupItems addObject:@{
+                @"title": group[@"identifier"] ?: @"",
+                @"value": group[@"path"] ?: @"",
+                @"action": @"browseAppGroup",
+                @"groupPath": group[@"path"] ?: @""
+            }];
+        }
+        allData[UCFilzaAppInfoSectionAppGroups] = groupItems.copy;
+    }
+    
+    self.sectionData = allData.copy;
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:UCFilzaAppInfoSectionAppGroups] withRowAnimation:UITableViewRowAnimationAutomatic];
+}
+
+#pragma mark - Table view data source
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return self.sectionTitles.count;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (section >= self.sectionData.count) return 0;
+    return self.sectionData[section].count;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    if (section >= self.sectionTitles.count) return nil;
+    return self.sectionTitles[section];
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *identifier = @"AppInfoCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:identifier];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:identifier];
+    }
+    
+    if (indexPath.section >= self.sectionData.count) return cell;
+    NSArray *rows = self.sectionData[indexPath.section];
+    if (indexPath.row >= rows.count) return cell;
+    
+    NSDictionary *item = rows[indexPath.row];
+    cell.textLabel.text = item[@"title"];
+    cell.detailTextLabel.text = item[@"value"];
+    
+    BOOL isLoading = [item[@"loading"] boolValue];
+    BOOL hasAction = item[@"action"] != nil;
+    BOOL destructive = [item[@"destructive"] boolValue];
+    
+    cell.detailTextLabel.numberOfLines = 0;
+    cell.textLabel.numberOfLines = 1;
+    cell.textLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:14];
+    
+    if (isLoading) {
+        cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    } else if (destructive) {
+        cell.textLabel.textColor = UIColor.systemRedColor;
+        cell.detailTextLabel.textColor = UIColor.systemRedColor;
+    } else {
+        cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+        cell.textLabel.textColor = UIColor.labelColor;
+    }
+    
+    if (hasAction) {
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else {
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    }
+    
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+    if (indexPath.section >= self.sectionData.count) return;
+    NSArray *rows = self.sectionData[indexPath.section];
+    if (indexPath.row >= rows.count) return;
+    
+    NSDictionary *item = rows[indexPath.row];
+    NSString *action = item[@"action"];
+    NSString *value = item[@"value"] ?: @"";
+    BOOL copyable = [item[@"copyable"] boolValue];
+    
+    if ([action isEqualToString:@"browse"]) {
+        [self browsePath:value title:item[@"title"]];
+    } else if ([action isEqualToString:@"browseAppGroup"]) {
+        [self browsePath:item[@"groupPath"] title:item[@"title"]];
+    } else if ([action isEqualToString:@"clearCache"]) {
+        [self confirmClearCache];
+    } else if ([action isEqualToString:@"editBadge"]) {
+        [self editBadge];
+    } else if ([action isEqualToString:@"dylibs"]) {
+        [self showDylibsList];
+    } else if ([action isEqualToString:@"loadCmds"]) {
+        [self showLoadCommands];
+    } else if ([action isEqualToString:@"segments"]) {
+        [self showSegments];
+    } else if ([action isEqualToString:@"environment"]) {
+        [self showEnvironmentList];
+    } else if ([action isEqualToString:@"arguments"]) {
+        [self showArgumentsList];
+    } else if ([action isEqualToString:@"urlSchemes"]) {
+        [self showURLSchemesList];
+    } else if ([action isEqualToString:@"bgModes"]) {
+        [self showBackgroundModes];
+    } else if ([action isEqualToString:@"infoPlist"]) {
+        [self showInfoPlistKeys];
+    } else if ([action isEqualToString:@"userDefaults"]) {
+        [self showUserDefaults];
+    } else if ([action isEqualToString:@"cookies"]) {
+        [self showCookies];
+    } else if (copyable && value.length > 0) {
+        [UIPasteboard.generalPasteboard setString:value];
+        UCFilzaPresentTransientMessage(self, @"已复制", nil);
+    }
+}
+
+- (void)showDylibsList {
+    NSArray *dylibs = UCFilzaLoadedDylibsList();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"加载动态库" items:dylibs];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showLoadCommands {
+    NSArray *cmds = UCFilzaMachOLoadCommands();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"Load Commands" items:cmds];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showSegments {
+    NSArray *segs = UCFilzaMachOSegments();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"Segments" items:segs];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showEnvironmentList {
+    NSArray *env = UCFilzaEnvironmentList();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"环境变量" items:env];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showArgumentsList {
+    NSArray *args = UCFilzaArgumentsList();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"启动参数" items:args];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showURLSchemesList {
+    NSArray *schemes = UCFilzaURLSchemesList();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"URL Schemes" items:schemes];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showBackgroundModes {
+    NSArray *modes = UCFilzaBackgroundModes();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"后台模式" items:modes];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showInfoPlistKeys {
+    NSArray *keys = UCFilzaInfoPlistKeys();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"Info.plist" items:keys];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showUserDefaults {
+    NSDictionary *defaults = [NSUserDefaults standardUserDefaults].dictionaryRepresentation;
+    NSMutableArray *items = [NSMutableArray array];
+    NSArray *sortedKeys = [defaults.allKeys sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+    for (NSString *key in sortedKeys) {
+        id value = defaults[key];
+        NSString *valueStr = [value description];
+        if (valueStr.length > 300) {
+            valueStr = [[valueStr substringToIndex:300] stringByAppendingString:@"..."];
+        }
+        [items addObject:@{
+            @"title": key,
+            @"subtitle": valueStr
+        }];
+    }
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"UserDefaults" items:items];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)showCookies {
+    NSArray *cookies = UCFilzaCookieList();
+    UCFilzaListViewController *vc = [UCFilzaListViewController controllerWithTitle:@"Cookies" items:cookies];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)browsePath:(NSString *)path title:(NSString *)title {
+    if (path.length == 0) return;
+    UIViewController *controller = UCFilzaViewControllerForPath(path, title ?: path.lastPathComponent);
+    if (controller) {
+        [self.navigationController pushViewController:controller animated:YES];
+    }
+}
+
+- (void)confirmClearCache {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"清除缓存"
+                                                                   message:@"确定要清除 Caches 和 tmp 目录下的所有文件吗？此操作不可撤销。"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"清除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+        [self clearCache];
+    }]];
+    
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)clearCache {
+    NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *tmpPath = NSTemporaryDirectory();
+    
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSError *error = nil;
+    NSUInteger clearedCount = 0;
+    
+    for (NSString *dirPath in @[cachePath, tmpPath]) {
+        if (dirPath.length == 0) continue;
+        NSArray *contents = [fm contentsOfDirectoryAtPath:dirPath error:&error];
+        if (!contents) continue;
+        
+        for (NSString *item in contents) {
+            NSString *fullPath = [dirPath stringByAppendingPathComponent:item];
+            [fm removeItemAtPath:fullPath error:nil];
+            clearedCount++;
+        }
+    }
+    
+    UCFilzaPresentTransientMessage(self, @"已清除", [NSString stringWithFormat:@"已清除 %lu 个文件", (unsigned long)clearedCount]);
+    [self calculateSizes];
+}
+
+- (void)editBadge {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"设置角标"
+                                                                   message:@"输入新的角标数字（留空清除）"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = @"0 = 清除角标";
+        textField.keyboardType = UIKeyboardTypeNumberPad;
+        textField.text = @(UIApplication.sharedApplication.applicationIconBadgeNumber).stringValue;
+    }];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        NSString *text = alert.textFields.firstObject.text ?: @"0";
+        NSInteger badge = text.integerValue;
+        [UIApplication.sharedApplication setApplicationIconBadgeNumber:badge];
+        [self loadAppInfo];
+        UCFilzaPresentTransientMessage(self, @"已更新", nil);
+    }]];
+    
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)copyAllInfo {
+    NSMutableString *info = [NSMutableString string];
+    
+    for (NSUInteger i = 0; i < self.sectionTitles.count; i++) {
+        [info appendFormat:@"=== %@ ===\n", self.sectionTitles[i]];
+        
+        if (i >= self.sectionData.count) continue;
+        NSArray *rows = self.sectionData[i];
+        
+        for (NSDictionary *item in rows) {
+            NSString *title = item[@"title"] ?: @"";
+            NSString *value = item[@"value"] ?: @"";
+            [info appendFormat:@"%@: %@\n", title, value];
+        }
+        
+        [info appendString:@"\n"];
+    }
+    
+    [UIPasteboard.generalPasteboard setString:info];
+    UCFilzaPresentTransientMessage(self, @"已复制", @"已复制全部信息");
 }
 
 @end
@@ -3652,7 +4866,7 @@ static UIImage *UCFilzaPreviewImageForCarAsset(NSString *filePath, NSString *ass
 + (void)presentFilzaPanelFromViewController:(UIViewController *)viewController {
     if (!viewController) return;
 
-    UCFilzaRootViewController *root = [[UCFilzaRootViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    UCFilzaAppInfoViewController *root = [[UCFilzaAppInfoViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
     UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:root];
     navigationController.modalPresentationStyle = UIModalPresentationFormSheet;
     navigationController.preferredContentSize = CGSizeMake(430, 640);
