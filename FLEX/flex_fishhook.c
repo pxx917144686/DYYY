@@ -1,26 +1,3 @@
-// Copyright (c) 2013, Facebook, Inc.
-// All rights reserved.
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//   * Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//   * Redistributions in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation
-//     and/or other materials provided with the distribution.
-//   * Neither the name Facebook nor the names of its contributors may be used to
-//     endorse or promote products derived from this software without specific
-//     prior written permission.
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "flex_fishhook.h"
 
 #include <dlfcn.h>
@@ -120,48 +97,52 @@ static void flex_perform_rebinding_with_section(struct rebindings_entry *rebindi
     uint32_t *indirect_symbol_indices = indirect_symtab + section->reserved1;
     void **indirect_symbol_bindings = (void **)((uintptr_t)slide + section->addr);
     vm_prot_t oldProtection = VM_PROT_READ;
-    
+    bool didChangeProtection = false;
+
     if (isDataConst) {
-        oldProtection = flex_get_protection(rebindings);
-        mprotect(indirect_symbol_bindings, section->size, PROT_READ | PROT_WRITE);
+        oldProtection = flex_get_protection(indirect_symbol_bindings);
+        if (mprotect(indirect_symbol_bindings, section->size, PROT_READ | PROT_WRITE) != 0) {
+            return;
+        }
+        didChangeProtection = true;
     }
-    
+
     for (uint i = 0; i < section->size / sizeof(void *); i++) {
         uint32_t symtab_index = indirect_symbol_indices[i];
-        
+
         if (symtab_index == INDIRECT_SYMBOL_ABS || symtab_index == INDIRECT_SYMBOL_LOCAL ||
             symtab_index == (INDIRECT_SYMBOL_LOCAL   | INDIRECT_SYMBOL_ABS)) {
             continue;
         }
-        
+
         uint32_t strtab_offset = symtab[symtab_index].n_un.n_strx;
         char *symbol_name = strtab + strtab_offset;
         bool symbol_name_longer_than_1 = symbol_name[0] && symbol_name[1];
         struct rebindings_entry *cur = rebindings;
-        
+
         while (cur) {
             for (uint j = 0; j < cur->rebindings_nel; j++) {
                 if (symbol_name_longer_than_1 &&
                   strcmp(&symbol_name[1], cur->rebindings[j].name) == 0) {
-                    
+
                     if (cur->rebindings[j].replaced != NULL &&
                       indirect_symbol_bindings[i] != cur->rebindings[j].replacement) {
-                        
+
                         *(cur->rebindings[j].replaced) = indirect_symbol_bindings[i];
                     }
-                    
+
                     indirect_symbol_bindings[i] = cur->rebindings[j].replacement;
                     goto symbol_loop;
                 }
             }
-            
+
             cur = cur->next;
         }
-        
+
     symbol_loop:;
     }
-    
-    if (isDataConst) {
+
+    if (isDataConst && didChangeProtection) {
         int protection = 0;
         if (oldProtection & VM_PROT_READ) {
             protection |= PROT_READ;
@@ -172,7 +153,7 @@ static void flex_perform_rebinding_with_section(struct rebindings_entry *rebindi
         if (oldProtection & VM_PROT_EXECUTE) {
             protection |= PROT_EXEC;
         }
-        
+
         mprotect(indirect_symbol_bindings, section->size, protection);
     }
 }
@@ -274,17 +255,11 @@ int flex_rebind_symbols(struct rebinding rebindings[], size_t rebindings_nel) {
     if (retval < 0) {
         return retval;
     }
-    
-    // If this was the first call, register callback for image additions (which is also invoked for
-    // existing images, otherwise, just run on existing images
-    if (!_flex_rebindings_head->next) {
-        _dyld_register_func_for_add_image(_flex_rebind_symbols_for_image);
-    } else {
-        uint32_t c = _dyld_image_count();
-        for (uint32_t i = 0; i < c; i++) {
-            _flex_rebind_symbols_for_image(_dyld_get_image_header(i), _dyld_get_image_vmaddr_slide(i));
-        }
+
+    uint32_t c = _dyld_image_count();
+    for (uint32_t i = 0; i < c; i++) {
+        _flex_rebind_symbols_for_image(_dyld_get_image_header(i), _dyld_get_image_vmaddr_slide(i));
     }
-    
+
     return retval;
 }
