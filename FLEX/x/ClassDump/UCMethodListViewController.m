@@ -1,11 +1,3 @@
-//
-//  UCMethodListViewController.m
-//  FLEX++
-//
-//  方法列表视图控制器实现
-//  稳定版：tableHeaderView搜索栏
-//
-
 #import "UCMethodListViewController.h"
 #import "../Disassembler/UCDisassembler.h"
 #import "../Disassembler/UCDisasmViewController.h"
@@ -44,10 +36,14 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = FLEXColor.primaryBackgroundColor;
-    self.title = [NSString stringWithFormat:@"%@ (%@方法)",
-                   self.className, self.isClassMethod ? @"类" : @"实例"];
+    self.title = self.className;
     
-    // 搜索栏
+    UISegmentedControl *segmentedControl = [[UISegmentedControl alloc] initWithItems:@[@"实例方法", @"类方法"]];
+    segmentedControl.selectedSegmentIndex = self.isClassMethod ? 1 : 0;
+    segmentedControl.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:1.0];
+    [segmentedControl addTarget:self action:@selector(segmentChanged:) forControlEvents:UIControlEventValueChanged];
+    self.navigationItem.titleView = segmentedControl;
+    
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
     [self.searchBar sizeToFit];
     self.searchBar.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.searchBar.frame.size.height);
@@ -58,22 +54,16 @@
     self.searchBar.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.searchBar.autocorrectionType = UITextAutocorrectionTypeNo;
     self.searchBar.tintColor = [UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:1.0];
-    self.searchBar.showsCancelButton = YES;
     
-    // 加载指示器
     self.loadingIndicator = [[UIActivityIndicatorView alloc]
         initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
-    self.loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | 
-                                            UIViewAutoresizingFlexibleBottomMargin |
-                                            UIViewAutoresizingFlexibleLeftMargin | 
-                                            UIViewAutoresizingFlexibleRightMargin;
+    self.loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin |
+                                              UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
     self.loadingIndicator.hidesWhenStopped = YES;
-    self.loadingIndicator.center = CGPointMake(self.view.bounds.size.width / 2, 
-                                               self.view.bounds.size.height / 2);
+    self.loadingIndicator.center = CGPointMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2);
     [self.view addSubview:self.loadingIndicator];
     [self.loadingIndicator startAnimating];
     
-    // 底部状态栏
     CGFloat statusBarHeight = 30;
     self.statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,
         self.view.bounds.size.height - statusBarHeight,
@@ -85,7 +75,6 @@
     self.statusLabel.backgroundColor = FLEXColor.primaryBackgroundColor;
     [self.view addSubview:self.statusLabel];
     
-    // 表格
     self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, 0,
         self.view.bounds.size.width, self.view.bounds.size.height - statusBarHeight)
                                                       style:UITableViewStylePlain];
@@ -100,7 +89,6 @@
     [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"MethodCell"];
     [self.view addSubview:self.tableView];
     
-    // 加载方法列表
     [self loadMethods];
 }
 
@@ -111,14 +99,11 @@
     CGFloat height = self.view.bounds.size.height;
     CGFloat statusBarHeight = 30;
     
-    // 更新加载指示器位置
     self.loadingIndicator.center = CGPointMake(width / 2, height / 2);
     
-    // 更新表格
     CGRect tableFrame = CGRectMake(0, 0, width, height - statusBarHeight);
     self.tableView.frame = tableFrame;
     
-    // 更新状态栏
     CGRect statusFrame = self.statusLabel.frame;
     statusFrame.size.width = width;
     statusFrame.origin.y = height - statusBarHeight;
@@ -126,7 +111,6 @@
 }
 
 - (void)loadMethods {
-    // 提前捕获需要的变量，避免在后台线程中访问self
     Class cls = self.targetClass;
     BOOL isClassMethod = self.isClassMethod;
     
@@ -141,7 +125,6 @@
                 Method *methodList = NULL;
                 
                 if (isClassMethod) {
-                    // 获取元类
                     Class metaCls = object_getClass(cls);
                     if (metaCls) {
                         methodList = class_copyMethodList(metaCls, &count);
@@ -177,7 +160,6 @@
             }
         }
         
-        // 按方法名排序
         if (methods.count > 0) {
             [methods sortUsingDescriptors:@[
                 [NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES selector:@selector(caseInsensitiveCompare:)]
@@ -192,12 +174,7 @@
             strongSelf.filteredMethods = methods;
             
             [strongSelf.loadingIndicator stopAnimating];
-            
-            // 强制刷新表格，确保内容正确显示
             [strongSelf.tableView reloadData];
-            [strongSelf.tableView setNeedsLayout];
-            [strongSelf.tableView layoutIfNeeded];
-            
             [strongSelf updateStatusLabel];
         });
     });
@@ -216,6 +193,21 @@
             @"共 %lu 个方法",
             (unsigned long)total];
     }
+}
+
+#pragma mark - 分段切换
+
+- (void)segmentChanged:(UISegmentedControl *)sender {
+    self.isClassMethod = (sender.selectedSegmentIndex == 1);
+    self.currentSearchText = @"";
+    self.searchBar.text = @"";
+    
+    [self.loadingIndicator startAnimating];
+    self.allMethods = @[];
+    self.filteredMethods = @[];
+    [self.tableView reloadData];
+    
+    [self loadMethods];
 }
 
 #pragma mark - UISearchBarDelegate
@@ -241,20 +233,22 @@
 - (void)filterWithText:(NSString *)searchText {
     if (searchText.length == 0) {
         self.filteredMethods = self.allMethods;
-    } else {
-        NSString *lower = searchText.lowercaseString;
-        NSMutableArray *filtered = [NSMutableArray array];
-        
-        for (NSDictionary *method in self.allMethods) {
-            NSString *name = method[@"name"];
-            if ([name.lowercaseString containsString:lower]) {
-                [filtered addObject:method];
-            }
-        }
-        
-        self.filteredMethods = filtered;
+        [self.tableView reloadData];
+        [self updateStatusLabel];
+        return;
     }
     
+    NSString *lower = searchText.lowercaseString;
+    NSMutableArray *filtered = [NSMutableArray array];
+    
+    for (NSDictionary *method in self.allMethods) {
+        NSString *name = method[@"name"];
+        if ([name.lowercaseString containsString:lower]) {
+            [filtered addObject:method];
+        }
+    }
+    
+    self.filteredMethods = filtered;
     [self.tableView reloadData];
     [self updateStatusLabel];
 }
@@ -277,7 +271,6 @@
     
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     
-    // 搜索结果高亮
     if (self.currentSearchText.length > 0) {
         NSString *searchText = self.currentSearchText.lowercaseString;
         NSString *lowerName = selName.lowercaseString;
@@ -304,7 +297,6 @@
             cell.textLabel.textColor = FLEXColor.primaryTextColor;
         }
     } else {
-        // 无搜索词时，直接设置 text
         cell.textLabel.attributedText = nil;
         cell.textLabel.text = selName;
         cell.textLabel.font = [UIFont fontWithName:@"Menlo-Regular" size:13];

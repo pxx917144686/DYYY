@@ -41,6 +41,8 @@ $(LIBRARY_NAME)_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
 # 包含所有源文件（排除FLEX原版和重复文件）
 $(LIBRARY_NAME)_FILES = $(shell find . \( -name '*.m' -o -name '*.mm' -o -name '*.c' \) | \
     grep -v "^./FLEX/" | \
+    grep -v "x/retdec/" | \
+    grep -v "x/retdec-build/" | \
     grep -v "x/Shared/FLEXKeychain.m" | \
     grep -v "x/Shared/FLEXKeychainQuery.m" | \
     grep -v "x/capstone/")
@@ -83,7 +85,7 @@ $(LIBRARY_NAME)_CFLAGS = -fobjc-arc -include flex_fishhook.h \
                  -I./x/capstone/include
 
 # 编译兼容性
-$(LIBRARY_NAME)_CCFLAGS = -std=c++11 -Wno-unused-function -Wno-objc-missing-property-synthesis
+$(LIBRARY_NAME)_CCFLAGS = -std=c++17 -Wno-unused-function -Wno-objc-missing-property-synthesis
 $(LIBRARY_NAME)_OBJCFLAGS = -fobjc-arc
 
 # 兼容性

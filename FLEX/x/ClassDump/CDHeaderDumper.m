@@ -4,6 +4,225 @@
 #import <objc/runtime.h>
 #import <mach-o/dyld.h>
 
+static NSString *CDSafeFileName(NSString *name);
+static BOOL CDIsLikelySwiftName(NSString *name);
+static BOOL CDShouldSkipImage(NSString *imagePath);
+static NSString *CDTypeFromEncoding(const char *encoding);
+static NSString *CDPropertyLine(objc_property_t property);
+static NSString *CDMethodLine(Method m, BOOL isClassMethod);
+static NSString *CDHeaderForClass(Class cls, NSString *imageName);
+static NSString *CDProtocolHeader(Protocol *protocol);
+
+#pragma mark - CDClassInfo
+
+@implementation CDClassInfo
++ (instancetype)infoForClass:(Class)cls {
+    if (!cls) return nil;
+    
+    CDClassInfo *info = [[CDClassInfo alloc] init];
+    NSString *className = NSStringFromClass(cls);
+    info.className = className;
+    
+    Class superCls = class_getSuperclass(cls);
+    info.superClassName = superCls ? NSStringFromClass(superCls) : nil;
+    
+    info.isMetaClass = class_isMetaClass(cls);
+    info.isKVOClass = [className hasPrefix:@"NSKVONotifying_"];
+    info.instanceSize = class_getInstanceSize(cls);
+    
+    const char *classNameC = className.UTF8String;
+    uint32_t imageCount = _dyld_image_count();
+    for (uint32_t i = 0; i < imageCount; i++) {
+        const char *cpath = _dyld_get_image_name(i);
+        if (!cpath) continue;
+        
+        NSString *imagePath = [NSString stringWithUTF8String:cpath];
+        unsigned int classCount = 0;
+        const char **names = objc_copyClassNamesForImage(cpath, &classCount);
+        if (!names) continue;
+        
+        BOOL found = NO;
+        for (unsigned int j = 0; j < classCount; j++) {
+            if (names[j] && strcmp(names[j], classNameC) == 0) {
+                info.imagePath = imagePath;
+                info.imageName = imagePath.lastPathComponent ?: @"Unknown";
+                found = YES;
+                break;
+            }
+        }
+        free(names);
+        if (found) break;
+    }
+    
+    if (!info.imageName) info.imageName = @"Unknown";
+    
+    unsigned int protocolCount = 0;
+    Protocol *__unsafe_unretained *protocols = class_copyProtocolList(cls, &protocolCount);
+    NSMutableArray<NSString *> *protoNames = [NSMutableArray array];
+    for (unsigned int i = 0; i < protocolCount; i++) {
+        const char *pn = protocol_getName(protocols[i]);
+        if (pn) [protoNames addObject:[NSString stringWithUTF8String:pn]];
+    }
+    if (protocols) free(protocols);
+    info.protocols = protoNames.copy;
+    
+    unsigned int propertyCount = 0;
+    objc_property_t *props = class_copyPropertyList(cls, &propertyCount);
+    NSMutableArray<NSDictionary *> *propInfo = [NSMutableArray array];
+    for (unsigned int i = 0; i < propertyCount; i++) {
+        const char *name = property_getName(props[i]);
+        const char *attrs = property_getAttributes(props[i]);
+        if (!name) continue;
+        
+        NSString *propName = [NSString stringWithUTF8String:name];
+        NSString *propAttrs = attrs ? [NSString stringWithUTF8String:attrs] : @"";
+        
+        NSString *type = @"id";
+        NSString *ivar = @"";
+        BOOL readonly = NO;
+        BOOL nonatomic = NO;
+        
+        NSArray<NSString *> *attrComponents = [propAttrs componentsSeparatedByString:@","];
+        for (NSString *comp in attrComponents) {
+            if (comp.length == 0) continue;
+            if ([comp hasPrefix:@"T"]) {
+                NSString *typeEnc = [comp substringFromIndex:1];
+                type = CDTypeFromEncoding(typeEnc.UTF8String);
+            } else if ([comp isEqualToString:@"R"]) {
+                readonly = YES;
+            } else if ([comp isEqualToString:@"N"]) {
+                nonatomic = YES;
+            } else if ([comp hasPrefix:@"V"]) {
+                ivar = [comp substringFromIndex:1];
+            }
+        }
+        
+        [propInfo addObject:@{
+            @"name": propName,
+            @"type": type,
+            @"typeEncoding": propAttrs,
+            @"readonly": @(readonly),
+            @"nonatomic": @(nonatomic),
+            @"ivar": ivar
+        }];
+    }
+    if (props) free(props);
+    info.properties = propInfo.copy;
+    
+    unsigned int methodCount = 0;
+    Method *methods = class_copyMethodList(cls, &methodCount);
+    NSMutableArray<NSDictionary *> *instMethods = [NSMutableArray array];
+    for (unsigned int i = 0; i < methodCount; i++) {
+        Method m = methods[i];
+        SEL sel = method_getName(m);
+        if (!sel) continue;
+        
+        NSString *name = NSStringFromSelector(sel);
+        
+        char *ret = method_copyReturnType(m);
+        NSString *retType = CDTypeFromEncoding(ret);
+        if (ret) free(ret);
+        
+        IMP imp = method_getImplementation(m);
+        
+        NSMutableArray<NSString *> *argTypes = [NSMutableArray array];
+        unsigned int argCount = method_getNumberOfArguments(m);
+        for (unsigned int j = 2; j < argCount; j++) {
+            char *argType = method_copyArgumentType(m, j);
+            if (argType) {
+                [argTypes addObject:CDTypeFromEncoding(argType)];
+                free(argType);
+            } else {
+                [argTypes addObject:@"id"];
+            }
+        }
+        
+        [instMethods addObject:@{
+            @"name": name,
+            @"returnType": retType,
+            @"argumentCount": @(argCount - 2),
+            @"argumentTypes": argTypes,
+            @"implementation": [NSString stringWithFormat:@"%p", imp]
+        }];
+    }
+    if (methods) free(methods);
+    
+    [instMethods sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES selector:@selector(caseInsensitiveCompare:)]]];
+    info.instanceMethods = instMethods.copy;
+    
+    Class meta = object_getClass(cls);
+    unsigned int classMethodCount = 0;
+    Method *classMethods = class_copyMethodList(meta, &classMethodCount);
+    NSMutableArray<NSDictionary *> *clsMethods = [NSMutableArray array];
+    for (unsigned int i = 0; i < classMethodCount; i++) {
+        Method m = classMethods[i];
+        SEL sel = method_getName(m);
+        if (!sel) continue;
+        
+        NSString *name = NSStringFromSelector(sel);
+        
+        char *ret = method_copyReturnType(m);
+        NSString *retType = CDTypeFromEncoding(ret);
+        if (ret) free(ret);
+        
+        IMP imp = method_getImplementation(m);
+        
+        NSMutableArray<NSString *> *argTypes = [NSMutableArray array];
+        unsigned int argCount = method_getNumberOfArguments(m);
+        for (unsigned int j = 2; j < argCount; j++) {
+            char *argType = method_copyArgumentType(m, j);
+            if (argType) {
+                [argTypes addObject:CDTypeFromEncoding(argType)];
+                free(argType);
+            } else {
+                [argTypes addObject:@"id"];
+            }
+        }
+        
+        [clsMethods addObject:@{
+            @"name": name,
+            @"returnType": retType,
+            @"argumentCount": @(argCount - 2),
+            @"argumentTypes": argTypes,
+            @"implementation": [NSString stringWithFormat:@"%p", imp]
+        }];
+    }
+    if (classMethods) free(classMethods);
+    
+    [clsMethods sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES selector:@selector(caseInsensitiveCompare:)]]];
+    info.classMethods = clsMethods.copy;
+    
+    unsigned int ivarCount = 0;
+    Ivar *ivars = class_copyIvarList(cls, &ivarCount);
+    NSMutableArray<NSDictionary *> *ivarInfo = [NSMutableArray array];
+    for (unsigned int i = 0; i < ivarCount; i++) {
+        Ivar ivar = ivars[i];
+        const char *name = ivar_getName(ivar);
+        const char *type = ivar_getTypeEncoding(ivar);
+        if (!name) continue;
+        
+        [ivarInfo addObject:@{
+            @"name": [NSString stringWithUTF8String:name],
+            @"type": CDTypeFromEncoding(type),
+            @"typeEncoding": type ? [NSString stringWithUTF8String:type] : @"",
+            @"offset": @(ivar_getOffset(ivar))
+        }];
+    }
+    if (ivars) free(ivars);
+    info.ivars = ivarInfo.copy;
+    
+    NSMutableArray<NSString *> *chain = [NSMutableArray array];
+    Class current = cls;
+    while (current) {
+        [chain addObject:NSStringFromClass(current)];
+        current = class_getSuperclass(current);
+    }
+    info.inheritanceChain = chain.copy;
+    
+    return info;
+}
+@end
+
 static NSString *CDSafeFileName(NSString *name) {
     NSMutableString *s = [name mutableCopy];
     NSArray *bad = @[@"/", @":", @"*", @"?", @"\"", @"<", @">", @"|", @"\\"];
@@ -638,6 +857,10 @@ static uint32_t _cachedImageCount = 0;
 }
 
 + (NSArray<NSString *> *)searchClassNames:(NSString *)keyword {
+    return [self searchClassNames:keyword prefixMatch:NO];
+}
+
++ (NSArray<NSString *> *)searchClassNames:(NSString *)keyword prefixMatch:(BOOL)prefixMatch {
     if (keyword.length == 0) {
         return [self allClassNames];
     }
@@ -647,12 +870,106 @@ static uint32_t _cachedImageCount = 0;
     NSMutableArray<NSString *> *results = [NSMutableArray array];
     
     for (NSString *name in allNames) {
-        if ([name.lowercaseString containsString:lowerKeyword]) {
-            [results addObject:name];
+        NSString *lowerName = name.lowercaseString;
+        if (prefixMatch) {
+            if ([lowerName hasPrefix:lowerKeyword]) {
+                [results addObject:name];
+            }
+        } else {
+            if ([lowerName containsString:lowerKeyword]) {
+                [results addObject:name];
+            }
         }
     }
     
     return results;
+}
+
+#pragma mark - 最近访问
+
+static NSMutableArray<NSString *> *_recentClasses = nil;
+static const NSInteger kMaxRecentClasses = 20;
+
++ (NSArray<NSString *> *)recentClassNames {
+    if (!_recentClasses) return @[];
+    return _recentClasses.copy;
+}
+
++ (void)addToRecentClasses:(NSString *)className {
+    if (className.length == 0) return;
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        _recentClasses = [NSMutableArray array];
+    });
+    
+    @synchronized (_recentClasses) {
+        [_recentClasses removeObject:className];
+        [_recentClasses insertObject:className atIndex:0];
+        if (_recentClasses.count > kMaxRecentClasses) {
+            [_recentClasses removeLastObject];
+        }
+    }
+}
+
+#pragma mark - 类详细信息
+
++ (CDClassInfo *)classInfoForName:(NSString *)className {
+    if (className.length == 0) return nil;
+    
+    Class cls = [self classForName:className];
+    if (!cls) return nil;
+    
+    return [CDClassInfo infoForClass:cls];
+}
+
+#pragma mark - 继承链
+
++ (NSArray<NSString *> *)inheritanceChainForClass:(NSString *)className {
+    if (className.length == 0) return @[];
+    
+    Class cls = [self classForName:className];
+    if (!cls) return @[];
+    
+    NSMutableArray<NSString *> *chain = [NSMutableArray array];
+    Class current = cls;
+    while (current) {
+        [chain addObject:NSStringFromClass(current)];
+        current = class_getSuperclass(current);
+    }
+    return chain.copy;
+}
+
+#pragma mark - 协议
+
++ (NSString *)protocolHeaderForName:(NSString *)protocolName {
+    if (protocolName.length == 0) return nil;
+    
+    Protocol *proto = objc_getProtocol(protocolName.UTF8String);
+    if (!proto) return nil;
+    
+    return CDProtocolHeader(proto);
+}
+
++ (NSArray<NSString *> *)allProtocolNames {
+    unsigned int count = 0;
+    Protocol *__unsafe_unretained *protocols = objc_copyProtocolList(&count);
+    if (!protocols || count == 0) return @[];
+    
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    for (unsigned int i = 0; i < count; i++) {
+        const char *pn = protocol_getName(protocols[i]);
+        if (pn) {
+            NSString *name = [NSString stringWithUTF8String:pn];
+            if (name.length > 0) {
+                [names addObject:name];
+            }
+        }
+    }
+    free(protocols);
+    
+    [names sortUsingSelector:@selector(caseInsensitiveCompare:)];
+    return names.copy;
 }
 
 @end

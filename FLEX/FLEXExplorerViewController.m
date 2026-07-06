@@ -27,7 +27,6 @@
 #import "x/ClassDump/UCClassSearchViewController.h"
 #import "x/Disassembler/UCDisassembler.h"
 #import "x/Disassembler/UCDisasmViewController.h"
-#import "x/Clean/UCSimulatorTool.h"
 #import "x/filza/UCFilzaTool.h"
 #import "x/Decrypt/UCDecryptTool.h"
 #import "x/Decrypt/DatabaseManager.h"
@@ -387,7 +386,6 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
     [toolbar.classdumpItem addTarget:self action:@selector(classdumpButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [toolbar.disassemblerItem addTarget:self action:@selector(disassemblerButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [toolbar.decryptItem addTarget:self action:@selector(decryptButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-    [toolbar.simulatorItem addTarget:self action:@selector(simulatorButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [toolbar.filzaItem addTarget:self action:@selector(filzaButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     [toolbar.protectionItem addTarget:self action:@selector(protectionButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 }
@@ -431,8 +429,7 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
 
 - (void)classdumpButtonTapped:(FLEXExplorerToolbarItem *)sender {
     // 直接进入类头文件搜索界面
-    UCClassSearchViewController *searchVC = [UCClassSearchViewController
-        searchViewControllerWithMode:UCClassSearchModeClassDump];
+    UCClassSearchViewController *searchVC = [[UCClassSearchViewController alloc] init];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:searchVC];
     nav.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:nav animated:YES completion:nil];
@@ -507,7 +504,6 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
 }
 
 - (void)disassemblerButtonTapped:(FLEXExplorerToolbarItem *)sender {
-    // 直接进入反汇编类搜索界面
     UCClassSearchViewController *searchVC = [UCClassSearchViewController
         searchViewControllerWithMode:UCClassSearchModeDisassembler];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:searchVC];
@@ -549,10 +545,6 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
     }]];
     
     [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)simulatorButtonTapped:(FLEXExplorerToolbarItem *)sender {
-    [UCSimulatorTool presentFromViewController:self];
 }
 
 - (void)filzaButtonTapped:(FLEXExplorerToolbarItem *)sender {

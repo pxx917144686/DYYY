@@ -2,7 +2,7 @@
 PACKAGE_IDENTIFIER = com.huami.dyyy
 PACKAGE_NAME = DYYY++
 PACKAGE_VERSION = 2.1-7++
-PACKAGE_ARCHITECTURE = iphoneos-arm64 iphoneos-arm64e
+PACKAGE_ARCHITECTURE = iphoneos-arm64
 PACKAGE_REVISION = 1
 PACKAGE_SECTION = Tweaks
 PACKAGE_DEPENDS = firmware (>= 14.0), mobilesubstrate
@@ -13,7 +13,7 @@ define Package/$(PACKAGE_IDENTIFIER)
   Package: com.huami.dyyy
   Name: DYYY++
   Version: 2.1-7++
-  Architecture: iphoneos-arm64 iphoneos-arm64e
+  Architecture: iphoneos-arm64
   Author: pxx917144686
   Section: Tweaks
   Depends: firmware (>= 14.0), mobilesubstrate
@@ -23,7 +23,7 @@ endef
 export THEOS_PACKAGE_DIR = $(CURDIR)
 
 # TARGET
-ARCHS = arm64 arm64e
+ARCHS = arm64
 TARGET = iphone:clang:latest:15.0
 USE_SWIFT = 1
 
@@ -67,9 +67,14 @@ $(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
 $(TWEAK_NAME)_FILES += DYYYSDKPatch.m
 
 # 添加 FLEX 源文件
-FLEX_FILES := $(shell find FLEX -name '*.m' -o -name '*.mm')
+FLEX_FILES := $(shell find FLEX -name '*.m' -o -name '*.mm' | grep -v 'FLEX/x/retdec' | grep -v 'FLEX/x/capstone' | grep -v 'UCDecompiler')
 $(TWEAK_NAME)_FILES += $(FLEX_FILES) FLEX/flex_fishhook.c
-$(TWEAK_NAME)_FILES += $(shell find FLEX/x/capstone -name '*.c')
+
+# Capstone 源文件（使用 FLEX 自带的 iOS 版本，用于反汇编）
+CAPSTONE_CORE := $(shell find FLEX/x/capstone -maxdepth 1 -name "*.c")
+CAPSTONE_ARM := $(shell find FLEX/x/capstone/arch/ARM -name "*.c")
+CAPSTONE_ARM64 := $(shell find FLEX/x/capstone/arch/AArch64 -name "*.c")
+$(TWEAK_NAME)_FILES += $(CAPSTONE_CORE) $(CAPSTONE_ARM) $(CAPSTONE_ARM64)
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
@@ -100,6 +105,8 @@ $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS)/include
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
+$(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -fno-modules
+$(TWEAK_NAME)_CCFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS += -Wno-everything

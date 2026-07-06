@@ -1,4 +1,5 @@
 #import "UCDisasmViewController.h"
+#import "UCPseudocodeViewController.h"
 #import "FLEXColor.h"
 #import <mach-o/dyld.h>
 #import <objc/runtime.h>
@@ -378,6 +379,8 @@
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选项"
                                                                     message:nil
                                                              preferredStyle:UIAlertControllerStyleActionSheet];
+
+    __weak typeof(self) weakSelf = self;
 
     [alert addAction:[UIAlertAction actionWithTitle:@"取消"
                                               style:UIAlertActionStyleCancel

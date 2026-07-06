@@ -50,9 +50,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Toolbar item for decrypt/capture.
 @property (nonatomic, readonly) FLEXExplorerToolbarItem *decryptItem;
 
-/// Toolbar item for simulator.
-@property (nonatomic, readonly) FLEXExplorerToolbarItem *simulatorItem;
-
 /// Toolbar item for filza file browser.
 @property (nonatomic, readonly) FLEXExplorerToolbarItem *filzaItem;
 

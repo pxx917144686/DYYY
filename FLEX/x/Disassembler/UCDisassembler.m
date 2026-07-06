@@ -1,6 +1,7 @@
 #import "UCDisassembler.h"
 #import <objc/runtime.h>
 #import <mach/mach.h>
+#import <mach/vm_map.h>
 #import <dlfcn.h>
 #include <capstone/capstone.h>
 #include <capstone/aarch64.h>
@@ -10,6 +11,22 @@
 static csh g_capstoneHandle = 0;
 static BOOL g_capstoneInitialized = NO;
 static dispatch_queue_t g_disasmQueue = NULL;
+
+static BOOL uc_safe_read_memory(uint64_t address, void *buffer, size_t size) {
+    if (address == 0 || size == 0 || buffer == NULL) return NO;
+    if (address < 0x100000000) return NO;
+    
+    vm_size_t outSize = 0;
+    kern_return_t kr = vm_read_overwrite(
+        mach_task_self(),
+        (vm_address_t)address,
+        (vm_size_t)size,
+        (vm_address_t)buffer,
+        &outSize
+    );
+    
+    return (kr == KERN_SUCCESS && outSize == size);
+}
 
 #pragma mark - 实现
 
@@ -96,7 +113,7 @@ static dispatch_queue_t g_disasmQueue = NULL;
 - (void)initCapstone {
     if (g_capstoneInitialized) return;
     
-    cs_err err = cs_open(CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN, &g_capstoneHandle);
+    cs_err err = cs_open(CS_ARCH_AARCH64, CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN, &g_capstoneHandle);
     if (err != CS_ERR_OK) {
         NSLog(@"[UCDisassembler] cs_open failed: %s", cs_strerror(err));
         return;
@@ -226,21 +243,26 @@ static dispatch_queue_t g_disasmQueue = NULL;
     
     if (size > 1048576) size = 1048576;
     
-    if (![UCDisassembler isAddressReadable:address size:MIN(size, 4096)]) {
+    uint8_t *codeBuffer = malloc(size);
+    if (!codeBuffer) return @[];
+    
+    if (!uc_safe_read_memory(address, codeBuffer, size)) {
+        free(codeBuffer);
         return @[];
     }
     
-    const uint8_t *code = (const uint8_t *)address;
     __block cs_insn *insns = NULL;
 
     __block size_t count = 0;
     if (g_disasmQueue) {
         dispatch_sync(g_disasmQueue, ^{
-            count = cs_disasm(g_capstoneHandle, code, size, address, 0, &insns);
+            count = cs_disasm(g_capstoneHandle, codeBuffer, size, address, 0, &insns);
         });
     } else {
-        count = cs_disasm(g_capstoneHandle, code, size, address, 0, &insns);
+        count = cs_disasm(g_capstoneHandle, codeBuffer, size, address, 0, &insns);
     }
+    
+    free(codeBuffer);
     
     if (count == 0 || !insns) {
         return @[];
@@ -410,15 +432,23 @@ static dispatch_queue_t g_disasmQueue = NULL;
 
 - (NSArray<UCDisasmInstruction *> *)hexDumpAtAddress:(uint64_t)address size:(NSUInteger)size {
     NSMutableArray *results = [NSMutableArray array];
-    const uint8_t *ptr = (const uint8_t *)address;
     
     NSUInteger rows = size / 4;
     if (rows > 1024) rows = 1024;
     
+    NSUInteger bufSize = rows * 4;
+    uint8_t *buf = malloc(bufSize);
+    if (!buf) return @[];
+    
+    if (!uc_safe_read_memory(address, buf, bufSize)) {
+        free(buf);
+        return @[];
+    }
+    
+    uint8_t *ptr = buf;
+    
     for (NSUInteger i = 0; i < rows; i++) {
         uint64_t insnAddr = address + i * 4;
-        
-        if (![UCDisassembler isAddressReadable:insnAddr size:4]) break;
         
         uint32_t insn = *(uint32_t *)ptr;
         ptr += 4;
@@ -446,6 +476,7 @@ static dispatch_queue_t g_disasmQueue = NULL;
         [results addObject:di];
     }
     
+    free(buf);
     return results;
 }
 
@@ -676,10 +707,12 @@ static dispatch_queue_t g_disasmQueue = NULL;
     uint64_t addr = start;
     uint64_t end = start + size;
     
+    uint32_t insnBuf = 0;
+    
     while (addr < end) {
-        if (![UCDisassembler isAddressReadable:addr size:4]) break;
+        if (!uc_safe_read_memory(addr, &insnBuf, sizeof(uint32_t))) break;
         
-        uint32_t insn = *(uint32_t *)addr;
+        uint32_t insn = insnBuf;
         
         BOOL isPrologue = NO;
         
@@ -785,16 +818,15 @@ static dispatch_queue_t g_disasmQueue = NULL;
     
     uint64_t pageBase = (insn.address & ~0xFFFULL) + op2.immediateValue;
     
-    __block uint64_t ldrOffset = 0;
-    __block BOOL foundLDR = NO;
+    uint64_t ldrOffset = 0;
+    BOOL foundLDR = NO;
     
     NSUInteger maxLookAhead = 10;
     
     for (NSInteger i = 1; i <= maxLookAhead; i++) {
         uint64_t nextAddr = insn.address + i * 4;
-        if (![UCDisassembler isAddressReadable:nextAddr size:4]) break;
-        
-        uint32_t nextInsn = *(uint32_t *)nextAddr;
+        uint32_t nextInsn = 0;
+        if (!uc_safe_read_memory(nextAddr, &nextInsn, sizeof(uint32_t))) break;
         
         if ((nextInsn & 0x3B000000) == 0x18000000) {
             continue;
@@ -851,23 +883,56 @@ static dispatch_queue_t g_disasmQueue = NULL;
 
 + (NSString *)stringAtAddress:(uint64_t)address maxLength:(NSUInteger)maxLen {
     if (address == 0 || maxLen == 0) return nil;
-    if (![self isAddressReadable:address size:1]) return nil;
     
-    const char *ptr = (const char *)address;
-    NSMutableString *str = [NSMutableString string];
+    NSUInteger bufSize = MIN(maxLen, 4096);
+    char *buf = malloc(bufSize);
+    if (!buf) return nil;
     
-    for (NSUInteger i = 0; i < maxLen; i++) {
-        if (![self isAddressReadable:address + i size:1]) break;
-        char c = ptr[i];
-        if (c == 0) break;
-        if (c < 0x20 || c > 0x7E) {
-            if (c != '\n' && c != '\t' && c != '\r') {
-                return nil;
-            }
-        }
-        [str appendFormat:@"%c", c];
+    if (!uc_safe_read_memory(address, buf, 1)) {
+        free(buf);
+        return nil;
     }
     
+    NSMutableString *str = [NSMutableString string];
+    NSUInteger totalRead = 0;
+    NSUInteger chunkSize = 256;
+    
+    while (totalRead < maxLen) {
+        NSUInteger readSize = MIN(chunkSize, maxLen - totalRead);
+        if (totalRead + readSize > bufSize) {
+            char *newBuf = realloc(buf, totalRead + readSize);
+            if (!newBuf) {
+                free(buf);
+                return nil;
+            }
+            buf = newBuf;
+            bufSize = totalRead + readSize;
+        }
+        
+        if (!uc_safe_read_memory(address + totalRead, buf + totalRead, readSize)) {
+            break;
+        }
+        
+        for (NSUInteger i = 0; i < readSize && totalRead + i < maxLen; i++) {
+            char c = buf[totalRead + i];
+            if (c == 0) {
+                free(buf);
+                if (str.length == 0) return nil;
+                return str;
+            }
+            if (c < 0x20 || c > 0x7E) {
+                if (c != '\n' && c != '\t' && c != '\r') {
+                    free(buf);
+                    return nil;
+                }
+            }
+            [str appendFormat:@"%c", c];
+        }
+        
+        totalRead += readSize;
+    }
+    
+    free(buf);
     if (str.length == 0) return nil;
     return str;
 }

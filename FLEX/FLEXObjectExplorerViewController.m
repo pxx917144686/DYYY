@@ -25,6 +25,7 @@
 #import "FLEXSingleRowSection.h"
 #import "FLEXShortcutsSection.h"
 #import "NSUserDefaults+FLEX.h"
+#import "x/ClassDump/UCClassHeaderDetailViewController.h"
 #import <objc/runtime.h>
 
 #pragma mark - 私有属性

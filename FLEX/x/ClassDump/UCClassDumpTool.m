@@ -16,6 +16,10 @@
     return [CDHeaderDumper headerForClassName:className];
 }
 
++ (CDClassInfo *)classInfoForName:(NSString *)className {
+    return [CDHeaderDumper classInfoForName:className];
+}
+
 + (NSArray<NSString *> *)allClassNames {
     return [CDHeaderDumper allClassNames];
 }
@@ -24,8 +28,32 @@
     return [CDHeaderDumper searchClassNames:keyword];
 }
 
++ (NSArray<NSString *> *)searchClassNames:(NSString *)keyword prefixMatch:(BOOL)prefixMatch {
+    return [CDHeaderDumper searchClassNames:keyword prefixMatch:prefixMatch];
+}
+
 + (NSArray<NSDictionary *> *)classNamesByImage {
     return [CDHeaderDumper allClassNamesByImage];
+}
+
++ (NSArray<NSString *> *)recentClassNames {
+    return [CDHeaderDumper recentClassNames];
+}
+
++ (void)addToRecentClasses:(NSString *)className {
+    [CDHeaderDumper addToRecentClasses:className];
+}
+
++ (NSArray<NSString *> *)inheritanceChainForClass:(NSString *)className {
+    return [CDHeaderDumper inheritanceChainForClass:className];
+}
+
++ (NSString *)protocolHeaderForName:(NSString *)protocolName {
+    return [CDHeaderDumper protocolHeaderForName:protocolName];
+}
+
++ (NSArray<NSString *> *)allProtocolNames {
+    return [CDHeaderDumper allProtocolNames];
 }
 
 @end

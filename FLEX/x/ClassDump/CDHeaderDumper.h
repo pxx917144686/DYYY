@@ -6,33 +6,51 @@ NS_ASSUME_NONNULL_BEGIN
 typedef void (^CDDumpProgressBlock)(CGFloat progress, NSString *text);
 typedef void (^CDDumpCompletionBlock)(NSURL *_Nullable zipURL, NSError *_Nullable error);
 
+@interface CDClassInfo : NSObject
+@property (nonatomic, copy) NSString *className;
+@property (nonatomic, copy) NSString *superClassName;
+@property (nonatomic, copy) NSString *imageName;
+@property (nonatomic, copy) NSString *imagePath;
+@property (nonatomic, assign) NSUInteger instanceSize;
+@property (nonatomic, assign) BOOL isMetaClass;
+@property (nonatomic, assign) BOOL isKVOClass;
+@property (nonatomic, strong) NSArray<NSString *> *protocols;
+@property (nonatomic, strong) NSArray<NSDictionary *> *properties;
+@property (nonatomic, strong) NSArray<NSDictionary *> *instanceMethods;
+@property (nonatomic, strong) NSArray<NSDictionary *> *classMethods;
+@property (nonatomic, strong) NSArray<NSDictionary *> *ivars;
+@property (nonatomic, strong) NSArray<NSString *> *inheritanceChain;
++ (instancetype)infoForClass:(Class)cls;
+@end
+
 @interface CDHeaderDumper : NSObject
 
-/// 批量导出所有类头文件为 ZIP
 + (void)dumpHeadersZipWithProgress:(CDDumpProgressBlock)progress
                         completion:(CDDumpCompletionBlock)completion;
 
-/// 获取指定类的头文件内容
-/// @param className 类名
-/// @return 头文件字符串，如果类不存在则返回 nil
 + (nullable NSString *)headerForClassName:(NSString *)className;
 
-/// 获取指定类名的 Class 对象
-/// @param className 类名
-/// @return Class 对象，如果不存在则返回 nil
 + (nullable Class)classForName:(NSString *)className;
 
-/// 获取所有可导出的类名列表（按 Image 分组）
-/// @return 数组，每个元素是 NSDictionary，包含 imageName、imagePath、classes(NSArray<NSString *>)
++ (nullable CDClassInfo *)classInfoForName:(NSString *)className;
+
 + (NSArray<NSDictionary *> *)allClassNamesByImage;
 
-/// 获取所有可导出的类名（扁平列表）
 + (NSArray<NSString *> *)allClassNames;
 
-/// 搜索类名
-/// @param keyword 搜索关键词
-/// @return 匹配的类名列表
 + (NSArray<NSString *> *)searchClassNames:(NSString *)keyword;
+
++ (NSArray<NSString *> *)searchClassNames:(NSString *)keyword prefixMatch:(BOOL)prefixMatch;
+
++ (NSArray<NSString *> *)recentClassNames;
+
++ (void)addToRecentClasses:(NSString *)className;
+
++ (NSArray<NSString *> *)inheritanceChainForClass:(NSString *)className;
+
++ (nullable NSString *)protocolHeaderForName:(NSString *)protocolName;
+
++ (NSArray<NSString *> *)allProtocolNames;
 
 @end
 
