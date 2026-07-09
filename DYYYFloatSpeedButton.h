@@ -5,7 +5,7 @@
 
 @class AWEPlayInteractionViewController;
 
-@interface FloatingSpeedButton : UIButton
+@interface DYYYFloatingSpeedButton : UIButton
 
 @property (nonatomic, assign) CGPoint lastLocation;
 @property (nonatomic, weak) AWEPlayInteractionViewController *interactionController;
@@ -31,12 +31,12 @@ extern NSInteger getCurrentSpeedIndex(void);
 extern float getCurrentSpeed(void);
 extern void setCurrentSpeedIndex(NSInteger index);
 extern void updateSpeedButtonUI(void);
-extern FloatingSpeedButton *getSpeedButton(void);
+extern DYYYFloatingSpeedButton *getSpeedButton(void);
 extern void showSpeedButton(void);
 extern void hideSpeedButton(void);
 extern void updateSpeedButtonVisibility(void);
 
 // 添加全局变量声明
-extern FloatingSpeedButton *speedButton;
+extern DYYYFloatingSpeedButton *speedButton;
 
 #endif /* DYYYFloatSpeedButton_h */

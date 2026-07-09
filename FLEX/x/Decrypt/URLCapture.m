@@ -2,7 +2,7 @@
 #import <objc/runtime.h>
 #import <zlib.h>
 #import <dlfcn.h>
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 #import "ScriptDecode.h"
 
 extern NSString *CurrentBundleID(void);
@@ -108,7 +108,7 @@ NSString * const IZXURLResponseCapturedNotification = @"IZXURLResponseCapturedNo
 NSString * const IZXURLResponseCapturedTextKey = @"text";
 
 static BOOL URLCaptureEnabled(void) {
-    return [[DatabaseManager sharedManager] getSwitch:@"zongkaiguan"
+    return [[DYYYDatabaseManager sharedManager] getSwitch:@"zongkaiguan"
                                               bundleID:CurrentBundleID()
                                           defaultValue:NO];
 }
@@ -159,7 +159,7 @@ static BOOL IZXRequestWasHandledByProtocol(NSURLRequest *request) {
 
 static NSURLSessionConfiguration *IZXConfigurationByAddingProtocol(NSURLSessionConfiguration *configuration) {
     if (!configuration) return configuration;
-    Class protocolClass = NSClassFromString(@"IZXURLCaptureProtocol");
+    Class protocolClass = NSClassFromString(@"DYYYIZXURLCaptureProtocol");
     if (!protocolClass) return configuration;
     NSArray *classes = configuration.protocolClasses ?: @[];
     for (Class cls in classes) {
@@ -301,7 +301,7 @@ static void SaveURLResponse(NSURLRequest *request,
             if (mayBeScript && scriptText.length > 0) {
                 NSString *scriptDecoded = IZXDecodeScriptText(scriptText, sourceLine);
                 if (scriptDecoded.length) {
-                    [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:scriptDecoded];
+                    [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:scriptDecoded];
                     bodyDescription = [NSString stringWithFormat:@"%@\n\n%@", bodyDescription ?: @"", scriptDecoded];
                 }
             }
@@ -315,7 +315,7 @@ static void SaveURLResponse(NSURLRequest *request,
                               errorLine, bodyDescription];
 
             NSString *bundleID = CurrentBundleID();
-            DatabaseManager *db = [DatabaseManager sharedManager];
+            DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
             [db insertDataIntoTable:@"url_responses" bundleID:bundleID text:info];
             [db insertLogText:[NSString stringWithFormat:@"URL响应已抓取: %ld %@", (long)statusCode, URLString]];
 
@@ -391,13 +391,13 @@ static IMP OriginalClassIMP(Class cls, const void *key, IMP wrapper) {
     return original == wrapper ? NULL : original;
 }
 
-@interface IZXURLCaptureProtocol : NSURLProtocol <NSURLSessionDataDelegate>
+@interface DYYYIZXURLCaptureProtocol : NSURLProtocol <NSURLSessionDataDelegate>
 @property (nonatomic, strong) NSURLSessionDataTask *task;
 @property (nonatomic, strong) NSMutableData *body;
 @property (nonatomic, strong) NSURLResponse *capturedResponse;
 @end
 
-@implementation IZXURLCaptureProtocol
+@implementation DYYYIZXURLCaptureProtocol
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
     if (!URLCaptureEnabled()) return NO;
@@ -661,7 +661,7 @@ void RegisterURLResponseHooks(void) {
                                                 DISPATCH_QUEUE_SERIAL);
         gTaskStates = [NSMutableDictionary dictionary];
 
-        [NSURLProtocol registerClass:[IZXURLCaptureProtocol class]];
+        [NSURLProtocol registerClass:[DYYYIZXURLCaptureProtocol class]];
         HookClassMethod([NSURLSessionConfiguration class], @selector(defaultSessionConfiguration),
                         (IMP)HookedDefaultSessionConfiguration, &kDefaultConfigOriginalKey, NULL);
         HookClassMethod([NSURLSessionConfiguration class], @selector(ephemeralSessionConfiguration),

@@ -1,5 +1,5 @@
 #import "ScriptDecode.h"
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 
 extern NSString *CurrentBundleID(void);
 
@@ -389,6 +389,6 @@ NSString *IZXDecodeScriptText(NSString *script, NSString *source) {
 void IZXTryRecordDecodedScript(NSString *script, NSString *source) {
     NSString *decoded = IZXDecodeScriptText(script, source);
     if (decoded.length == 0) return;
-    [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:decoded];
-    [[DatabaseManager sharedManager] insertLogText:[NSString stringWithFormat:@"脚本自适应检测完成: %@", IZXScriptDetectType(script ?: @"")]];
+    [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:CurrentBundleID() text:decoded];
+    [[DYYYDatabaseManager sharedManager] insertLogText:[NSString stringWithFormat:@"脚本自适应检测完成: %@", IZXScriptDetectType(script ?: @"")]];
 }

@@ -1,18 +1,18 @@
 #import "CapturePanel.h"
-#import "FLEXColor.h"
-#import "FLEXTableViewController.h"
-#import "FLEXNetworkMITMViewController.h"
-#import "FLEXNetworkRecorder.h"
-#import "FLEXNetworkTransaction.h"
-#import "FLEXNetworkTransactionCell.h"
-#import "FLEXNetworkObserver.h"
-#import "FLEXNetworkSettingsController.h"
-#import "FLEXResources.h"
+#import "DYYYFLEXColor.h"
+#import "DYYYFLEXTableViewController.h"
+#import "DYYYFLEXNetworkMITMViewController.h"
+#import "DYYYFLEXNetworkRecorder.h"
+#import "DYYYFLEXNetworkTransaction.h"
+#import "DYYYFLEXNetworkTransactionCell.h"
+#import "DYYYFLEXNetworkObserver.h"
+#import "DYYYFLEXNetworkSettingsController.h"
+#import "DYYYFLEXResources.h"
 #import "UIBarButtonItem+FLEX.h"
-#import "FLEXHTTPTransactionDetailController.h"
-#import "FLEXActivityViewController.h"
-#import "DatabaseManager.h"
-#import "UCDecryptTool.h"
+#import "DYYYFLEXHTTPTransactionDetailController.h"
+#import "DYYYFLEXActivityViewController.h"
+#import "DYYYDatabaseManager.h"
+#import "DYYYUCDecryptTool.h"
 
 #pragma mark - 通知名称定义
 
@@ -30,7 +30,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 #pragma mark - 功能开关项
 
-@interface CaptureSwitchItem : NSObject
+@interface DYYYCaptureSwitchItem : NSObject
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *switchKey;
 @property (nonatomic, copy) NSString *desc;
@@ -38,9 +38,9 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 + (instancetype)itemWithTitle:(NSString *)title key:(NSString *)key desc:(NSString *)desc default:(BOOL)def;
 @end
 
-@implementation CaptureSwitchItem
+@implementation DYYYCaptureSwitchItem
 + (instancetype)itemWithTitle:(NSString *)title key:(NSString *)key desc:(NSString *)desc default:(BOOL)def {
-    CaptureSwitchItem *item = [CaptureSwitchItem new];
+    DYYYCaptureSwitchItem *item = [DYYYCaptureSwitchItem new];
     item.title = title;
     item.switchKey = key;
     item.desc = desc;
@@ -51,7 +51,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 #pragma mark - 详情视图控制器
 
-@interface CaptureDetailViewController : UIViewController <UISearchBarDelegate>
+@interface DYYYCaptureDetailViewController : UIViewController <UISearchBarDelegate>
 
 @property (nonatomic, copy) NSString *textContent;
 @property (nonatomic, copy) NSString *navTitle;
@@ -64,7 +64,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 @end
 
-@implementation CaptureDetailViewController
+@implementation DYYYCaptureDetailViewController
 
 - (instancetype)initWithText:(NSString *)text title:(NSString *)title {
     self = [super init];
@@ -80,7 +80,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = FLEXColor.primaryBackgroundColor;
+    self.view.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     self.title = self.navTitle;
     
     // 导航栏按钮
@@ -107,7 +107,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"搜索内容...";
-    self.searchBar.backgroundColor = FLEXColor.primaryBackgroundColor;
+    self.searchBar.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
     
     // 文本视图
@@ -115,8 +115,8 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     self.textView = [[UITextView alloc] initWithFrame:CGRectMake(0, topOffset,
         self.view.bounds.size.width, self.view.bounds.size.height - topOffset)];
     self.textView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    self.textView.backgroundColor = FLEXColor.primaryBackgroundColor;
-    self.textView.textColor = FLEXColor.primaryTextColor;
+    self.textView.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
+    self.textView.textColor = DYYYFLEXColor.primaryTextColor;
     self.textView.font = [UIFont fontWithName:@"Menlo-Regular" size:self.fontSize];
     self.textView.editable = NO;
     self.textView.selectable = YES;
@@ -170,7 +170,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     if (self.navigationItem.rightBarButtonItems.count > 0) {
         sourceItem = self.navigationItem.rightBarButtonItems.firstObject;
     }
-    UIViewController *activityVC = [FLEXActivityViewController sharing:items source:sourceItem];
+    UIViewController *activityVC = [DYYYFLEXActivityViewController sharing:items source:sourceItem];
     [self presentViewController:activityVC animated:YES completion:nil];
 }
 
@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         self.textView.attributedText = [[NSAttributedString alloc]
             initWithString:self.textContent
             attributes:@{NSFontAttributeName: [UIFont fontWithName:@"Menlo-Regular" size:self.fontSize],
-                         NSForegroundColorAttributeName: FLEXColor.primaryTextColor}];
+                         NSForegroundColorAttributeName: DYYYFLEXColor.primaryTextColor}];
         self.matchRanges = @[];
         return;
     }
@@ -224,7 +224,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     NSMutableAttributedString *attrText = [[NSMutableAttributedString alloc]
         initWithString:self.textContent
         attributes:@{NSFontAttributeName: [UIFont fontWithName:@"Menlo-Regular" size:self.fontSize],
-                     NSForegroundColorAttributeName: FLEXColor.primaryTextColor}];
+                     NSForegroundColorAttributeName: DYYYFLEXColor.primaryTextColor}];
     
     NSMutableArray<NSValue *> *ranges = [NSMutableArray array];
     NSString *text = self.textContent.lowercaseString;
@@ -270,11 +270,11 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 #pragma mark - 设置视图控制器
 
-@interface CaptureSettingsVC : FLEXTableViewController
-@property (nonatomic, strong) NSArray<CaptureSwitchItem *> *switchItems;
+@interface DYYYCaptureSettingsVC : DYYYFLEXTableViewController
+@property (nonatomic, strong) NSArray<DYYYCaptureSwitchItem *> *switchItems;
 @end
 
-@implementation CaptureSettingsVC
+@implementation DYYYCaptureSettingsVC
 
 - (instancetype)init {
     self = [super initWithStyle:UITableViewStyleGrouped];
@@ -282,15 +282,15 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         self.title = @"功能设置";
         
         _switchItems = @[
-            [CaptureSwitchItem itemWithTitle:@"总开关" key:@"zongkaiguan" desc:@"控制所有解密/抓包功能" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"网络抓包增强" key:@"zhaiyaokaiguan" desc:@"捕获 URL 响应并自动解密" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"加密算法捕获" key:@"jiamisuanfakaiguan" desc:@"记录 AES/DES/RSA 等算法调用" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"HMAC 密钥捕获" key:@"hanmiyaokaiguan" desc:@"记录 HMAC 密钥和摘要算法" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"SSL 证书捕获" key:@"ssl3kaiguan" desc:@"捕获 SSL/TLS 握手证书" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"代理绕过" key:@"proxy_bypass" desc:@"禁用系统代理检测" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"RSA 加密捕获" key:@"rsa_encrypt" desc:@"记录 RSA 加密操作" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"RSA 解密捕获" key:@"rsa_decrypt" desc:@"记录 RSA 解密操作" default:NO],
-            [CaptureSwitchItem itemWithTitle:@"RSA 签名捕获" key:@"rsa_sign" desc:@"记录 RSA 签名操作" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"总开关" key:@"zongkaiguan" desc:@"控制所有解密/抓包功能" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"网络抓包增强" key:@"zhaiyaokaiguan" desc:@"捕获 URL 响应并自动解密" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"加密算法捕获" key:@"jiamisuanfakaiguan" desc:@"记录 AES/DES/RSA 等算法调用" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"HMAC 密钥捕获" key:@"hanmiyaokaiguan" desc:@"记录 HMAC 密钥和摘要算法" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"SSL 证书捕获" key:@"ssl3kaiguan" desc:@"捕获 SSL/TLS 握手证书" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"代理绕过" key:@"proxy_bypass" desc:@"禁用系统代理检测" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"RSA 加密捕获" key:@"rsa_encrypt" desc:@"记录 RSA 加密操作" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"RSA 解密捕获" key:@"rsa_decrypt" desc:@"记录 RSA 解密操作" default:NO],
+            [DYYYCaptureSwitchItem itemWithTitle:@"RSA 签名捕获" key:@"rsa_sign" desc:@"记录 RSA 签名操作" default:NO],
         ];
     }
     return self;
@@ -298,7 +298,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.tableView.backgroundColor = FLEXColor.primaryBackgroundColor;
+    self.tableView.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 60;
 }
@@ -328,12 +328,12 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:switchCellId];
         if (!cell) {
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:switchCellId];
-            cell.backgroundColor = FLEXColor.primaryBackgroundColor;
+            cell.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
         }
         
-        CaptureSwitchItem *item = self.switchItems[indexPath.row];
+        DYYYCaptureSwitchItem *item = self.switchItems[indexPath.row];
         cell.textLabel.text = item.title;
-        cell.textLabel.textColor = FLEXColor.primaryTextColor;
+        cell.textLabel.textColor = DYYYFLEXColor.primaryTextColor;
         cell.detailTextLabel.text = item.desc;
         cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
         cell.detailTextLabel.numberOfLines = 0;
@@ -344,7 +344,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         [sw addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
         
         NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"unknown";
-        BOOL isOn = [[DatabaseManager sharedManager] getSwitch:item.switchKey
+        BOOL isOn = [[DYYYDatabaseManager sharedManager] getSwitch:item.switchKey
                                                       bundleID:bundleID
                                                   defaultValue:item.defaultValue];
         sw.on = isOn;
@@ -355,11 +355,11 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:statCellId];
         if (!cell) {
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:statCellId];
-            cell.backgroundColor = FLEXColor.primaryBackgroundColor;
+            cell.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
         }
         
-        DatabaseManager *db = [DatabaseManager sharedManager];
+        DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
         
         if (indexPath.row == 0) {
             cell.textLabel.text = @"解密记录";
@@ -373,13 +373,13 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
             cell.detailTextLabel.textColor = [UIColor colorWithRed:0.78 green:0.4 blue:1.0 alpha:1.0];
         }
         
-        cell.textLabel.textColor = FLEXColor.primaryTextColor;
+        cell.textLabel.textColor = DYYYFLEXColor.primaryTextColor;
         return cell;
     } else {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:buttonCellId];
         if (!cell) {
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:buttonCellId];
-            cell.backgroundColor = FLEXColor.primaryBackgroundColor;
+            cell.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
         }
         cell.textLabel.text = @"清除所有本地数据";
         cell.textLabel.textColor = UIColor.redColor;
@@ -399,7 +399,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         
         [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
         [alert addAction:[UIAlertAction actionWithTitle:@"确定清除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull a) {
-            DatabaseManager *db = [DatabaseManager sharedManager];
+            DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
             [db clearTable:@"decrypt_data"];
             [db clearTable:@"crypto_keys"];
             [db clearTable:@"jiamisuanfa"];
@@ -429,9 +429,9 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 }
 
 - (void)switchChanged:(UISwitch *)sender {
-    CaptureSwitchItem *item = self.switchItems[sender.tag];
+    DYYYCaptureSwitchItem *item = self.switchItems[sender.tag];
     NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"unknown";
-    [[DatabaseManager sharedManager] setSwitch:item.switchKey
+    [[DYYYDatabaseManager sharedManager] setSwitch:item.switchKey
                                       bundleID:bundleID
                                          value:sender.isOn];
     
@@ -447,7 +447,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 #pragma mark - 通用列表基类
 
-@interface CaptureListViewController : FLEXTableViewController
+@interface DYYYCaptureListViewController : DYYYFLEXTableViewController
 
 @property (nonatomic, strong) NSArray *allItems;
 @property (nonatomic, strong) NSArray *filteredItems;
@@ -468,7 +468,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 @end
 
-@implementation CaptureListViewController
+@implementation DYYYCaptureListViewController
 
 - (instancetype)initWithTableName:(NSString *)tableName
                        scopeTitles:(NSArray<NSString *> *)scopeTitles
@@ -497,7 +497,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = 64;
-    self.tableView.backgroundColor = FLEXColor.primaryBackgroundColor;
+    self.tableView.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
 
     [self.tableView registerClass:UITableViewCell.class forCellReuseIdentifier:@"CaptureCell"];
     
@@ -515,7 +515,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)setupStatusBar {
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 30)];
-    footerView.backgroundColor = FLEXColor.primaryBackgroundColor;
+    footerView.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     
     self.statusLabel = [[UILabel alloc] initWithFrame:footerView.bounds];
     self.statusLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -565,7 +565,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     NSString *searchText = self.searchController.searchBar.text;
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSArray *items = [[DatabaseManager sharedManager]
+        NSArray *items = [[DYYYDatabaseManager sharedManager]
             queryAllRecordsFromTable:tableName limit:500];
         
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -641,12 +641,12 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
     cell.detailTextLabel.text = [self detailOfText:text];
     cell.detailTextLabel.font = [UIFont fontWithName:@"Menlo-Regular" size:10];
-    cell.detailTextLabel.textColor = FLEXColor.primaryTextColor;
+    cell.detailTextLabel.textColor = DYYYFLEXColor.primaryTextColor;
     cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
 
-    cell.backgroundColor = FLEXColor.primaryBackgroundColor;
+    cell.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     cell.selectedBackgroundView = [[UIView alloc] init];
-    cell.selectedBackgroundView.backgroundColor = [FLEXColor secondaryBackgroundColorWithAlpha:0.5];
+    cell.selectedBackgroundView.backgroundColor = [DYYYFLEXColor secondaryBackgroundColorWithAlpha:0.5];
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
     return cell;
@@ -662,7 +662,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (UIViewController *)detailViewControllerForItem:(NSDictionary *)item {
     NSString *text = item[@"longText"] ?: @"";
-    return [[CaptureDetailViewController alloc] initWithText:text title:@"详情"];
+    return [[DYYYCaptureDetailViewController alloc] initWithText:text title:@"详情"];
 }
 
 #pragma mark - 辅助
@@ -702,10 +702,10 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 #pragma mark - 解密列表
 
-@interface CaptureDecryptListVC : CaptureListViewController
+@interface DYYYCaptureDecryptListVC : DYYYCaptureListViewController
 @end
 
-@implementation CaptureDecryptListVC
+@implementation DYYYCaptureDecryptListVC
 
 - (instancetype)init {
     return [self initWithTableName:@"decrypt_data"
@@ -728,17 +728,17 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (UIViewController *)detailViewControllerForItem:(NSDictionary *)item {
     NSString *text = item[@"longText"] ?: @"";
-    return [[CaptureDetailViewController alloc] initWithText:text title:@"解密详情"];
+    return [[DYYYCaptureDetailViewController alloc] initWithText:text title:@"解密详情"];
 }
 
 @end
 
 #pragma mark - 密钥列表
 
-@interface CaptureKeyListVC : CaptureListViewController
+@interface DYYYCaptureKeyListVC : DYYYCaptureListViewController
 @end
 
-@implementation CaptureKeyListVC
+@implementation DYYYCaptureKeyListVC
 
 - (instancetype)init {
     return [self initWithTableName:@"crypto_keys"
@@ -760,17 +760,17 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (UIViewController *)detailViewControllerForItem:(NSDictionary *)item {
     NSString *text = item[@"longText"] ?: @"";
-    return [[CaptureDetailViewController alloc] initWithText:text title:@"密钥详情"];
+    return [[DYYYCaptureDetailViewController alloc] initWithText:text title:@"密钥详情"];
 }
 
 @end
 
 #pragma mark - 算法列表
 
-@interface CaptureCryptoListVC : CaptureListViewController
+@interface DYYYCaptureCryptoListVC : DYYYCaptureListViewController
 @end
 
-@implementation CaptureCryptoListVC
+@implementation DYYYCaptureCryptoListVC
 
 - (instancetype)init {
     return [self initWithTableName:@"jiamisuanfa"
@@ -794,14 +794,14 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (UIViewController *)detailViewControllerForItem:(NSDictionary *)item {
     NSString *text = item[@"longText"] ?: @"";
-    return [[CaptureDetailViewController alloc] initWithText:text title:@"算法详情"];
+    return [[DYYYCaptureDetailViewController alloc] initWithText:text title:@"算法详情"];
 }
 
 @end
 
 #pragma mark - 主面板容器
 
-@interface CapturePanelViewController () <UIPageViewControllerDataSource, UIPageViewControllerDelegate>
+@interface DYYYCapturePanelViewController () <UIPageViewControllerDataSource, UIPageViewControllerDelegate>
 
 @property (nonatomic, strong) UISegmentedControl *segment;
 @property (nonatomic, strong) UIPageViewController *pageVC;
@@ -810,12 +810,12 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 @end
 
-@implementation CapturePanelViewController
+@implementation DYYYCapturePanelViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    self.view.backgroundColor = FLEXColor.primaryBackgroundColor;
+    self.view.backgroundColor = DYYYFLEXColor.primaryBackgroundColor;
     self.title = @"逆向助手";
     
     UIBarButtonItem *close = [[UIBarButtonItem alloc]
@@ -830,10 +830,10 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     [self.segment addTarget:self action:@selector(segmentChanged:) forControlEvents:UIControlEventValueChanged];
     self.navigationItem.titleView = self.segment;
 
-    FLEXNetworkMITMViewController *networkVC = [[FLEXNetworkMITMViewController alloc] init];
-    CaptureDecryptListVC *decryptVC = [[CaptureDecryptListVC alloc] init];
-    CaptureKeyListVC *keyVC = [[CaptureKeyListVC alloc] init];
-    CaptureCryptoListVC *cryptoVC = [[CaptureCryptoListVC alloc] init];
+    DYYYFLEXNetworkMITMViewController *networkVC = [[DYYYFLEXNetworkMITMViewController alloc] init];
+    DYYYCaptureDecryptListVC *decryptVC = [[DYYYCaptureDecryptListVC alloc] init];
+    DYYYCaptureKeyListVC *keyVC = [[DYYYCaptureKeyListVC alloc] init];
+    DYYYCaptureCryptoListVC *cryptoVC = [[DYYYCaptureCryptoListVC alloc] init];
 
     _viewControllers = @[networkVC, decryptVC, keyVC, cryptoVC];
     _currentIndex = 0;
@@ -860,11 +860,11 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     // 延迟执行重量级操作放到后台线程，避免进入时卡顿
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // 确保解密 hook 已安装（放到后台线程）
-        [UCDecryptTool installDecryptHooksIfNeeded];
+        [DYYYUCDecryptTool installDecryptHooksIfNeeded];
         
         // 确保 FLEX 网络监听已启用
-        if (!FLEXNetworkObserver.isEnabled) {
-            FLEXNetworkObserver.enabled = YES;
+        if (!DYYYFLEXNetworkObserver.isEnabled) {
+            DYYYFLEXNetworkObserver.enabled = YES;
         }
     });
     
@@ -916,7 +916,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)enableAllFeatures:(BOOL)enable {
     NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"unknown";
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     
     NSArray *allSwitches = @[@"zongkaiguan", @"zhaiyaokaiguan", @"jiamisuanfakaiguan",
                               @"hanmiyaokaiguan", @"rsa_encrypt", @"rsa_decrypt", @"rsa_sign"];
@@ -930,7 +930,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)enableNetworkOnly {
     NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"unknown";
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     
     [db setSwitch:@"zongkaiguan" bundleID:bundleID value:YES];
     [db setSwitch:@"zhaiyaokaiguan" bundleID:bundleID value:YES];
@@ -946,7 +946,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
 - (void)updateRightBarButtonItems {
     UIBarButtonItem *settings = [[UIBarButtonItem alloc]
-        initWithImage:FLEXResources.gearIcon
+        initWithImage:DYYYFLEXResources.gearIcon
         style:UIBarButtonItemStylePlain
         target:self
         action:@selector(settingsTapped)];
@@ -961,7 +961,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 }
 
 - (void)settingsTapped {
-    CaptureSettingsVC *settings = [[CaptureSettingsVC alloc] init];
+    DYYYCaptureSettingsVC *settings = [[DYYYCaptureSettingsVC alloc] init];
     settings.title = @"功能设置";
     
     UIBarButtonItem *done = [[UIBarButtonItem alloc]
@@ -980,8 +980,8 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
     
     // 刷新各列表数据
     for (UIViewController *vc in self.viewControllers) {
-        if ([vc isKindOfClass:[CaptureListViewController class]]) {
-            [(CaptureListViewController *)vc reloadData];
+        if ([vc isKindOfClass:[DYYYCaptureListViewController class]]) {
+            [(DYYYCaptureListViewController *)vc reloadData];
         }
     }
 }
@@ -996,7 +996,7 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
             title = @"清除网络记录";
             msg = @"确定清除所有网络抓包记录？";
             action = ^{
-                [FLEXNetworkRecorder.defaultRecorder clearRecordedActivity];
+                [DYYYFLEXNetworkRecorder.defaultRecorder clearRecordedActivity];
             };
             break;
         }
@@ -1004,8 +1004,8 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
             title = @"清除解密记录";
             msg = @"确定清除所有解密记录？";
             action = ^{
-                [[DatabaseManager sharedManager] clearTable:@"decrypt_data"];
-                CaptureDecryptListVC *vc = self.viewControllers[CaptureTabDecrypt];
+                [[DYYYDatabaseManager sharedManager] clearTable:@"decrypt_data"];
+                DYYYCaptureDecryptListVC *vc = self.viewControllers[CaptureTabDecrypt];
                 [vc reloadData];
                 
                 [[NSNotificationCenter defaultCenter]
@@ -1019,8 +1019,8 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
             title = @"清除密钥记录";
             msg = @"确定清除所有密钥记录？";
             action = ^{
-                [[DatabaseManager sharedManager] clearTable:@"crypto_keys"];
-                CaptureKeyListVC *vc = self.viewControllers[CaptureTabKeys];
+                [[DYYYDatabaseManager sharedManager] clearTable:@"crypto_keys"];
+                DYYYCaptureKeyListVC *vc = self.viewControllers[CaptureTabKeys];
                 [vc reloadData];
                 
                 [[NSNotificationCenter defaultCenter]
@@ -1034,8 +1034,8 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
             title = @"清除算法记录";
             msg = @"确定清除所有加密算法调用记录？";
             action = ^{
-                [[DatabaseManager sharedManager] clearTable:@"jiamisuanfa"];
-                CaptureCryptoListVC *vc = self.viewControllers[CaptureTabCrypto];
+                [[DYYYDatabaseManager sharedManager] clearTable:@"jiamisuanfa"];
+                DYYYCaptureCryptoListVC *vc = self.viewControllers[CaptureTabCrypto];
                 [vc reloadData];
                 
                 [[NSNotificationCenter defaultCenter]
@@ -1134,7 +1134,7 @@ void IZXShowDecryptPanelNow(void) {
             rootVC = rootVC.presentedViewController;
         }
 
-        CapturePanelViewController *panel = [[CapturePanelViewController alloc] init];
+        DYYYCapturePanelViewController *panel = [[DYYYCapturePanelViewController alloc] init];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:panel];
         nav.modalPresentationStyle = UIModalPresentationFullScreen;
         [rootVC presentViewController:nav animated:YES completion:nil];

@@ -27,7 +27,7 @@ typedef uint32_t CCModeOptions;
 #import <Security/Security.h>
 #import <dlfcn.h>
 #import "fishhook.h"
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 
 #define LOG(fmt, ...) NSLog(@"[CryptoCapture] " fmt, ##__VA_ARGS__)
 
@@ -289,7 +289,7 @@ static NSString *SafeString(id obj) {
 static void StoreCryptoRecord(NSString *info, BOOL isDecrypt) {
     if (info.length == 0) return;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
     if (isDecrypt) {
         [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
@@ -320,7 +320,7 @@ static NSString *FormatIOBlock(NSString *title,
 
 static void CaptureDigest(const void *data, size_t len, const unsigned char *result, int digLen, const char *name) {
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     if (![db isDigestCaptureEnabledForBundle:bundleID]) return;
 
@@ -377,7 +377,7 @@ unsigned char* my_CC_SHA224(const void *data, CC_LONG len, unsigned char *md) {
 void my_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLen, const void *data, size_t dataLen, void *macOut) {
     if (!orig_CCHmac) return;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     BOOL enabled = [db isHMACCaptureEnabledForBundle:bundleID];
     orig_CCHmac(algorithm, key, keyLen, data, dataLen, macOut);
@@ -397,7 +397,7 @@ void my_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLen, const 
 CCCryptorStatus my_CCCrypt(CCOperation op, CCAlgorithm alg, CCOptions options, const void *key, size_t keyLen, const void *iv, const void *dataIn, size_t dataInLen, void *dataOut, size_t dataOutAvailable, size_t *dataOutMoved) {
     if (!orig_CCCrypt) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
 
     CCCryptorStatus status = orig_CCCrypt(op, alg, options, key, keyLen, iv,
@@ -457,7 +457,7 @@ CCCryptorStatus my_CCCryptorCreateWithMode(CCOperation op, CCMode mode, CCAlgori
                                            CCModeOptions options, CCCryptorRef *cryptorRef) {
     if (!orig_CCCryptorCreateWithMode) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
 
     CCCryptorStatus status = orig_CCCryptorCreateWithMode(op, mode, alg, padding, iv, key, keyLen,
@@ -510,7 +510,7 @@ CCCryptorStatus my_CCCryptorCreate(CCOperation op, CCAlgorithm alg, CCOptions op
                                    CCCryptorRef *cryptorRef) {
     if (!orig_CCCryptorCreate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
 
     CCCryptorStatus status = orig_CCCryptorCreate(op, alg, options, key, keyLength, iv, cryptorRef);
@@ -559,7 +559,7 @@ CCCryptorStatus my_CCCryptorUpdate(CCCryptorRef cryptorRef,
                                    size_t *dataOutMoved) {
     if (!orig_CCCryptorUpdate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
     NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
@@ -584,7 +584,7 @@ CCCryptorStatus my_CCCryptorUpdate(CCCryptorRef cryptorRef,
         NSString *io = FormatIOBlock(header, dataIn, dataInLength, dataOut, moved);
         StoreCryptoRecord(io, isDecrypt);
         if (!isDecrypt && dataInLength > 0) {
-            [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[加密前明文捕获/CCCryptorUpdate]\n" stringByAppendingString:io]];
+            [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[加密前明文捕获/CCCryptorUpdate]\n" stringByAppendingString:io]];
         }
     }
     return status;
@@ -595,7 +595,7 @@ CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
                                   size_t *dataOutMoved) {
     if (!orig_CCCryptorFinal) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
     NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
@@ -628,7 +628,7 @@ CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
                 NSString *whole = FormatIOBlock(wholeHeader, fullInput.bytes, fullInput.length, fullOutput.bytes, fullOutput.length);
                 StoreCryptoRecord(whole, isDecrypt);
                 if (!isDecrypt && fullInput.length > 0) {
-                    [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[加密前完整明文捕获]\n" stringByAppendingString:whole]];
+                    [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[加密前完整明文捕获]\n" stringByAppendingString:whole]];
                 }
             }
         }
@@ -724,7 +724,7 @@ static NSString *TryDecryptOnce(NSData *key, NSData *iv, NSData *ciphertext,
                           plain, HexStringFromBytes(out.bytes, out.length),
                           Base64StringFromBytes(out.bytes, out.length)];
         NSString *bundleID = CurrentBundleID();
-        DatabaseManager *db = [DatabaseManager sharedManager];
+        DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
         [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
         [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
         LOG(@"%@", info);
@@ -825,7 +825,7 @@ NSString *IZXTryAutoDecryptData(NSData *encryptedData, NSString *source) {
                                       (unsigned long)candidate.length, (unsigned long)out.length,
                                       plain, HexStringFromBytes(out.bytes, out.length), Base64StringFromBytes(out.bytes, out.length)];
                     NSString *bundleID = CurrentBundleID();
-                    DatabaseManager *db = [DatabaseManager sharedManager];
+                    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
                     [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
                     [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
                     LOG(@"%@", info);
@@ -908,7 +908,7 @@ NSString *IZXTryAutoDecryptData(NSData *encryptedData, NSString *source) {
     if (debugLines.count) {
         NSString *info = [NSString stringWithFormat:@"[自动解密未命中] %@\n已捕获参数数: %lu\n输入长度: %lu\n尝试摘要:\n%@", source ?: @"(unknown)", (unsigned long)specs.count, (unsigned long)encryptedData.length, [debugLines componentsJoinedByString:@"\n"]];
         NSString *bundleID = CurrentBundleID();
-        [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
+        [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
         LOG(@"%@", info);
     }
     return nil;
@@ -917,7 +917,7 @@ NSString *IZXTryAutoDecryptData(NSData *encryptedData, NSString *source) {
 OSStatus my_SecKeyEncrypt(SecKeyRef key, SecPadding padding, const uint8_t *plainText, size_t plainTextLen, uint8_t *cipherText, size_t *cipherTextLen) {
     if (!orig_SecKeyEncrypt) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db getSwitch:@"rsa_encrypt" bundleID:bundleID defaultValue:NO];
     OSStatus status = orig_SecKeyEncrypt(key, padding, plainText, plainTextLen,
                                         cipherText, cipherTextLen);
@@ -937,7 +937,7 @@ OSStatus my_SecKeyEncrypt(SecKeyRef key, SecPadding padding, const uint8_t *plai
 OSStatus my_SecKeyDecrypt(SecKeyRef key, SecPadding padding, const uint8_t *cipherText, size_t cipherTextLen, uint8_t *plainText, size_t *plainTextLen) {
     if (!orig_SecKeyDecrypt) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db getSwitch:@"rsa_decrypt" bundleID:bundleID defaultValue:NO];
     OSStatus status = orig_SecKeyDecrypt(key, padding, cipherText, cipherTextLen,
                                         plainText, plainTextLen);
@@ -960,7 +960,7 @@ OSStatus my_SecKeyDecrypt(SecKeyRef key, SecPadding padding, const uint8_t *ciph
 OSStatus my_SecKeyRawSign(SecKeyRef key, SecPadding padding, const uint8_t *dataToSign, size_t dataToSignLen, uint8_t *sig, size_t *sigLen) {
     if (!orig_SecKeyRawSign) return errSecUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     if ([db getSwitch:@"rsa_sign" bundleID:bundleID defaultValue:NO]) {
         NSString *data = HexStringFromBytes(dataToSign, dataToSignLen);
@@ -978,7 +978,7 @@ int my_CCKeyDerivationPBKDF(uint32_t algorithm, const char *password, size_t pas
     if (!orig_CCKeyDerivationPBKDF) return -1;
     int result = orig_CCKeyDerivationPBKDF(algorithm, password, passwordLen, salt, saltLen, prf, rounds, derivedKey, derivedKeyLen);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
         NSString *prfName;
         switch (prf) {
@@ -1022,7 +1022,7 @@ CFDataRef my_SecKeyCreateDecryptedData(SecKeyRef key, SecKeyAlgorithm algorithm,
     if (!orig_SecKeyCreateDecryptedData) return NULL;
     CFDataRef result = orig_SecKeyCreateDecryptedData(key, algorithm, ciphertext, error);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db getSwitch:@"rsa_decrypt" bundleID:bundleID defaultValue:NO]) {
         NSData *cipherData = (__bridge NSData *)ciphertext;
         NSData *plainData = result ? CFBridgingRelease(CFRetain(result)) : nil;
@@ -1049,7 +1049,7 @@ CFDataRef my_SecKeyCreateEncryptedData(SecKeyRef key, SecKeyAlgorithm algorithm,
     if (!orig_SecKeyCreateEncryptedData) return NULL;
     CFDataRef result = orig_SecKeyCreateEncryptedData(key, algorithm, plaintext, error);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db getSwitch:@"rsa_encrypt" bundleID:bundleID defaultValue:NO]) {
         NSData *plainData = (__bridge NSData *)plaintext;
         NSData *cipherData = result ? CFBridgingRelease(CFRetain(result)) : nil;
@@ -1072,7 +1072,7 @@ CFDataRef my_SecKeyCreateSignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFD
     if (!orig_SecKeyCreateSignature) return NULL;
     CFDataRef result = orig_SecKeyCreateSignature(key, algorithm, dataToSign, error);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db getSwitch:@"rsa_sign" bundleID:bundleID defaultValue:NO]) {
         NSData *signData = (__bridge NSData *)dataToSign;
         NSData *sigData = result ? CFBridgingRelease(CFRetain(result)) : nil;
@@ -1094,7 +1094,7 @@ Boolean my_SecKeyVerifySignature(SecKeyRef key, SecKeyAlgorithm algorithm, CFDat
     if (!orig_SecKeyVerifySignature) return false;
     Boolean result = orig_SecKeyVerifySignature(key, algorithm, signedData, signature, error);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db getSwitch:@"rsa_sign" bundleID:bundleID defaultValue:NO]) {
         NSData *signData = (__bridge NSData *)signedData;
         NSData *sigData = (__bridge NSData *)signature;
@@ -1114,7 +1114,7 @@ CCCryptorStatus my_CCCryptorGCMAddIV(CCCryptorRef cryptorRef, const void *iv, si
     if (!orig_CCCryptorGCMAddIV) return kCCUnimplemented;
     CCCryptorStatus status = orig_CCCryptorGCMAddIV(cryptorRef, iv, ivLen);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
         NSDictionary *ctx = GetCryptorContext(cryptorRef);
         if (ctx && [ctx isKindOfClass:[NSMutableDictionary class]]) {
@@ -1137,7 +1137,7 @@ CCCryptorStatus my_CCCryptorGCMAddAAD(CCCryptorRef cryptorRef, const void *aData
     if (!orig_CCCryptorGCMAddAAD) return kCCUnimplemented;
     CCCryptorStatus status = orig_CCCryptorGCMAddAAD(cryptorRef, aData, aDataLen);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
         NSDictionary *ctx = GetCryptorContext(cryptorRef);
         if (ctx && [ctx isKindOfClass:[NSMutableDictionary class]]) {
@@ -1158,7 +1158,7 @@ CCCryptorStatus my_CCCryptorGCMAddAAD(CCCryptorRef cryptorRef, const void *aData
 CCCryptorStatus my_CCCryptorGCMUpdate(CCCryptorRef cryptorRef, const void *dataIn, size_t dataInLength, void *dataOut) {
     if (!orig_CCCryptorGCMUpdate) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
     NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
@@ -1191,7 +1191,7 @@ CCCryptorStatus my_CCCryptorGCMUpdate(CCCryptorRef cryptorRef, const void *dataI
 CCCryptorStatus my_CCCryptorGCMFinal(CCCryptorRef cryptorRef, void *dataOut, void *tagOut, size_t *tagLength) {
     if (!orig_CCCryptorGCMFinal) return kCCUnimplemented;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
     NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
@@ -1225,7 +1225,7 @@ CCCryptorStatus my_CCCryptorGCMFinal(CCCryptorRef cryptorRef, void *dataOut, voi
                 NSString *whole = FormatIOBlock(wholeHeader, fullInput.bytes, fullInput.length, fullOutput.bytes, fullOutput.length);
                 StoreCryptoRecord(whole, isDecrypt);
                 if (!isDecrypt && fullInput.length > 0) {
-                    [[DatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[GCM 加密前明文捕获]\n" stringByAppendingString:whole]];
+                    [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:[@"[GCM 加密前明文捕获]\n" stringByAppendingString:whole]];
                 }
             }
         }

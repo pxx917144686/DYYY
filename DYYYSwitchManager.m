@@ -110,35 +110,8 @@ static NSLock *settingsLock = nil;
     if ([item.key hasPrefix:@"DYYYisEnableArea"] && ![item.key isEqualToString:@"DYYYisEnableArea"]) {
         BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
         [sender setEnabled:parentEnabled];
-        
-        NSArray<NSString *> *areaSubKeys = @[
-            @"DYYYisEnableAreaProvince",
-            @"DYYYisEnableAreaCity", 
-            @"DYYYisEnableAreaDistrict", 
-            @"DYYYisEnableAreaStreet"
-        ];
-        
-        if ([areaSubKeys containsObject:item.key]) {
-            // 检查是否有任何子开关启用
-            BOOL anyEnabled = NO;
-            for (NSString *key in areaSubKeys) {
-                if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) {
-                    anyEnabled = YES;
-                    break;
-                }
-            }
-            
-            if (anyEnabled && parentEnabled) {
-                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:item.key];
-                [sender setOn:YES animated:NO];
-            } else {
-                [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-                [sender setOn:NO animated:NO];
-            }
-        } else {
-            BOOL isOn = parentEnabled ? [[NSUserDefaults standardUserDefaults] boolForKey:item.key] : NO;
-            [sender setOn:isOn animated:NO];
-        }
+        BOOL isOn = parentEnabled ? [[NSUserDefaults standardUserDefaults] boolForKey:item.key] : NO;
+        [sender setOn:isOn animated:NO];
     }
     
     // 处理日期时间格式的互斥逻辑
@@ -364,7 +337,6 @@ static NSLock *settingsLock = nil;
                       tableView:(UITableView *)tableView
                settingSections:(NSArray<NSArray<DYYYSettingItem *> *> *)settingSections {
     
-    // 定义属地显示的子开关键名列表
     NSArray<NSString *> *areaSubKeys = @[
         @"DYYYisEnableAreaProvince",
         @"DYYYisEnableAreaCity", 
@@ -372,34 +344,12 @@ static NSLock *settingsLock = nil;
         @"DYYYisEnableAreaStreet"
     ];
     
-    // 添加此行：将变量声明移到方法开头，确保在整个方法范围内可见
+    if (section >= settingSections.count) {
+        return;
+    }
+    
     NSArray<DYYYSettingItem *> *sectionItems = settingSections[section];
     
-    // 使用锁保护设置修改
-    [settingsLock lock];
-    
-    @try {
-        // 先更新数据部分
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        
-        for (NSUInteger row = 0; row < sectionItems.count; row++) {
-            DYYYSettingItem *item = sectionItems[row];
-            
-            // 严格只更新属地显示的子开关，其他所有开关都不修改
-            if ([areaSubKeys containsObject:item.key]) {
-                [defaults setBool:enabled forKey:item.key];
-            }
-        }
-        [defaults synchronize];
-        
-        // 添加日志确认哪些键被修改
-        NSLog(@"DYYY: updateAreaSubSwitchesUI - 只修改了属地子开关，总开关状态: %@", enabled ? @"开" : @"关");
-    }
-    @finally {
-        [settingsLock unlock];
-    }
-    
-    // 再更新UI部分 - 只在cell可见时执行
     for (NSUInteger row = 0; row < sectionItems.count; row++) {
         DYYYSettingItem *item = sectionItems[row];
         
@@ -411,7 +361,9 @@ static NSLock *settingsLock = nil;
                 id accessoryView = [cell valueForKey:@"accessoryView"];
                 if (accessoryView && [accessoryView isKindOfClass:[UISwitch class]]) {
                     UISwitch *switchControl = (UISwitch *)accessoryView;
-                    [switchControl setOn:enabled animated:NO];
+                    switchControl.enabled = enabled;
+                    BOOL isOn = [[NSUserDefaults standardUserDefaults] boolForKey:item.key];
+                    [switchControl setOn:isOn animated:NO];
                 }
             }
         }

@@ -25,6 +25,7 @@
     self.backgroundColor = [UIColor clearColor];
     self.userInteractionEnabled = YES;
     self.isCancelled = NO;
+    self.allowSuccessAnimation = NO;
 
     BOOL isDarkMode = [DYYYManager isDarkMode];
 
@@ -161,10 +162,11 @@
 }
 
 - (void)dismiss {
-  if (_progress >= 0.5 && !self.isShowingSuccessAnimation &&
+  if (self.allowSuccessAnimation && !self.isShowingSuccessAnimation &&
       !self.isCancelled) {
     self.isShowingSuccessAnimation = YES;
     [self showSuccessAnimation:nil];
+    return;
   }
   if (self.isCancelled) {
     [self showCancelAnimation:nil];

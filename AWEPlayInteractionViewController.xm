@@ -15,7 +15,7 @@
 #import "DYYYPipPlayer.h"
 
 // 外部符号声明
-extern FloatingSpeedButton *speedButton;
+extern DYYYFloatingSpeedButton *speedButton;
 extern BOOL isFloatSpeedButtonEnabled;
 
 @interface DYYYDraggableButton : UIButton
@@ -1102,18 +1102,6 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
     BOOL isSwitchOn = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDouble"];
     if (!isSwitchOn) {
         %orig;
-    }
-}
-
-- (void)viewDidLayoutSubviews {
-    %orig;
-    if (![self.parentViewController isKindOfClass:%c(AWEFeedCellViewController)]) {
-        return;
-    }
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
-        CGRect frame = self.view.frame;
-        frame.size.height = self.view.superview.frame.size.height - 83;
-        self.view.frame = frame;
     }
 }
 
@@ -2675,7 +2663,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
                                                                color:@"#FF9500"
                                                               action:^{
             // 显示FLEX调试界面
-            Class flexManagerClass = %c(FLEXManager);
+            Class flexManagerClass = %c(DYYYFLEXManager);
             if (flexManagerClass) {
                 id flexManager = [flexManagerClass sharedManager];
                 if ([flexManager respondsToSelector:@selector(showExplorer)]) {
@@ -2887,21 +2875,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         [menuModules addObject:advancedSettingsModule];
     }
     
-    // 读取上次保存的顺序并应用
-    NSArray *savedOrder = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYModuleOrder"];
-    if (savedOrder && [savedOrder isKindOfClass:[NSArray class]] && savedOrder.count == menuModules.count) {
-        NSMutableArray *orderedModules = [NSMutableArray arrayWithCapacity:menuModules.count];
-        for (NSNumber *indexNumber in savedOrder) {
-            NSInteger index = [indexNumber integerValue];
-            if (index >= 0 && index < menuModules.count) {
-                [orderedModules addObject:menuModules[index]];
-            }
-        }
-        if (orderedModules.count == menuModules.count) {
-            return orderedModules;
-        }
-    }
-    
+    // 直接返回按代码生成的原始顺序（保存索引重排逻辑会导致全部显示首个模块的 bug）
     return menuModules;
 }
 

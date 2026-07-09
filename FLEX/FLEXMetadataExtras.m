@@ -9,14 +9,14 @@
 
 NSString * const FLEXAuxiliarynfoKeyFieldLabels = @"FLEXAuxiliarynfoKeyFieldLabels";
 
-@implementation FLEXMethodBase (Auxiliary)
+@implementation DYYYFLEXMethodBase (Auxiliary)
 - (id)auxiliaryInfoForKey:(NSString *)key { return nil; }
 @end
 
-@implementation FLEXProperty (Auxiliary)
+@implementation DYYYFLEXProperty (Auxiliary)
 - (id)auxiliaryInfoForKey:(NSString *)key { return nil; }
 @end
 
-@implementation FLEXIvar (Auxiliary)
+@implementation DYYYFLEXIvar (Auxiliary)
 - (id)auxiliaryInfoForKey:(NSString *)key { return nil; }
 @end

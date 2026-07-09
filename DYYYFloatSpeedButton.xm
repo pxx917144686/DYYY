@@ -6,7 +6,7 @@
 
 @class AWEFeedCellViewController;
 
-FloatingSpeedButton *speedButton = nil;
+DYYYFloatingSpeedButton *speedButton = nil;
 static BOOL isCommentViewVisible = NO;
 static BOOL showSpeedX = NO;
 static CGFloat speedButtonSize = 32.0;
@@ -143,7 +143,7 @@ void applyCurrentSpeedToVideo() {
     });
 }
 
-FloatingSpeedButton *getSpeedButton(void) { return speedButton; }
+DYYYFloatingSpeedButton *getSpeedButton(void) { return speedButton; }
 
 void showSpeedButton(void) { 
     isForceHidden = NO; 
@@ -176,7 +176,7 @@ void updateSpeedButtonVisibility() {
     });
 }
 
-@implementation FloatingSpeedButton
+@implementation DYYYFloatingSpeedButton
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -620,7 +620,7 @@ void updateSpeedButtonVisibility() {
                                          (screenBounds.size.height - speedButtonSize) / 2, 
                                          speedButtonSize, speedButtonSize);
         
-        speedButton = [[FloatingSpeedButton alloc] initWithFrame:initialFrame];
+        speedButton = [[DYYYFloatingSpeedButton alloc] initWithFrame:initialFrame];
         speedButton.interactionController = self;
         
         // 正确读取显示后缀设置

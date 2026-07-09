@@ -7,12 +7,12 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "FLEXSystemLogMessage.h"
+#import "DYYYFLEXSystemLogMessage.h"
 
 @protocol FLEXLogController <NSObject>
 
 /// Guaranteed to call back on the main thread.
-+ (instancetype)withUpdateHandler:(void(^)(NSArray<FLEXSystemLogMessage *> *newMessages))newMessagesHandler;
++ (instancetype)withUpdateHandler:(void(^)(NSArray<DYYYFLEXSystemLogMessage *> *newMessages))newMessagesHandler;
 
 - (BOOL)startMonitoring;
 

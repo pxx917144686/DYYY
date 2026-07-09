@@ -6,7 +6,7 @@
 //
 
 #import "SceneKit+Snapshot.h"
-#import "FHSSnapshotNodes.h"
+#import "DYYYFHSSnapshotNodes.h"
 
 /// 选择这个值是为了避免在相同z位置的节点之间发生z轴冲突，
 /// 但又足够小以至于它们在视觉上看起来处于同一平面。
@@ -53,11 +53,11 @@ CGFloat const kHeaderVerticalInset = 8.0;
     return node;
 }
 
-+ (instancetype)highlight:(FHSViewSnapshot *)view color:(UIColor *)color {
++ (instancetype)highlight:(DYYYFHSViewSnapshot *)view color:(UIColor *)color {
     return [self shapeNodeWithSize:view.frame.size materialDiffuse:color offsetZ:YES];
 }
 
-+ (instancetype)snapshot:(FHSViewSnapshot *)view {
++ (instancetype)snapshot:(DYYYFHSViewSnapshot *)view {
     id image = view.snapshotImage;
     return [self shapeNodeWithSize:view.frame.size materialDiffuse:image offsetZ:NO];
 }
@@ -103,7 +103,7 @@ CGFloat const kHeaderVerticalInset = 8.0;
     return border;
 }
 
-+ (instancetype)header:(FHSViewSnapshot *)view {
++ (instancetype)header:(DYYYFHSViewSnapshot *)view {
     SCNText *text = [SCNText labelGeometry:view.title font:[UIFont boldSystemFontOfSize:13.0]];
     SCNNode *textNode = [SCNNode nodeWithGeometry:text];
 
@@ -134,12 +134,12 @@ CGFloat const kHeaderVerticalInset = 8.0;
     return headerNode;
 }
 
-+ (instancetype)snapshot:(FHSViewSnapshot *)view
-                  parent:(FHSViewSnapshot *)parent
++ (instancetype)snapshot:(DYYYFHSViewSnapshot *)view
+                  parent:(DYYYFHSViewSnapshot *)parent
               parentNode:(SCNNode *)parentNode
                     root:(SCNNode *)rootNode
                    depth:(NSInteger *)depthOut
-                nodesMap:(NSMutableDictionary<NSString *, FHSSnapshotNodes *> *)nodesMap
+                nodesMap:(NSMutableDictionary<NSString *, DYYYFHSSnapshotNodes *> *)nodesMap
              hideHeaders:(BOOL)hideHeaders {
     NSInteger const depth = *depthOut;
 
@@ -154,7 +154,7 @@ CGFloat const kHeaderVerticalInset = 8.0;
     node.name = view.view.identifier;
 
     // 开始构建节点树
-    FHSSnapshotNodes *nodes = [FHSSnapshotNodes snapshot:view depth:depth];
+    DYYYFHSSnapshotNodes *nodes = [DYYYFHSSnapshotNodes snapshot:view depth:depth];
     nodes.snapshot = node;
 
     // 必须将节点添加到根节点
@@ -200,16 +200,16 @@ CGFloat const kHeaderVerticalInset = 8.0;
 
     nodesMap[view.view.identifier] = nodes;
 
-    NSMutableArray<FHSViewSnapshot *> *checkForIntersect = [NSMutableArray new];
+    NSMutableArray<DYYYFHSViewSnapshot *> *checkForIntersect = [NSMutableArray new];
     NSInteger maxChildDepth = depth;
 
     // 递归到子节点；重叠的子节点具有更高的深度
-    for (FHSViewSnapshot *child in view.children) {
+    for (DYYYFHSViewSnapshot *child in view.children) {
         NSInteger childDepth = depth + 1;
 
         // 与兄弟节点相交的子节点在
         // 前面兄弟节点的上层单独渲染
-        for (FHSViewSnapshot *sibling in checkForIntersect) {
+        for (DYYYFHSViewSnapshot *sibling in checkForIntersect) {
             if (CGRectIntersectsRect(sibling.frame, child.frame)) {
                 childDepth = maxChildDepth + 1;
                 break;

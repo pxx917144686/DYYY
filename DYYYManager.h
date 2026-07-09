@@ -5,6 +5,8 @@
 #endif
 #import "AwemeHeaders.h"
 
+@class YYAnimatedImageView;
+
 // 主题管理类（外部类声明）
 @interface AWEUIThemeManager : NSObject
 @property (nonatomic, assign) BOOL isLightTheme;
@@ -164,5 +166,41 @@
                       bgmURL:(NSString *)bgmURL
                     progress:(void (^)(NSInteger current, NSInteger total, NSString *status))progressBlock
                   completion:(void (^)(BOOL success, NSString *message))completion;
+
+#pragma mark - 评论相关方法
+
+/**
+ * 保存评论区图片（支持普通图片和实况照片）
+ * @param imageModels 评论图片模型数组（AWECommentImageModel）
+ * @param currentIndex 当前图片索引（-1 表示保存全部）
+ * @param completion 完成回调
+ */
++ (void)saveCommentImages:(NSArray *)imageModels
+             currentIndex:(NSInteger)currentIndex
+               completion:(void (^)(NSInteger successCount, NSInteger livePhotoCount, NSInteger failedCount))completion;
+
+/**
+ * 下载并分享评论区语音
+ * @param audioContent 语音内容 JSON 字符串
+ * @param userName 评论者用户名
+ * @param createTime 评论创建时间（NSNumber，秒级时间戳）
+ */
++ (void)downloadAndShareCommentAudio:(NSString *)audioContent
+                            userName:(NSString *)userName
+                          createTime:(NSNumber *)createTime;
+
+#pragma mark - 动画贴纸和GIF相关方法
+
+/**
+ * 保存动图表情（自动判断普通动图或 HEIF 动图）
+ * @param targetStickerView 表情视图
+ */
++ (void)saveAnimatedSticker:(YYAnimatedImageView *)targetStickerView;
+
+/**
+ * 保存 HEIF 格式动图表情
+ * @param stickerView 表情视图
+ */
++ (void)saveHeifSticker:(YYAnimatedImageView *)stickerView;
 
 @end

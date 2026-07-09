@@ -11,6 +11,7 @@
 #import "DYYYBottomAlertView.h"
 #import "DYYYUtils.h"
 #import "DYYYSwitchManager.h"
+#import "DYYYABTestHook.h"
 
 @interface UISwitch (DYYY_FuturisticEffects)
 - (void)applyFuturisticEffects;
@@ -18,11 +19,6 @@
 @end
 
 extern NSDictionary *dyyySettings;
-
-static BOOL gFileExists = NO;
-static BOOL gDataLoaded = NO;
-static NSDictionary *gFixedABTestData = nil;
-static dispatch_once_t onceToken;
 
 // 添加图片选择器代理
 @interface DYYYImagePickerDelegate : NSObject <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
@@ -407,66 +403,8 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
     [optionsDialog show];
 }
 
-// 加载固定ABTest数据
-void loadFixedABTestData(void) {
-    static NSDate *lastLoadAttemptTime = nil;
-    static const NSTimeInterval kMinLoadInterval = 60.0;
-    
-    NSDate *now = [NSDate date];
-    if (lastLoadAttemptTime && [now timeIntervalSinceDate:lastLoadAttemptTime] < kMinLoadInterval) {
-        return;
-    }
-    lastLoadAttemptTime = now;
-
-    __block NSString *documentsDirectory = nil;
-    __block NSString *dyyyFolderPath = nil;
-    __block NSString *jsonFilePath = nil;
-    __block NSFileManager *fileManager = nil;
-    __block NSError *error = nil;
-    
-    dispatch_once(&onceToken, ^{
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        documentsDirectory = [paths firstObject];
-        
-        dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
-        jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
-        
-        fileManager = [NSFileManager defaultManager];
-        if (![fileManager fileExistsAtPath:dyyyFolderPath]) {
-            error = nil;
-            [fileManager createDirectoryAtPath:dyyyFolderPath 
-                  withIntermediateDirectories:YES 
-                                   attributes:nil 
-                                        error:&error];
-            if (error) {
-                NSLog(@"[DYYY] 创建DYYY目录失败: %@", error.localizedDescription);
-            }
-        }
-        
-        // 检查文件是否存在
-        if (![fileManager fileExistsAtPath:jsonFilePath]) {
-            gFileExists = NO;
-            gDataLoaded = YES;
-            return;
-        }
-        
-        error = nil;
-        NSData *jsonData = [NSData dataWithContentsOfFile:jsonFilePath options:0 error:&error];
-        
-        if (jsonData) {
-            NSDictionary *loadedData = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
-            if (loadedData && !error) {
-                // 成功加载数据，保存到全局变量
-                gFixedABTestData = [loadedData copy];
-                gFileExists = YES;
-                gDataLoaded = YES;
-                return;
-            }
-        }
-        gFileExists = NO;
-        gDataLoaded = YES;
-    });
-}
+// 加载固定ABTest数据（使用 DYYYABTestHook 的统一实现，不再重复定义）
+// ensureABTestDataLoaded() / loadFixedABTestData() 已在 DYYYABTestHook.xm 中实现
 
 // 获取当前ABTest数据
 NSDictionary *getCurrentABTestData(void) {
@@ -602,8 +540,8 @@ NSDictionary *getCurrentABTestData(void) {
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
     
-    // 初始化热更新数据
-    loadFixedABTestData();
+    // 初始化热更新数据（使用 DYYYABTestHook 统一接口）
+    ensureABTestDataLoaded();
 
     [self ensureCustomAlbumSizeDefault];
 }
@@ -952,11 +890,17 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"时间进度位置" key:@"DYYYScheduleStyle" type:DYYYSettingItemTypeCustomPicker placeholder:@"点击选择"],
                 [DYYYSettingItem itemWithTitle:@"进度标签颜色" key:@"DYYYProgressLabelColor" type:DYYYSettingItemTypeTextField placeholder:@"十六进制"],
                 [DYYYSettingItem itemWithTitle:@"隐藏视频进度" key:@"DYYYHideVideoProgress" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"推荐过滤直播" key:@"DYYYisSkipLive" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"推荐过滤热点" key:@"DYYYisSkipHotSpot" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"推荐过滤低赞" key:@"DYYYfilterLowLikes" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭"],
-                [DYYYSettingItem itemWithTitle:@"推荐过滤文案" key:@"DYYYfilterKeywords" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
-                [DYYYSettingItem itemWithTitle:@"推荐视频时限" key:@"DYYYfiltertimelimit" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭，单位为天"],
+                [DYYYSettingItem itemWithTitle:@"过滤直播" key:@"DYYYisSkipLive" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤热点" key:@"DYYYisSkipHotSpot" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤图集" key:@"DYYYSkipPhoto" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤图文" key:@"DYYYSkipPhotoText" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤音乐卡" key:@"DYYYSkipMusic" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤抖音AI" key:@"DYYYSkipAIInteraction" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤道具" key:@"DYYYFilterProp" type:DYYYSettingItemTypeTextField placeholder:@"英文逗号分隔"],
+                [DYYYSettingItem itemWithTitle:@"禁用自动进入直播" key:@"DYYYDisableAutoEnterLive" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"过滤低赞" key:@"DYYYfilterLowLikes" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭"],
+                [DYYYSettingItem itemWithTitle:@"过滤文案" key:@"DYYYfilterKeywords" type:DYYYSettingItemTypeTextField placeholder:@"不填关闭"],
+                [DYYYSettingItem itemWithTitle:@"视频时限" key:@"DYYYfiltertimelimit" type:DYYYSettingItemTypeTextField placeholder:@"填0关闭，单位为天"],
                 [DYYYSettingItem itemWithTitle:@"首页全屏+透明" key:@"DYYYisEnableFullScreen" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去除App内更新" key:@"DYYYNoUpdates" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"去青少年弹窗" key:@"DYYYHideteenmode" type:DYYYSettingItemTypeSwitch],
@@ -1138,6 +1082,8 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"头像文本-修改" key:@"DYYYAvatarTapText" type:DYYYSettingItemTypeTextField placeholder:@"可以自定义修改"],
                 [DYYYSettingItem itemWithTitle:@"菜单背景颜色" key:@"DYYYBackgroundColor" type:DYYYSettingItemTypeColorPicker],
                 [DYYYSettingItem itemWithTitle:@"默认倍速（如果没有倍数设置）" key:@"DYYYDefaultSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
+                [DYYYSettingItem itemWithTitle:@"长按倍速" key:@"DYYYLongPressSpeed" type:DYYYSettingItemTypeSpeedPicker placeholder:@"点击选择"],
+                [DYYYSettingItem itemWithTitle:@"上下手势控制倍速" key:@"DYYYEnableLongPressSpeedGesture" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速按钮功能-开关" key:@"DYYYEnableFloatSpeedButton" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"倍速数值（强制倍数）" key:@"DYYYSpeedSettings" type:DYYYSettingItemTypeTextField placeholder:@"英文逗号分隔"],
                 [DYYYSettingItem itemWithTitle:@"下一个视频会自动恢复默认倍速" key:@"DYYYAutoRestoreSpeed" type:DYYYSettingItemTypeSwitch],
@@ -1153,6 +1099,7 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏弹幕" key:@"DYYYHideDanmaku" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -清屏移除进度" key:@"DYYYEnabshijianjindu" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏进度" key:@"DYYYHideTimeProgress" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"  -清屏隐藏章节" key:@"DYYYHideChapter" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏滑条" key:@"DYYYHideSlider" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏底栏" key:@"DYYYHideTabBar" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -清屏隐藏倍速" key:@"DYYYHideSpeed" type:DYYYSettingItemTypeSwitch],
@@ -2142,26 +2089,8 @@ NSDictionary *getCurrentABTestData(void) {
             ![item.key isEqualToString:@"DYYYisEnableArea"]) {
             BOOL parentEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableArea"];
             switchView.enabled = parentEnabled;
-            BOOL isAreaSubSwitch = [item.key isEqualToString:@"DYYYisEnableAreaProvince"] ||
-                                  [item.key isEqualToString:@"DYYYisEnableAreaCity"] ||
-                                  [item.key isEqualToString:@"DYYYisEnableAreaDistrict"] ||
-                                  [item.key isEqualToString:@"DYYYisEnableAreaStreet"];
-            if (isAreaSubSwitch) {
-                BOOL anyEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaProvince"] ||
-                                [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaCity"] ||
-                                [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaDistrict"] ||
-                                [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableAreaStreet"];
-                if (anyEnabled && parentEnabled) {
-                    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:item.key];
-                    [switchView setOn:YES];
-                } else {
-                    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:item.key];
-                    [switchView setOn:NO];
-                }
-            } else {
-                BOOL isOn = parentEnabled ? [[NSUserDefaults standardUserDefaults] boolForKey:item.key] : NO;
-                [switchView setOn:isOn];
-            }
+            BOOL isOn = parentEnabled ? [[NSUserDefaults standardUserDefaults] boolForKey:item.key] : NO;
+            [switchView setOn:isOn];
         } else {
             [switchView setOn:[[NSUserDefaults standardUserDefaults] boolForKey:item.key]];
         }
@@ -2385,6 +2314,7 @@ NSDictionary *getCurrentABTestData(void) {
         if (!error) {
             gFileExists = NO;
             gFixedABTestData = nil;
+            gDataLoaded = NO;
             [DYYYManager showToast:@"ABTest配置文件已删除"];
         } else {
             [DYYYManager showToast:[NSString stringWithFormat:@"删除配置文件失败: %@", error.localizedDescription]];

@@ -52,14 +52,14 @@ $(TWEAK_NAME)_FILES = DYYY.xm \
             DYYYFloatClearButton.xm \
             AWEPlayInteractionViewController.xm \
             AWEModernLongPressPanelTableViewController.xm \
-            CityManager.m \
+            DYYYCityManager.m \
             DYYYManager.m \
             DYYYSettingViewController.m \
             DYYYSwitchManager.m \
             DYYYToast.m \
             DYYYBottomAlertView.m \
             DYYYUtils.m
-$(TWEAK_NAME)_FILES += DYYYFilterAdsAndFeed.xm DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
+$(TWEAK_NAME)_FILES += DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 $(TWEAK_NAME)_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
 $(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
 
@@ -90,14 +90,12 @@ $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage SwiftUI Combine
-$(TWEAK_NAME)_LDFLAGS += -L$(THEOS_PROJECT_DIR)/libwebp -lwebp
 # 链接器标志，解决class_ro_t指针签名警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_adhoc_codesign -Xlinker -objc_abi_version -Xlinker 2
 # 统一class_ro_t指针签名设置，解决链接警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_warn_duplicate_libraries
 # 抑制class_ro_t指针签名不一致警告
 $(TWEAK_NAME)_LDFLAGS += -Wl,-w
-$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/libwebp/include
 
 # FLEX 库和头文件路径
 $(TWEAK_NAME)_LIBRARIES = 

@@ -12,8 +12,8 @@ static BOOL isCommentViewVisible = NO;
 static BOOL isForceHidden = NO;
 static void hideSpeedButton(void) {}
 static void showSpeedButton(void) {}
-// HideUIButton 接口声明
-@interface HideUIButton : UIButton
+// DYYYHideUIButton 接口声明
+@interface DYYYHideUIButton : UIButton
 // 状态属性
 @property(nonatomic, assign) BOOL isElementsHidden;
 @property(nonatomic, assign) BOOL isLocked;
@@ -47,7 +47,7 @@ static void showSpeedButton(void) {}
 static void setupFloatClearButton(void);
 static void updateFloatClearButton(NSString *changedKey);
 static void initTargetClassNames(void);
-static HideUIButton *hideButton;
+static DYYYHideUIButton *hideButton;
 static BOOL isAppInTransition = NO;
 static NSArray *targetClassNames;
 
@@ -91,6 +91,52 @@ void updateClearButtonVisibility() {
             hideButton.hidden = shouldHide;
         }
     });
+}
+
+void reloadClearButtonConfiguration(void) {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reloadClearButtonConfiguration();
+        });
+        return;
+    }
+
+    initTargetClassNames();
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL isEnabled = [defaults boolForKey:@"DYYYEnableFloatClearButton"];
+    if (!isEnabled) {
+        if (hideButton) {
+            if (hideButton.isElementsHidden) {
+                [hideButton safeResetState];
+            }
+            [hideButton removeFromSuperview];
+            hideButton = nil;
+        }
+        return;
+    }
+
+    if (!hideButton) {
+        setupFloatClearButton();
+        if (!hideButton) {
+            return;
+        }
+    }
+
+    UIWindow *activeWindow = getKeyWindow();
+    if (!activeWindow) {
+        return;
+    }
+
+    if (![hideButton isDescendantOfView:activeWindow]) {
+        [activeWindow addSubview:hideButton];
+    }
+
+    [activeWindow bringSubviewToFront:hideButton];
+    if (hideButton.isElementsHidden) {
+        [hideButton hideUIElements];
+    }
+    updateClearButtonVisibility();
 }
 
 void showClearButton(void) {
@@ -149,7 +195,7 @@ static void setupFloatClearButton(void) {
             if (userSize > 0) buttonSize = userSize;
         }
 
-        hideButton = [[HideUIButton alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
+        hideButton = [[DYYYHideUIButton alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
         hideButton.alpha = 0.5;
 
         NSString *savedPositionString = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYHideUIButtonPosition"];
@@ -227,7 +273,7 @@ static void initTargetClassNames(void) {
 
     targetClassNames = [list copy];
 }
-@implementation HideUIButton
+@implementation DYYYHideUIButton
 - (instancetype)initWithFrame:(CGRect)frame {
 	self = [super initWithFrame:frame];
 	if (self) {
@@ -794,7 +840,7 @@ static void initTargetClassNames(void) {
         }
         
         CGFloat buttonSize = [[NSUserDefaults standardUserDefaults] floatForKey:@"DYYYEnableFloatClearButtonSize"] ?: 40.0;
-        hideButton = [[HideUIButton alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
+        hideButton = [[DYYYHideUIButton alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
         hideButton.alpha = 0.5;
         
         NSString *savedPositionString = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYHideUIButtonPosition"];

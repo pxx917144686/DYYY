@@ -3,7 +3,7 @@
 #import <CFNetwork/CFNetwork.h>
 #import <objc/runtime.h>
 #import "fishhook.h"
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 
 #define LOG(fmt, ...) NSLog(@"[SSLHook] " fmt, ##__VA_ARGS__)
 
@@ -16,7 +16,7 @@ CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
     if (!orig_CFNetworkCopySystemProxySettings) return NULL;
     CFDictionaryRef original = orig_CFNetworkCopySystemProxySettings();
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     if ([db getSwitch:@"proxy_bypass" bundleID:bundleID defaultValue:NO]) {
 
@@ -56,12 +56,12 @@ CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
 
 void ssl2_kill(void) {
     LOG(@"SSL2 kill activated");
-    [[DatabaseManager sharedManager] insertLogText:@"SSL2 kill activated"];
+    [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL2 kill activated"];
 }
 
 void ssl3_kill(void) {
     LOG(@"SSL3 kill activated");
-    [[DatabaseManager sharedManager] insertLogText:@"SSL3 kill activated"];
+    [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL3 kill activated"];
 }
 
 static const char* (*orig_SSL_get_psk_identity)(void *ssl);
@@ -71,7 +71,7 @@ const char* replaced_SSL_get_psk_identity(void *ssl) {
     if (identity) {
         NSString *bundleID = CurrentBundleID();
         NSString *pskInfo = [NSString stringWithFormat:@"PSK Identity: %s", identity];
-        [[DatabaseManager sharedManager] insertDataIntoTable:@"ssl_psk" bundleID:bundleID text:pskInfo];
+        [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"ssl_psk" bundleID:bundleID text:pskInfo];
         LOG(@"%@", pskInfo);
     }
     return identity;

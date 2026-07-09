@@ -8,7 +8,7 @@
 //
 
 #import "NSString+ObjcRuntime.h"
-#import "FLEXRuntimeUtility.h"
+#import "DYYYFLEXRuntimeUtility.h"
 
 @implementation NSString (Utilities)
 

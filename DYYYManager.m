@@ -5,13 +5,124 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Photos/Photos.h>
-#import <libwebp/decode.h>
-#import <libwebp/demux.h>
-#import <libwebp/mux.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
 #import "DYYYToast.h"
+#import "DYYYUtils.h"
+
+@interface YYImageFrame : NSObject
+@property(nonatomic, strong) UIImage *image;
+@property(nonatomic) CGFloat duration;
+@end
+
+@interface YYImageDecoder : NSObject
+@property(nonatomic, readonly) NSUInteger frameCount;
++ (instancetype)decoderWithData:(NSData *)data scale:(CGFloat)scale;
+- (YYImageFrame *)frameAtIndex:(NSUInteger)index decodeForDisplay:(BOOL)decodeForDisplay;
+@end
+
+static const NSTimeInterval kDYYYDefaultFrameDelay = 0.1f;
+
+static inline CGFloat DYYYNormalizedDelay(CGFloat delay) {
+    if (!isfinite(delay) || delay < 0.01f) {
+        return kDYYYDefaultFrameDelay;
+    }
+    return delay;
+}
+
+static YYImageDecoder *DYYYCreateYYDecoderWithData(NSData *data, CGFloat scale) {
+    if (!data || data.length == 0) {
+        return nil;
+    }
+
+    Class decoderClass = NSClassFromString(@"YYImageDecoder");
+    if (!decoderClass || ![decoderClass respondsToSelector:@selector(decoderWithData:scale:)]) {
+        return nil;
+    }
+
+    CGFloat resolvedScale = scale > 0 ? scale : 1.0f;
+    id decoderInstance = [(id)decoderClass decoderWithData:data scale:resolvedScale];
+    if (![decoderInstance isKindOfClass:decoderClass]) {
+        return nil;
+    }
+
+    return (YYImageDecoder *)decoderInstance;
+}
+
+static NSURL *DYYYTemporaryGIFURLForSourceURL(NSURL *sourceURL) {
+    NSString *baseName = sourceURL.lastPathComponent.stringByDeletingPathExtension;
+    if (baseName.length == 0) {
+        baseName = @"image";
+    }
+    NSString *fileName = [NSString stringWithFormat:@"%@_%@.gif", baseName, [[NSUUID UUID] UUIDString]];
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    return [NSURL fileURLWithPath:path];
+}
+
+static BOOL DYYYWriteGIFUsingYYDecoder(YYImageDecoder *decoder, NSURL *gifURL) {
+    if (!decoder || decoder.frameCount == 0) {
+        return NO;
+    }
+
+    NSUInteger frameCount = (NSUInteger)decoder.frameCount;
+    CGImageDestinationRef dest = CGImageDestinationCreateWithURL((__bridge CFURLRef)gifURL, kUTTypeGIF, frameCount, NULL);
+    if (!dest) {
+        return NO;
+    }
+
+    NSDictionary *gifProperties = @{(__bridge NSString *)kCGImagePropertyGIFDictionary : @{(__bridge NSString *)kCGImagePropertyGIFLoopCount : @0}};
+    CGImageDestinationSetProperties(dest, (__bridge CFDictionaryRef)gifProperties);
+
+    BOOL hasFrame = NO;
+    for (NSUInteger i = 0; i < frameCount; i++) {
+        YYImageFrame *frame = [decoder frameAtIndex:i decodeForDisplay:YES];
+        UIImage *image = frame.image;
+        CGImageRef imageRef = image.CGImage;
+        if (!imageRef) {
+            continue;
+        }
+
+        CGFloat delay = DYYYNormalizedDelay(frame.duration);
+        NSDictionary *frameProps = @{(__bridge NSString *)kCGImagePropertyGIFDictionary : @{(__bridge NSString *)kCGImagePropertyGIFDelayTime : @(delay)}};
+        CGImageDestinationAddImage(dest, imageRef, (__bridge CFDictionaryRef)frameProps);
+        hasFrame = YES;
+    }
+
+    BOOL success = hasFrame ? CGImageDestinationFinalize(dest) : NO;
+    CFRelease(dest);
+    return success;
+}
+
+static BOOL DYYYConvertAnimatedDataWithYYDecoder(NSData *data, NSURL *gifURL) {
+    YYImageDecoder *decoder = DYYYCreateYYDecoderWithData(data, 1.0f);
+    if (!decoder) {
+        return NO;
+    }
+    return DYYYWriteGIFUsingYYDecoder(decoder, gifURL);
+}
+
+static BOOL DYYYWriteStaticImageToGIF(UIImage *image, NSURL *gifURL) {
+    CGImageRef imageRef = image.CGImage;
+    if (!imageRef) {
+        return NO;
+    }
+
+    CGImageDestinationRef dest = CGImageDestinationCreateWithURL((__bridge CFURLRef)gifURL, kUTTypeGIF, 1, NULL);
+    if (!dest) {
+        return NO;
+    }
+
+    NSDictionary *gifProperties = @{(__bridge NSString *)kCGImagePropertyGIFDictionary : @{(__bridge NSString *)kCGImagePropertyGIFLoopCount : @0}};
+    CGImageDestinationSetProperties(dest, (__bridge CFDictionaryRef)gifProperties);
+
+    NSDictionary *frameProperties = @{(__bridge NSString *)kCGImagePropertyGIFDictionary : @{(__bridge NSString *)kCGImagePropertyGIFDelayTime : @(kDYYYDefaultFrameDelay)}};
+    CGImageDestinationAddImage(dest, imageRef, (__bridge CFDictionaryRef)frameProperties);
+
+    BOOL success = CGImageDestinationFinalize(dest);
+    CFRelease(dest);
+    return success;
+}
 
 @interface DYYYManager () {
   AVAssetExportSession *session;
@@ -526,343 +637,50 @@
       }];
 }
 
-static void ReleaseWebPData(void *info, const void *data, size_t size) {
-  free((void *)data);
-}
-
 + (void)convertWebpToGifSafely:(NSURL *)webpURL
                     completion:
                         (void (^)(NSURL *gifURL, BOOL success))completion {
-  dispatch_async(
-      dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        // 创建GIF文件路径
-        NSString *gifFileName =
-            [[webpURL.lastPathComponent stringByDeletingPathExtension]
-                stringByAppendingPathExtension:@"gif"];
-        NSURL *gifURL = [NSURL
-            fileURLWithPath:[NSTemporaryDirectory()
-                                stringByAppendingPathComponent:gifFileName]];
-
-        // 读取WebP文件数据
-        NSData *webpData = [NSData dataWithContentsOfURL:webpURL];
-        if (!webpData) {
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-              completion(nil, NO);
-            }
-          });
-          return;
-        }
-
-        // 初始化WebP解码器
-        WebPData webp_data;
-        webp_data.bytes = webpData.bytes;
-        webp_data.size = webpData.length;
-
-        // 创建WebP动画解码器
-        WebPDemuxer *demux = WebPDemux(&webp_data);
-        if (!demux) {
-          // 如果无法解码为动画，尝试直接解码为静态图像
-          WebPDecoderConfig config;
-          WebPInitDecoderConfig(&config);
-
-          // 设置解码选项，支持透明度
-          config.output.colorspace = MODE_RGBA;
-          config.options.use_threads = 1;
-
-          // 尝试解码
-          VP8StatusCode status =
-              WebPDecode(webpData.bytes, webpData.length, &config);
-
-          if (status != VP8_STATUS_OK) {
-            // 解码失败
-            dispatch_async(dispatch_get_main_queue(), ^{
-              if (completion) {
-                completion(nil, NO);
-              }
-            });
-            return;
-          }
-
-          // 成功解码为静态图像，创建UIImage
-          CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-          CGDataProviderRef provider = CGDataProviderCreateWithData(
-              NULL, config.output.u.RGBA.rgba,
-              config.output.width * config.output.height * 4,
-              ReleaseWebPData); // 使用定义的C函数作为回调
-
-          CGImageRef imageRef = CGImageCreate(
-              config.output.width, config.output.height, 8, 32,
-              config.output.width * 4, colorSpace,
-              kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedLast,
-              provider, NULL, false, kCGRenderingIntentDefault);
-
-          // 创建静态GIF
-          NSDictionary *gifProperties = @{
-            (__bridge NSString *)kCGImagePropertyGIFDictionary : @{
-              (__bridge NSString *)kCGImagePropertyGIFLoopCount : @0,
-            }
-          };
-
-          CGImageDestinationRef destination = CGImageDestinationCreateWithURL(
-              (__bridge CFURLRef)gifURL, kUTTypeGIF, 1, NULL);
-          if (!destination) {
-            CGImageRelease(imageRef);
-            CGDataProviderRelease(provider);
-            CGColorSpaceRelease(colorSpace);
-
-            dispatch_async(dispatch_get_main_queue(), ^{
-              if (completion) {
-                completion(nil, NO);
-              }
-            });
-            return;
-          }
-
-          CGImageDestinationSetProperties(
-              destination, (__bridge CFDictionaryRef)gifProperties);
-
-          NSDictionary *frameProperties = @{
-            (__bridge NSString *)kCGImagePropertyGIFDictionary : @{
-              (__bridge NSString *)kCGImagePropertyGIFDelayTime : @0.1f,
-            }
-          };
-
-          CGImageDestinationAddImage(destination, imageRef,
-                                     (__bridge CFDictionaryRef)frameProperties);
-          BOOL success = CGImageDestinationFinalize(destination);
-
-          CGImageRelease(imageRef);
-          CGDataProviderRelease(provider);
-          CGColorSpaceRelease(colorSpace);
-          CFRelease(destination);
-
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-              completion(gifURL, success);
-            }
-          });
-          return;
-        }
-
-        // 获取WebP信息
-        uint32_t frameCount = WebPDemuxGetI(demux, WEBP_FF_FRAME_COUNT);
-        int canvasWidth = WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH);
-        int canvasHeight = WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT);
-        BOOL isAnimated = (frameCount > 1);
-        BOOL hasAlpha = WebPDemuxGetI(demux, WEBP_FF_FORMAT_FLAGS) & ALPHA_FLAG;
-
-        // 设置GIF属性
-        NSDictionary *gifProperties = @{
-          (__bridge NSString *)kCGImagePropertyGIFDictionary : @{
-            (__bridge NSString *)
-            kCGImagePropertyGIFLoopCount : @0, // 0表示无限循环
-          }
-        };
-
-        // 创建GIF图像目标
-        CGImageDestinationRef destination = CGImageDestinationCreateWithURL(
-            (__bridge CFURLRef)gifURL, kUTTypeGIF, isAnimated ? frameCount : 1,
-            NULL);
-        if (!destination) {
-          WebPDemuxDelete(demux);
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-              completion(nil, NO);
-            }
-          });
-          return;
-        }
-
-        // 设置GIF属性
-        CGImageDestinationSetProperties(
-            destination, (__bridge CFDictionaryRef)gifProperties);
-
-        // 解码每一帧并添加到GIF
-        BOOL allFramesAdded = YES;
-        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-
-        // 用于保存上一帧的画布
-        CGContextRef prevCanvas = CGBitmapContextCreate(
-            NULL, canvasWidth, canvasHeight, 8, canvasWidth * 4, colorSpace,
-            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault);
-
-        // 用于当前绘制的画布
-        CGContextRef currCanvas = CGBitmapContextCreate(
-            NULL, canvasWidth, canvasHeight, 8, canvasWidth * 4, colorSpace,
-            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault);
-
-        // 如果画布创建失败，则返回错误
-        if (!prevCanvas || !currCanvas) {
-          if (prevCanvas)
-            CGContextRelease(prevCanvas);
-          if (currCanvas)
-            CGContextRelease(currCanvas);
-          CGColorSpaceRelease(colorSpace);
-          WebPDemuxDelete(demux);
-          CFRelease(destination);
-
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-              completion(nil, NO);
-            }
-          });
-          return;
-        }
-
-        // 初始化为透明背景
-        CGContextClearRect(prevCanvas,
-                           CGRectMake(0, 0, canvasWidth, canvasHeight));
-
-        for (uint32_t i = 0; i < frameCount; i++) {
-          WebPIterator iter;
-          if (WebPDemuxGetFrame(demux, i + 1, &iter)) {
-            // 解码当前帧
-            WebPDecoderConfig config;
-            WebPInitDecoderConfig(&config);
-
-            // 设置解码配置，强制处理透明度
-            config.output.colorspace = MODE_RGBA;
-            config.output.is_external_memory = 0;
-            config.options.use_threads = 1;
-
-            // 解码
-            VP8StatusCode status =
-                WebPDecode(iter.fragment.bytes, iter.fragment.size, &config);
-
-            if (status != VP8_STATUS_OK) {
-              WebPDemuxReleaseIterator(&iter);
-              continue;
-            }
-
-            // 创建帧图像
-            CGDataProviderRef frameProvider = CGDataProviderCreateWithData(
-                NULL, config.output.u.RGBA.rgba,
-                config.output.width * config.output.height * 4,
-                ReleaseWebPData);
-
-            if (!frameProvider) {
-              WebPFreeDecBuffer(&config.output);
-              WebPDemuxReleaseIterator(&iter);
-              continue;
-            }
-
-            CGImageRef frameImageRef = CGImageCreate(
-                config.output.width, config.output.height, 8, 32,
-                config.output.width * 4, colorSpace,
-                kCGBitmapByteOrderDefault |
-                    (hasAlpha ? kCGImageAlphaLast : kCGImageAlphaNoneSkipLast),
-                frameProvider, NULL, false, kCGRenderingIntentDefault);
-
-            if (!frameImageRef) {
-              CGDataProviderRelease(frameProvider);
-              WebPDemuxReleaseIterator(&iter);
-              continue;
-            }
-
-            // 准备当前帧画布 - 根据合成模式处理
-            // 首先拷贝上一帧的状态到当前帧
-            CGContextCopyBytes(currCanvas, prevCanvas, canvasWidth,
-                               canvasHeight);
-
-            // 根据混合模式处理当前帧
-            if (iter.blend_method == WEBP_MUX_BLEND) {
-              // 使用Alpha混合模式，将当前帧混合到背景上
-              CGContextDrawImage(currCanvas,
-                                 CGRectMake(iter.x_offset,
-                                            canvasHeight - iter.y_offset -
-                                                config.output.height,
-                                            config.output.width,
-                                            config.output.height),
-                                 frameImageRef);
-            } else {
-              // 不混合模式，清除目标区域后再绘制
-              CGContextClearRect(currCanvas,
-                                 CGRectMake(iter.x_offset,
-                                            canvasHeight - iter.y_offset -
-                                                config.output.height,
-                                            config.output.width,
-                                            config.output.height));
-
-              CGContextDrawImage(currCanvas,
-                                 CGRectMake(iter.x_offset,
-                                            canvasHeight - iter.y_offset -
-                                                config.output.height,
-                                            config.output.width,
-                                            config.output.height),
-                                 frameImageRef);
-            }
-
-            // 从当前画布创建帧图像
-            CGImageRef canvasImageRef = CGBitmapContextCreateImage(currCanvas);
-
-            // 处理帧间延迟
-            float delayTime = iter.duration / 1000.0f;
-            if (delayTime <= 0.01f) {
-              delayTime = 0.1f; // 默认延迟
-            }
-
-            // 创建帧属性
-            NSDictionary *frameProperties = @{
-              (__bridge NSString *)kCGImagePropertyGIFDictionary : @{
-                (__bridge NSString *)
-                kCGImagePropertyGIFDelayTime : @(delayTime),
-                (__bridge NSString *)
-                kCGImagePropertyGIFHasGlobalColorMap : @YES,
-                (__bridge NSString *)kCGImagePropertyColorModel :
-                        hasAlpha ? @"RGBA" : @"RGB",
-              }
-            };
-
-            // 添加帧到GIF
-            CGImageDestinationAddImage(
-                destination, canvasImageRef,
-                (__bridge CFDictionaryRef)frameProperties);
-
-            // 根据处理模式更新上一帧画布
-            if (iter.dispose_method == WEBP_MUX_DISPOSE_BACKGROUND) {
-              // 处理背景处理模式 - 清除当前帧区域
-              CGContextClearRect(prevCanvas,
-                                 CGRectMake(iter.x_offset,
-                                            canvasHeight - iter.y_offset -
-                                                config.output.height,
-                                            config.output.width,
-                                            config.output.height));
-            } else if (iter.dispose_method == WEBP_MUX_DISPOSE_NONE) {
-              // 保持当前帧，复制当前画布到上一帧
-              CGContextCopyBytes(prevCanvas, currCanvas, canvasWidth,
-                                 canvasHeight);
-            }
-
-            // 释放资源
-            CGImageRelease(canvasImageRef);
-            CGImageRelease(frameImageRef);
-            CGDataProviderRelease(frameProvider);
-            WebPDemuxReleaseIterator(&iter);
-          } else {
-            allFramesAdded = NO;
-          }
-        }
-
-        // 释放画布
-        CGContextRelease(prevCanvas);
-        CGContextRelease(currCanvas);
-        CGColorSpaceRelease(colorSpace);
-
-        // 完成GIF生成
-        BOOL success =
-            CGImageDestinationFinalize(destination) && allFramesAdded;
-
-        // 释放资源
-        WebPDemuxDelete(demux);
-        CFRelease(destination);
-
+    if (!webpURL) {
         dispatch_async(dispatch_get_main_queue(), ^{
           if (completion) {
-            completion(gifURL, success);
+              completion(nil, NO);
           }
         });
+        return;
+    }
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      NSData *webpData = [NSData dataWithContentsOfURL:webpURL options:NSDataReadingMappedIfSafe error:nil];
+      if (!webpData) {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion(nil, NO);
+            }
+          });
+          return;
+      }
+
+      NSURL *gifURL = DYYYTemporaryGIFURLForSourceURL(webpURL);
+      [[NSFileManager defaultManager] removeItemAtURL:gifURL error:nil];
+
+      BOOL success = DYYYConvertAnimatedDataWithYYDecoder(webpData, gifURL);
+      if (!success) {
+          UIImage *fallbackImage = [UIImage imageWithData:webpData];
+          if (fallbackImage) {
+              success = DYYYWriteStaticImageToGIF(fallbackImage, gifURL);
+          }
+      }
+
+      if (!success) {
+          [[NSFileManager defaultManager] removeItemAtURL:gifURL error:nil];
+      }
+
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (completion) {
+            completion(success ? gifURL : nil, success);
+        }
       });
+    });
 }
 
 // 辅助函数：复制上下文像素数据
@@ -1206,6 +1024,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
           [[NSFileManager defaultManager] fileExistsAtPath:videoPath];
 
       // 隐藏进度视图
+      progressView.allowSuccessAnimation = (imageExists && videoExists);
       [progressView dismiss];
 
       if (imageExists && videoExists) {
@@ -1579,6 +1398,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
         completionBlock(successCount, totalCount);
       }
 
+      progressView.allowSuccessAnimation = (successCount > 0);
       [progressView dismiss];
       [self.progressViews removeObjectForKey:batchID];
 
@@ -1761,6 +1581,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
         [self.mediaTypeMap removeObjectForKey:downloadIDForTask];
       }
 
+      progressView.allowSuccessAnimation = !moveError;
       [progressView dismiss];
 
       if (wasCancelled) {
@@ -2337,6 +2158,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                     }
                     
                     dispatch_group_notify(saveGroup, dispatch_get_main_queue(), ^{
+                        progressView.allowSuccessAnimation = (successCount > 0);
                         [progressView dismiss];
                         
                         [fileManager removeItemAtPath:livePhotoPath error:nil];
@@ -3139,6 +2961,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                                 completedSteps++;
                                 
                                 dispatch_async(dispatch_get_main_queue(), ^{
+                                    progressView.allowSuccessAnimation = success;
                                     [progressView dismiss];
                                     
                                     if (success) {
@@ -3751,6 +3574,352 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
     
     // 如果没有其他特殊情况，返回控制器本身
     return viewController;
+}
+
+#pragma mark - 评论图片保存
+
++ (void)saveCommentImages:(NSArray *)imageModels
+             currentIndex:(NSInteger)currentIndex
+               completion:(void (^)(NSInteger successCount, NSInteger livePhotoCount, NSInteger failedCount))completion {
+    if (!imageModels || imageModels.count == 0) {
+        if (completion) completion(0, 0, 0);
+        return;
+    }
+
+    // 确定要保存的图片
+    NSArray *imagesToSave = nil;
+    if (currentIndex >= 0 && currentIndex < (NSInteger)imageModels.count) {
+        imagesToSave = @[imageModels[currentIndex]];
+    } else {
+        imagesToSave = imageModels;
+    }
+
+    // 分离普通图片和实况照片
+    NSMutableArray *normalImages = [NSMutableArray array];
+    NSMutableArray *livePhotos = [NSMutableArray array];
+
+    for (id imageModel in imagesToSave) {
+        @try {
+            // 获取图片 URL - originUrl 和 mediumUrl 都是 AWEURLModel 类型
+            NSString *imageUrlStr = nil;
+
+            // 首先尝试 originUrl
+            AWEURLModel *originUrlModel = [imageModel valueForKey:@"originUrl"];
+            if (originUrlModel) {
+                NSArray *urlList = [originUrlModel originURLList];
+                if (urlList && urlList.count > 0) {
+                    imageUrlStr = urlList.firstObject;
+                }
+            }
+
+            // 如果 originUrl 没有获取到，尝试 mediumUrl
+            if (!imageUrlStr) {
+                AWEURLModel *mediumUrlModel = [imageModel valueForKey:@"mediumUrl"];
+                if (mediumUrlModel) {
+                    NSArray *urlList = [mediumUrlModel originURLList];
+                    if (urlList && urlList.count > 0) {
+                        imageUrlStr = urlList.firstObject;
+                    }
+                }
+            }
+
+            NSLog(@"[DYYY] 评论图片URL: %@", imageUrlStr);
+
+            if (!imageUrlStr || imageUrlStr.length == 0) {
+                NSLog(@"[DYYY] 无法获取图片URL，imageModel: %@", imageModel);
+                continue;
+            }
+
+            // 检查是否是实况照片
+            id livePhotoModel = [imageModel valueForKey:@"livePhotoModel"];
+            if (livePhotoModel) {
+                NSArray *videoUrls = [livePhotoModel valueForKey:@"videoUrl"];
+                if (videoUrls && videoUrls.count > 0) {
+                    NSString *videoUrlStr = videoUrls.firstObject;
+                    if (videoUrlStr && videoUrlStr.length > 0) {
+                        [livePhotos addObject:@{
+                            @"imageURL": imageUrlStr,
+                            @"videoURL": videoUrlStr
+                        }];
+                        continue;
+                    }
+                }
+            }
+
+            // 普通图片
+            [normalImages addObject:imageUrlStr];
+        } @catch (NSException *e) {
+            NSLog(@"[DYYY] 解析评论图片失败: %@", e);
+        }
+    }
+
+    NSLog(@"[DYYY] 解析完成: 普通图片=%lu, 实况照片=%lu", (unsigned long)normalImages.count, (unsigned long)livePhotos.count);
+
+    if (normalImages.count == 0 && livePhotos.count == 0) {
+        if (completion) completion(0, 0, (NSInteger)imagesToSave.count);
+        return;
+    }
+
+    __block NSInteger successCount = 0;
+    __block NSInteger livePhotoCount = 0;
+    __block NSInteger failedCount = 0;
+
+    dispatch_group_t group = dispatch_group_create();
+
+    // 保存普通图片
+    if (normalImages.count > 0) {
+        dispatch_group_enter(group);
+        [self downloadAllImagesWithProgress:[normalImages mutableCopy]
+                                   progress:nil
+                                 completion:^(NSInteger imgSuccess, NSInteger imgTotal) {
+            successCount += imgSuccess;
+            failedCount += (imgTotal - imgSuccess);
+            dispatch_group_leave(group);
+        }];
+    }
+
+    // 保存实况照片
+    if (livePhotos.count > 0) {
+        dispatch_group_enter(group);
+        [self downloadAllLivePhotosWithProgress:livePhotos
+                                       progress:nil
+                                     completion:^(NSInteger lpSuccess, NSInteger lpTotal) {
+            successCount += lpSuccess;
+            livePhotoCount = lpSuccess;
+            failedCount += (lpTotal - lpSuccess);
+            dispatch_group_leave(group);
+        }];
+    }
+
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        if (completion) {
+            completion(successCount, livePhotoCount, failedCount);
+        }
+    });
+}
+
+#pragma mark - 评论语音下载/分享
+
++ (void)downloadAndShareCommentAudio:(NSString *)audioContent
+                            userName:(NSString *)userName
+                          createTime:(NSNumber *)createTime {
+    if (!audioContent || audioContent.length == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [DYYYUtils showToast:@"语音内容为空"];
+        });
+        return;
+    }
+
+    NSData *jsonData = [audioContent dataUsingEncoding:NSUTF8StringEncoding];
+    NSError *error = nil;
+    NSDictionary *audioDict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+    if (error || !audioDict) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [DYYYUtils showToast:@"语音数据解析失败"];
+        });
+        NSLog(@"[DYYY] 解析语音 JSON 失败: %@", error);
+        return;
+    }
+
+    NSArray *videoList = audioDict[@"video_list"];
+    if (!videoList || videoList.count == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [DYYYUtils showToast:@"未找到语音URL"];
+        });
+        return;
+    }
+
+    NSDictionary *videoInfo = videoList.firstObject;
+    NSString *audioURLString = videoInfo[@"main_url"];
+    if (!audioURLString || audioURLString.length == 0) {
+        audioURLString = videoInfo[@"backup_url"];
+    }
+
+    if (!audioURLString || audioURLString.length == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [DYYYUtils showToast:@"语音URL无效"];
+        });
+        return;
+    }
+
+    NSURL *audioURL = [NSURL URLWithString:audioURLString];
+    if (!audioURL) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [DYYYUtils showToast:@"语音URL格式错误"];
+        });
+        return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [DYYYUtils showToast:@"正在下载语音..."];
+    });
+
+    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:config];
+
+    NSURLSessionDownloadTask *downloadTask = [session downloadTaskWithURL:audioURL completionHandler:^(NSURL *location, NSURLResponse *response, NSError *error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [DYYYUtils showToast:[NSString stringWithFormat:@"下载失败: %@", error.localizedDescription]];
+            });
+            NSLog(@"[DYYY] 下载语音失败: %@", error);
+            return;
+        }
+
+        if (!location) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [DYYYUtils showToast:@"下载失败：无效的文件"];
+            });
+            return;
+        }
+
+        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+        formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        NSTimeInterval timestamp = (createTime && [createTime doubleValue] > 0) ? [createTime doubleValue] : [[NSDate date] timeIntervalSince1970];
+        NSDate *commentDate = [NSDate dateWithTimeIntervalSince1970:timestamp];
+        NSString *timeString = [formatter stringFromDate:commentDate];
+        timeString = [timeString stringByReplacingOccurrencesOfString:@":" withString:@"-"];
+        timeString = [timeString stringByReplacingOccurrencesOfString:@" " withString:@"_"];
+
+        NSString *safeUserName = userName ?: @"未知用户";
+        safeUserName = [safeUserName stringByReplacingOccurrencesOfString:@"/" withString:@"_"];
+        safeUserName = [safeUserName stringByReplacingOccurrencesOfString:@"\\" withString:@"_"];
+
+        NSString *fileName = [NSString stringWithFormat:@"%@_%@.m4a", safeUserName, timeString];
+        NSString *tempDir = NSTemporaryDirectory();
+        NSString *targetPath = [tempDir stringByAppendingPathComponent:fileName];
+
+        NSError *moveError = nil;
+        [[NSFileManager defaultManager] removeItemAtPath:targetPath error:nil];
+        [[NSFileManager defaultManager] moveItemAtPath:location.path toPath:targetPath error:&moveError];
+
+        if (moveError) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [DYYYUtils showToast:@"文件保存失败"];
+            });
+            NSLog(@"[DYYY] 移动文件失败: %@", moveError);
+            return;
+        }
+
+        NSURL *fileURL = [NSURL fileURLWithPath:targetPath];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIViewController *topVC = [DYYYUtils topView];
+            if (!topVC) {
+                [DYYYUtils showToast:@"无法显示分享界面"];
+                return;
+            }
+
+            UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[fileURL] applicationActivities:nil];
+
+            activityVC.completionWithItemsHandler = ^(UIActivityType activityType, BOOL completed, NSArray *returnedItems, NSError *activityError) {
+                [[NSFileManager defaultManager] removeItemAtPath:targetPath error:nil];
+
+                if (completed) {
+                    [DYYYUtils showToast:@"分享成功"];
+                } else if (activityError) {
+                    [DYYYUtils showToast:@"分享失败"];
+                }
+            };
+
+            if ([activityVC respondsToSelector:@selector(popoverPresentationController)]) {
+                activityVC.popoverPresentationController.sourceView = topVC.view;
+                activityVC.popoverPresentationController.sourceRect = CGRectMake(topVC.view.bounds.size.width / 2, topVC.view.bounds.size.height / 2, 0, 0);
+            }
+
+            [topVC presentViewController:activityVC animated:YES completion:nil];
+        });
+    }];
+
+    [downloadTask resume];
+}
+
+#pragma mark - 动图表情保存
+
++ (void)saveAnimatedSticker:(YYAnimatedImageView *)targetStickerView {
+    if (!targetStickerView) {
+        [DYYYUtils showToast:@"无法获取表情视图"];
+        return;
+    }
+    [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (status != PHAuthorizationStatusAuthorized) {
+            [DYYYUtils showToast:@"需要相册权限才能保存"];
+            return;
+        }
+        if ([DYYYUtils isBDImageWithHeifURL:targetStickerView.image]) {
+            [self saveHeifSticker:targetStickerView];
+            return;
+        }
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          NSArray *images = [DYYYUtils getImagesFromYYAnimatedImageView:targetStickerView];
+          CGFloat duration = [DYYYUtils getDurationFromYYAnimatedImageView:targetStickerView];
+          if (!images || images.count == 0) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                [DYYYUtils showToast:@"无法获取表情帧"];
+              });
+              return;
+          }
+          NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"sticker_%ld.gif", (long)[[NSDate date] timeIntervalSince1970]]];
+          BOOL success = [DYYYUtils createGIFWithImages:images
+                                               duration:duration
+                                                   path:tempPath
+                                               progress:^(float progress){
+                                               }];
+          dispatch_async(dispatch_get_main_queue(), ^{
+            if (!success) {
+                return;
+            }
+            [DYYYUtils saveGIFToPhotoLibrary:tempPath
+                                  completion:^(BOOL saved, NSError *error) {
+                               if (saved) {
+                                   [DYYYToast showSuccessToastWithMessage:@"已保存到相册"];
+                               } else {
+                                   NSString *errorMsg = error ? error.localizedDescription : @"未知错误";
+                                   [DYYYUtils showToast:[NSString stringWithFormat:@"保存失败: %@", errorMsg]];
+                               }
+                             }];
+          });
+        });
+      });
+    }];
+}
+
++ (void)saveHeifSticker:(YYAnimatedImageView *)stickerView {
+    UIImage *image = stickerView.image;
+    NSURL *heifURL = [image performSelector:@selector(bd_webURL)];
+    if (!heifURL) {
+        [DYYYUtils showToast:@"无法获取表情URL"];
+        return;
+    }
+    [DYYYUtils convertHeicToGif:heifURL
+                     completion:^(NSURL *gifURL, BOOL success) {
+                         if (!success || !gifURL) {
+                             [DYYYUtils showToast:@"表情转换失败"];
+                             return;
+                         }
+                         [[PHPhotoLibrary sharedPhotoLibrary]
+                             performChanges:^{
+                               PHAssetCreationRequest *request = [PHAssetCreationRequest creationRequestForAsset];
+                               [request addResourceWithType:PHAssetResourceTypePhoto fileURL:gifURL options:nil];
+                             }
+                             completionHandler:^(BOOL success, NSError *_Nullable error) {
+                               dispatch_async(dispatch_get_main_queue(), ^{
+                                 if (success) {
+                                     [DYYYToast showSuccessToastWithMessage:@"已保存到相册"];
+                                 } else {
+                                     NSString *errorMsg = error ? error.localizedDescription : @"未知错误";
+                                     [DYYYUtils showToast:[NSString stringWithFormat:@"保存失败: %@", errorMsg]];
+                                 }
+                                 NSError *removeError = nil;
+                                 [[NSFileManager defaultManager] removeItemAtURL:gifURL error:&removeError];
+                                 if (removeError) {
+                                     NSLog(@"删除临时转换文件失败: %@", removeError);
+                                 }
+                               });
+                             }];
+                       }];
 }
 
 @end

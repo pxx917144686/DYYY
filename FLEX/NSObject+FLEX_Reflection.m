@@ -8,15 +8,15 @@
 //
 
 #import "NSObject+FLEX_Reflection.h"
-#import "FLEXClassBuilder.h"
-#import "FLEXMirror.h"
-#import "FLEXProperty.h"
-#import "FLEXMethod.h"
-#import "FLEXIvar.h"
-#import "FLEXProtocol.h"
-#import "FLEXPropertyAttributes.h"
+#import "DYYYFLEXClassBuilder.h"
+#import "DYYYFLEXMirror.h"
+#import "DYYYFLEXProperty.h"
+#import "DYYYFLEXMethod.h"
+#import "DYYYFLEXIvar.h"
+#import "DYYYFLEXProtocol.h"
+#import "DYYYFLEXPropertyAttributes.h"
 #import "NSArray+FLEX.h"
-#import "FLEXUtility.h"
+#import "DYYYFLEXUtility.h"
 
 
 NSString * FLEXTypeEncodingString(const char *returnType, NSUInteger count, ...) {
@@ -83,7 +83,7 @@ NSArray<Class> *FLEXGetClassHierarchy(Class cls, BOOL includeSelf) {
     return classes.copy;
 }
 
-NSArray<FLEXProtocol *> *FLEXGetConformedProtocols(Class cls) {
+NSArray<DYYYFLEXProtocol *> *FLEXGetConformedProtocols(Class cls) {
     if (!cls) return nil;
     
     unsigned int count = 0;
@@ -92,43 +92,43 @@ NSArray<FLEXProtocol *> *FLEXGetConformedProtocols(Class cls) {
     free(list);
     
     return [protocols flex_mapped:^id(Protocol *pro, NSUInteger idx) {
-        return [FLEXProtocol protocol:pro];
+        return [DYYYFLEXProtocol protocol:pro];
     }];
 }
 
-NSArray<FLEXIvar *> *FLEXGetAllIvars(_Nullable Class cls) {
+NSArray<DYYYFLEXIvar *> *FLEXGetAllIvars(_Nullable Class cls) {
     if (!cls) return nil;
     
     unsigned int ivcount;
     Ivar *objcivars = class_copyIvarList(cls, &ivcount);
     NSArray *ivars = [NSArray flex_forEachUpTo:ivcount map:^id(NSUInteger i) {
-        return [FLEXIvar ivar:objcivars[i]];
+        return [DYYYFLEXIvar ivar:objcivars[i]];
     }];
 
     free(objcivars);
     return ivars;
 }
 
-NSArray<FLEXProperty *> *FLEXGetAllProperties(_Nullable Class cls) {
+NSArray<DYYYFLEXProperty *> *FLEXGetAllProperties(_Nullable Class cls) {
     if (!cls) return nil;
     
     unsigned int pcount;
     objc_property_t *objcproperties = class_copyPropertyList(cls, &pcount);
     NSArray *properties = [NSArray flex_forEachUpTo:pcount map:^id(NSUInteger i) {
-        return [FLEXProperty property:objcproperties[i] onClass:cls];
+        return [DYYYFLEXProperty property:objcproperties[i] onClass:cls];
     }];
 
     free(objcproperties);
     return properties;
 }
 
-NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
+NSArray<DYYYFLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
     if (!cls) return nil;
 
     unsigned int mcount;
     Method *objcmethods = class_copyMethodList(cls, &mcount);
     NSArray *methods = [NSArray flex_forEachUpTo:mcount map:^id(NSUInteger i) {
-        return [FLEXMethod method:objcmethods[i] isInstanceMethod:instance];
+        return [DYYYFLEXMethod method:objcmethods[i] isInstanceMethod:instance];
     }];
     
     free(objcmethods);
@@ -152,21 +152,21 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
     );
     
     // 从 NSObject 复制所有 "flex_" 开头的方法
-    id filterFunc = ^BOOL(FLEXMethod *method, NSUInteger idx) {
+    id filterFunc = ^BOOL(DYYYFLEXMethod *method, NSUInteger idx) {
         return [method.name hasPrefix:@"flex_"];
     };
     NSArray *instanceMethods = [NSObject.flex_allInstanceMethods flex_filtered:filterFunc];
     NSArray *classMethods = [NSObject.flex_allClassMethods flex_filtered:filterFunc];
     
-    FLEXClassBuilder *proxy     = [FLEXClassBuilder builderForClass:NSProxyClass];
-    FLEXClassBuilder *proxyMeta = [FLEXClassBuilder builderForClass:NSProxy_meta];
+    DYYYFLEXClassBuilder *proxy     = [DYYYFLEXClassBuilder builderForClass:NSProxyClass];
+    DYYYFLEXClassBuilder *proxyMeta = [DYYYFLEXClassBuilder builderForClass:NSProxy_meta];
     [proxy addMethods:instanceMethods];
     [proxyMeta addMethods:classMethods];
     
     if (SwiftObjectClass) {
         Class SwiftObject_meta = object_getClass(SwiftObjectClass);
-        FLEXClassBuilder *swiftObject = [FLEXClassBuilder builderForClass:SwiftObjectClass];
-        FLEXClassBuilder *swiftObjectMeta = [FLEXClassBuilder builderForClass:SwiftObject_meta];
+        DYYYFLEXClassBuilder *swiftObject = [DYYYFLEXClassBuilder builderForClass:SwiftObjectClass];
+        DYYYFLEXClassBuilder *swiftObjectMeta = [DYYYFLEXClassBuilder builderForClass:SwiftObject_meta];
         [swiftObject addMethods:instanceMethods];
         [swiftObjectMeta addMethods:classMethods];
         
@@ -183,12 +183,12 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 
 @implementation NSObject (Reflection)
 
-+ (FLEXMirror *)flex_reflection {
-    return [FLEXMirror reflect:self];
++ (DYYYFLEXMirror *)flex_reflection {
+    return [DYYYFLEXMirror reflect:self];
 }
 
-- (FLEXMirror *)flex_reflection {
-    return [FLEXMirror reflect:self];
+- (DYYYFLEXMirror *)flex_reflection {
+    return [DYYYFLEXMirror reflect:self];
 }
 
 /// 代码借鉴自 Mike Ash 的 MAObjCRuntime
@@ -219,7 +219,7 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
     return FLEXGetClassHierarchy(self, YES);
 }
 
-+ (NSArray<FLEXProtocol *> *)flex_protocols {
++ (NSArray<DYYYFLEXProtocol *> *)flex_protocols {
     return FLEXGetConformedProtocols(self);
 }
 
@@ -230,36 +230,36 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 
 @implementation NSObject (Methods)
 
-+ (NSArray<FLEXMethod *> *)flex_allMethods {
++ (NSArray<DYYYFLEXMethod *> *)flex_allMethods {
     NSMutableArray *instanceMethods = self.flex_allInstanceMethods.mutableCopy;
     [instanceMethods addObjectsFromArray:self.flex_allClassMethods];
     return instanceMethods;
 }
 
-+ (NSArray<FLEXMethod *> *)flex_allInstanceMethods {
++ (NSArray<DYYYFLEXMethod *> *)flex_allInstanceMethods {
     return FLEXGetAllMethods(self, YES);
 }
 
-+ (NSArray<FLEXMethod *> *)flex_allClassMethods {
++ (NSArray<DYYYFLEXMethod *> *)flex_allClassMethods {
     return FLEXGetAllMethods(self.flex_metaclass, NO) ?: @[];
 }
 
-+ (FLEXMethod *)flex_methodNamed:(NSString *)name {
++ (DYYYFLEXMethod *)flex_methodNamed:(NSString *)name {
     Method m = class_getInstanceMethod([self class], NSSelectorFromString(name));
     if (m == NULL) {
         return nil;
     }
 
-    return [FLEXMethod method:m isInstanceMethod:YES];
+    return [DYYYFLEXMethod method:m isInstanceMethod:YES];
 }
 
-+ (FLEXMethod *)flex_classMethodNamed:(NSString *)name {
++ (DYYYFLEXMethod *)flex_classMethodNamed:(NSString *)name {
     Method m = class_getClassMethod([self class], NSSelectorFromString(name));
     if (m == NULL) {
         return nil;
     }
 
-    return [FLEXMethod method:m isInstanceMethod:NO];
+    return [DYYYFLEXMethod method:m isInstanceMethod:NO];
 }
 
 + (BOOL)addMethod:(SEL)selector
@@ -269,11 +269,11 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
     return class_addMethod(instance ? self.class : self.flex_metaclass, selector, implementaiton, typeEncoding.UTF8String);
 }
 
-+ (IMP)replaceImplementationOfMethod:(FLEXMethodBase *)method with:(IMP)implementation useInstance:(BOOL)instance {
++ (IMP)replaceImplementationOfMethod:(DYYYFLEXMethodBase *)method with:(IMP)implementation useInstance:(BOOL)instance {
     return class_replaceMethod(instance ? self.class : self.flex_metaclass, method.selector, implementation, method.typeEncoding.UTF8String);
 }
 
-+ (void)swizzle:(FLEXMethodBase *)original with:(FLEXMethodBase *)other onInstance:(BOOL)instance {
++ (void)swizzle:(DYYYFLEXMethodBase *)original with:(DYYYFLEXMethodBase *)other onInstance:(BOOL)instance {
     [self swizzleBySelector:original.selector with:other.selector onInstance:instance];
 }
 
@@ -306,21 +306,21 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 
 @implementation NSObject (Ivars)
 
-+ (NSArray<FLEXIvar *> *)flex_allIvars {
++ (NSArray<DYYYFLEXIvar *> *)flex_allIvars {
     return FLEXGetAllIvars(self);
 }
 
-+ (FLEXIvar *)flex_ivarNamed:(NSString *)name {
++ (DYYYFLEXIvar *)flex_ivarNamed:(NSString *)name {
     Ivar i = class_getInstanceVariable([self class], name.UTF8String);
     if (i == NULL) {
         return nil;
     }
 
-    return [FLEXIvar ivar:i];
+    return [DYYYFLEXIvar ivar:i];
 }
 
 #pragma mark 获取地址
-- (void *)flex_getIvarAddress:(FLEXIvar *)ivar {
+- (void *)flex_getIvarAddress:(DYYYFLEXIvar *)ivar {
     return (uint8_t *)(__bridge void *)self + ivar.offset;
 }
 
@@ -336,7 +336,7 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 }
 
 #pragma mark 设置实例变量对象
-- (void)flex_setIvar:(FLEXIvar *)ivar object:(id)value {
+- (void)flex_setIvar:(DYYYFLEXIvar *)ivar object:(id)value {
     object_setIvar(self, ivar.objc_ivar, value);
 }
 
@@ -353,7 +353,7 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 }
 
 #pragma mark 设置实例变量值
-- (void)flex_setIvar:(FLEXIvar *)ivar value:(void *)value size:(size_t)size {
+- (void)flex_setIvar:(DYYYFLEXIvar *)ivar value:(void *)value size:(size_t)size {
     void *address = [self flex_getIvarAddress:ivar];
     memcpy(address, value, size);
 }
@@ -378,43 +378,43 @@ NSArray<FLEXMethod *> *FLEXGetAllMethods(_Nullable Class cls, BOOL instance) {
 
 @implementation NSObject (Properties)
 
-+ (NSArray<FLEXProperty *> *)flex_allProperties {
++ (NSArray<DYYYFLEXProperty *> *)flex_allProperties {
     NSMutableArray *instanceProperties = self.flex_allInstanceProperties.mutableCopy;
     [instanceProperties addObjectsFromArray:self.flex_allClassProperties];
     return instanceProperties;
 }
 
-+ (NSArray<FLEXProperty *> *)flex_allInstanceProperties {
++ (NSArray<DYYYFLEXProperty *> *)flex_allInstanceProperties {
     return FLEXGetAllProperties(self);
 }
 
-+ (NSArray<FLEXProperty *> *)flex_allClassProperties {
++ (NSArray<DYYYFLEXProperty *> *)flex_allClassProperties {
     return FLEXGetAllProperties(self.flex_metaclass) ?: @[];
 }
 
-+ (FLEXProperty *)flex_propertyNamed:(NSString *)name {
++ (DYYYFLEXProperty *)flex_propertyNamed:(NSString *)name {
     objc_property_t p = class_getProperty([self class], name.UTF8String);
     if (p == NULL) {
         return nil;
     }
 
-    return [FLEXProperty property:p onClass:self];
+    return [DYYYFLEXProperty property:p onClass:self];
 }
 
-+ (FLEXProperty *)flex_classPropertyNamed:(NSString *)name {
++ (DYYYFLEXProperty *)flex_classPropertyNamed:(NSString *)name {
     objc_property_t p = class_getProperty(object_getClass(self), name.UTF8String);
     if (p == NULL) {
         return nil;
     }
 
-    return [FLEXProperty property:p onClass:object_getClass(self)];
+    return [DYYYFLEXProperty property:p onClass:object_getClass(self)];
 }
 
-+ (void)flex_replaceProperty:(FLEXProperty *)property {
++ (void)flex_replaceProperty:(DYYYFLEXProperty *)property {
     [self flex_replaceProperty:property.name attributes:property.attributes];
 }
 
-+ (void)flex_replaceProperty:(NSString *)name attributes:(FLEXPropertyAttributes *)attributes {
++ (void)flex_replaceProperty:(NSString *)name attributes:(DYYYFLEXPropertyAttributes *)attributes {
     unsigned int count;
     objc_property_attribute_t *objc_attributes = [attributes copyAttributesList:&count];
     class_replaceProperty([self class], name.UTF8String, objc_attributes, count);

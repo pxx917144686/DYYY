@@ -139,6 +139,7 @@
         
         closeButton.layer.borderWidth = 1.0;
         closeButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.3].CGColor;
+        self.closeButton = closeButton;
         [self addSubview:closeButton];
         
         // 声音控制按钮 - 右上角
@@ -171,11 +172,47 @@
         self.restoreButton = soundButton;
         [self addSubview:soundButton];
         
-        // 直接给整个容器添加点击手势，设置代理以避免与按钮冲突
+        // 播放/暂停图标 - 居中显示
+        self.playPauseIconView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, 50, 50)];
+        self.playPauseIconView.center = CGPointMake(self.bounds.size.width / 2, self.bounds.size.height / 2);
+        self.playPauseIconView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
+        self.playPauseIconView.layer.cornerRadius = 25;
+        self.playPauseIconView.clipsToBounds = YES;
+        self.playPauseIconView.alpha = 0;
+        self.playPauseIconView.contentMode = UIViewContentModeCenter;
+        
+        if (@available(iOS 13.0, *)) {
+            UIImage *pauseImage = [UIImage systemImageNamed:@"pause.fill"];
+            self.playPauseIconView.image = pauseImage;
+            self.playPauseIconView.tintColor = [UIColor whiteColor];
+        }
+        
+        [self addSubview:self.playPauseIconView];
+        
+        // 进度条背景
+        self.progressBarView = [[UIView alloc] initWithFrame:CGRectMake(0, self.bounds.size.height - 3, self.bounds.size.width, 3)];
+        self.progressBarView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.3];
+        [self addSubview:self.progressBarView];
+        
+        // 进度条填充
+        self.progressBarFillView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 3)];
+        self.progressBarFillView.backgroundColor = [UIColor colorWithRed:1.0 green:0.2 blue:0.2 alpha:1.0];
+        [self.progressBarView addSubview:self.progressBarFillView];
+        
+        // 单击手势
         UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handleContainerTap:)];
         tapGesture.numberOfTapsRequired = 1;
         tapGesture.delegate = self;
         [self addGestureRecognizer:tapGesture];
+        
+        // 双击手势 - 恢复全屏
+        UITapGestureRecognizer *doubleTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handleDoubleTap:)];
+        doubleTapGesture.numberOfTapsRequired = 2;
+        doubleTapGesture.delegate = self;
+        [self addGestureRecognizer:doubleTapGesture];
+        
+        // 单击手势需要双击手势失败才触发
+        [tapGesture requireGestureRecognizerToFail:doubleTapGesture];
         
         // 拖动手势
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dyyy_handlePipPan:)];
@@ -438,6 +475,29 @@
                                              selector:@selector(playerStalled:)
                                                  name:AVPlayerItemPlaybackStalledNotification
                                                object:self.pipPlayer.currentItem];
+    
+    // 时间观察者 - 更新进度条
+    __weak typeof(self) weakSelf = self;
+    self.timeObserver = [self.pipPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 10)
+                                                                      queue:dispatch_get_main_queue()
+                                                                 usingBlock:^(CMTime time) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        
+        AVPlayerItem *item = strongSelf.pipPlayer.currentItem;
+        if (!item) return;
+        
+        CMTime duration = item.duration;
+        if (CMTIME_IS_INVALID(duration) || duration.value == 0) return;
+        
+        CGFloat progress = CMTimeGetSeconds(time) / CMTimeGetSeconds(duration);
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
+        
+        CGRect fillFrame = strongSelf.progressBarFillView.frame;
+        fillFrame.size.width = strongSelf.progressBarView.frame.size.width * progress;
+        strongSelf.progressBarFillView.frame = fillFrame;
+    }];
 }
 
 // 移除播放器观察者
@@ -445,6 +505,12 @@
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemFailedToPlayToEndTimeNotification object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVPlayerItemPlaybackStalledNotification object:nil];
+    
+    // 移除时间观察者
+    if (self.timeObserver && self.pipPlayer) {
+        [self.pipPlayer removeTimeObserver:self.timeObserver];
+        self.timeObserver = nil;
+    }
 }
 
 // 播放完成处理
@@ -528,8 +594,48 @@
         return;
     }
     
-    // 切换控制按钮显示
-    [self dyyy_toggleControlButtons];
+    // 点击中间区域：暂停/播放
+    [self dyyy_togglePlayPause];
+}
+
+// 双击手势：恢复全屏
+- (void)dyyy_handleDoubleTap:(UITapGestureRecognizer *)tap {
+    [self dyyy_restoreFullScreen];
+}
+
+// 切换播放/暂停
+- (void)dyyy_togglePlayPause {
+    if (!self.pipPlayer) {
+        return;
+    }
+    
+    if (self.pipPlayer.rate > 0) {
+        // 正在播放，暂停
+        [self.pipPlayer pause];
+        self.isPlayingInPip = NO;
+        
+        // 显示暂停图标
+        if (@available(iOS 13.0, *)) {
+            UIImage *pauseImage = [UIImage systemImageNamed:@"pause.fill"];
+            self.playPauseIconView.image = pauseImage;
+        }
+    } else {
+        // 已暂停，播放
+        [self.pipPlayer play];
+        self.isPlayingInPip = YES;
+        
+        // 显示播放图标
+        if (@available(iOS 13.0, *)) {
+            UIImage *playImage = [UIImage systemImageNamed:@"play.fill"];
+            self.playPauseIconView.image = playImage;
+        }
+    }
+    
+    // 显示图标，然后淡出
+    self.playPauseIconView.alpha = 1.0;
+    [UIView animateWithDuration:0.3 delay:0.5 options:UIViewAnimationOptionCurveEaseOut animations:^{
+        self.playPauseIconView.alpha = 0;
+    } completion:nil];
 }
 
 // 切换控制按钮的显示/隐藏
@@ -640,9 +746,9 @@
         return;
     }
     
-    // 使用DYYYPipManager创建小窗
-    [[DYYYPipManager sharedManager] createPipWithAwemeModel:awemeModel];
-    [DYYYManager showToast:@"已开启小窗播放"];
+    // 创建小窗播放器
+    DYYYPipManager *pipManager = [DYYYPipManager sharedManager];
+    [pipManager createPipWithAwemeModel:awemeModel];
 }
 
 // 恢复PIP视频到全屏

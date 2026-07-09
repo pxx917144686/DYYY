@@ -8,7 +8,7 @@
 //
 
 #import "NSDictionary+ObjcRuntime.h"
-#import "FLEXRuntimeUtility.h"
+#import "DYYYFLEXRuntimeUtility.h"
 
 @implementation NSDictionary (ObjcRuntime)
 
@@ -89,7 +89,7 @@
 + (instancetype)attributesDictionaryForProperty:(objc_property_t)property {
     NSMutableDictionary *attrs = [NSMutableDictionary new];
 
-    for (NSString *key in FLEXRuntimeUtility.allPropertyAttributeKeys) {
+    for (NSString *key in DYYYFLEXRuntimeUtility.allPropertyAttributeKeys) {
         char *value = property_copyAttributeValue(property, key.UTF8String);
         if (value) {
             attrs[key] = [[NSString alloc]

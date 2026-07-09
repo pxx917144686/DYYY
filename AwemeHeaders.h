@@ -33,6 +33,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
   MediaTypeHeic
 };
 
+@interface YYAnimatedImageView : UIImageView
+@end
+
 @interface URLModel : NSObject
 @property(nonatomic, strong) NSArray *originURLList;
 - (NSURL *)getDYYYSrcURLDownload;
@@ -94,6 +97,16 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(copy, nonatomic) NSString *shortID;
 @end
 
+@interface AWEPropGuideV2Model : NSObject
+@property(nonatomic, copy) NSString *propName;
+@end
+
+@interface AWELiveFollowFeedCellModel : NSObject
+@end
+
+@interface AWEMusicCardModel : NSObject
+@end
+
 @interface AWEAwemeModel : NSObject
 @property(nonatomic, strong, readwrite) NSNumber *createTime;
 @property(nonatomic, assign, readwrite) CGFloat videoDuration;
@@ -108,19 +121,39 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(nonatomic, copy) NSString *descriptionString;
 @property(nonatomic, assign) BOOL isAds;
 @property(nonatomic, assign) BOOL isLive;
+@property(nonatomic, assign) BOOL isNewTextMode;  // 文字图文专有属性
 @property(nonatomic, strong) NSString *shareURL;
 @property(nonatomic, strong) id hotSpotLynxCardModel;
+@property(nonatomic, strong) AWELiveFollowFeedCellModel *cellRoom;
+@property(nonatomic, strong) NSString *videoFeedTag;
 @property(nonatomic, copy) NSString *liveReason;
 @property(nonatomic, strong) id shareRecExtra; // 推荐视频专有属性
+@property(nonatomic, copy) NSString *referString; // 推荐页为 homepage_hot
 @property(nonatomic, strong) NSArray<AWEAwemeTextExtraModel *> *textExtras;
 @property(nonatomic, copy) NSString *itemTitle;
 @property(nonatomic, copy) NSString *descriptionSimpleString;
 @property(nonatomic, strong) NSString *itemID;
 @property(nonatomic, strong) AWEUserModel *author;
+@property(nonatomic, strong) AWEPropGuideV2Model *propGuideV2;
+@property(nonatomic, strong) AWEMusicCardModel *musicCard;
+@property(nonatomic, assign) BOOL isShowLandscapeEntryView;
 
 @property(nonatomic, strong) AWEAwemeStatisticsModel *statistics;
 - (BOOL)isLive;
+- (BOOL)contentFilter;
+- (BOOL)checkIsAd;
+- (BOOL)isHardAdModel;
+- (BOOL)isHardAd;
 - (AWESearchAwemeExtraModel *)searchExtraModel;
+@end
+
+@interface AWEListDataController : NSObject
+@property(nonatomic, strong) NSMutableArray *dataSource;
+@property(nonatomic, strong) NSMutableArray *filteredDataSource;
+@end
+
+@interface AWEHotListDataController : NSObject
+- (id)transferAwemeListIfNeededWithArray:(id)arg1 isInitFetch:(BOOL)arg2;
 @end
 
 @interface AWELongPressPanelBaseViewModel : NSObject
@@ -156,6 +189,12 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface AWENormalModeTabBarGeneralButton : UIButton
 @property(nonatomic) NSInteger status;
+@end
+
+@interface AWENormalModeTabBarPlusButton : UIView
+@end
+
+@interface AWENormalModeTabBarGeneralPlusButton : AWENormalModeTabBarPlusButton
 @end
 
 @interface AWEHPTopTabItemBadgeContentView : UIView
@@ -320,6 +359,9 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEPlayInteractionProgressContainerView : UIView
 @end
 
+@interface AWEDPlayerProgressContainerView : UIView
+@end
+
 @interface AFDFastSpeedView : UIView
 @end
 
@@ -410,14 +452,22 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @property(nonatomic, assign) CGAffineTransform transform;
 @end
 
+// 评论区实况照片模型
+@interface AWECommentLivePhotoModel : NSObject
+@property(nonatomic, copy) NSArray *videoUrl;
+@end
+
 @interface AWECommentImageModel : NSObject
-@property(nonatomic, copy) NSString *originUrl;
+@property(nonatomic, strong) AWEURLModel *originUrl;
+@property(nonatomic, strong) AWEURLModel *mediumUrl;
+@property(nonatomic, strong) AWECommentLivePhotoModel *livePhotoModel;
 @end
 
 @class AWECommentModel;
 @class AWECommentLongPressPanelParam;
 @class AWEIMStickerModel;
 @class AWEURLModel;
+@class AWECommentAudioModel;
 
 @interface AWECommentLongPressPanelContext : NSObject
 - (AWECommentModel *)selectdComment;
@@ -426,11 +476,20 @@ typedef NS_ENUM(NSInteger, MediaType) {
 
 @interface AWECommentLongPressPanelParam : NSObject
 - (AWECommentModel *)selectdComment;
+- (NSDictionary *)extraParams;
+@end
+
+@interface AWECommentAudioModel : NSObject
+@property (nonatomic, copy, readwrite) NSString *content;
 @end
 
 @interface AWECommentModel : NSObject
+@property (nonatomic, strong, readwrite) AWECommentAudioModel *audioModel;
+@property (nonatomic, strong, readwrite) AWEUserModel *author;
+@property (nonatomic, strong, readwrite) NSNumber *createTime;
 - (AWEIMStickerModel *)sticker;
 - (NSString *)content;
+- (NSArray<AWECommentImageModel *> *)imageList;
 @end
 
 @interface AWEIMStickerModel : NSObject
@@ -978,6 +1037,24 @@ typedef NS_ENUM(NSInteger, MediaType) {
 @interface AWEDPlayerFeedPlayerViewController : UIViewController
 @property(nonatomic) UIView *contentView;
 - (void)setVideoControllerPlaybackRate:(double)arg0;
+@end
+
+@interface AWEDPlayerViewController_Merge : UIViewController
+@property(nonatomic) UIView *contentView;
+- (void)setVideoControllerPlaybackRate:(double)arg0;
+@end
+
+@interface AWEPlayVideoViewController : UIViewController
+@property(nonatomic, strong) AWEAwemeModel *model;
+@end
+
+@interface TTMetalView : UIView
+@end
+@interface TTMetalViewNew : UIView
+@end
+@interface TTMetalViewVP : UIView
+@end
+@interface AWEConcernCellLastView : UIView
 @end
 
 // 底部热点提示框

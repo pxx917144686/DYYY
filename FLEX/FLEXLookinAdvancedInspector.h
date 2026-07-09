@@ -1,9 +1,9 @@
 #import <Foundation/Foundation.h>
-#import "FLEXLookinInspector.h"
+#import "DYYYFLEXLookinInspector.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface FLEXLookinAdvancedInspector : FLEXLookinInspector
+@interface FLEXLookinAdvancedInspector : DYYYFLEXLookinInspector
 
 // 高级分析功能
 - (NSArray *)analyzeViewPerformance:(UIView *)view;

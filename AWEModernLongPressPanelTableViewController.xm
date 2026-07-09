@@ -107,7 +107,7 @@
 %new
 - (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {    
     // 直接打开 FLEX 调试器
-    [[%c(FLEXManager) sharedManager] showExplorer];
+    [[%c(DYYYFLEXManager) sharedManager] showExplorer];
 }
 
 %new

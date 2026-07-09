@@ -5,7 +5,7 @@
 #import <Security/Security.h>
 #import <dlfcn.h>
 #import "fishhook.h"
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 
 #define LOG(fmt, ...) NSLog(@"[StreamingHash] " fmt, ##__VA_ARGS__)
 
@@ -121,7 +121,7 @@ static void FinalizeHashCtx(const void *ctx, const unsigned char *md) {
     NSUInteger digestLen = [entry[@"digestLen"] unsignedIntegerValue];
     NSData *accumulatedData = entry[@"data"];
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     NSString *hashHex = HexStringFromBytes(md, digestLen);
     NSString *hashB64 = Base64StringFromBytes(md, digestLen);
@@ -189,7 +189,7 @@ static void FinalizeHMACCtx(const void *ctx, void *macOut) {
     NSString *keyHex = entry[@"keyHex"];
     NSString *keyB64 = entry[@"keyB64"];
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     NSString *macHex = HexStringFromBytes(macOut, digestLen);
     NSString *macB64 = Base64StringFromBytes(macOut, digestLen);
@@ -373,7 +373,7 @@ int my_CCDigest(uint32_t algorithm, const void *data, size_t dataLength, void *o
     if (digestLen == 0) return result;
 
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     NSString *hashHex = HexStringFromBytes(output, digestLen);
     NSString *hashB64 = Base64StringFromBytes(output, digestLen);
 

@@ -6,8 +6,8 @@
 //
 
 #import <SceneKit/SceneKit.h>
-#import "FHSViewSnapshot.h"
-@class FHSSnapshotNodes;
+#import "DYYYFHSViewSnapshot.h"
+@class DYYYFHSSnapshotNodes;
 
 extern CGFloat const kFHSSmallZOffset;
 
@@ -18,9 +18,9 @@ extern CGFloat const kFHSSmallZOffset;
 @property (nonatomic, readonly) SCNNode *nearestAncestorSnapshot;
 
 /// @return 在指定快照上渲染高亮覆盖层的节点
-+ (instancetype)highlight:(FHSViewSnapshot *)view color:(UIColor *)color;
++ (instancetype)highlight:(DYYYFHSViewSnapshot *)view color:(UIColor *)color;
 /// @return 渲染快照图像的节点
-+ (instancetype)snapshot:(FHSViewSnapshot *)view;
++ (instancetype)snapshot:(DYYYFHSViewSnapshot *)view;
 /// @return 在两个顶点之间绘制线条的节点
 + (instancetype)lineFrom:(SCNVector3)v1 to:(SCNVector3)v2 color:(UIColor *)lineColor;
 
@@ -28,16 +28,16 @@ extern CGFloat const kFHSSmallZOffset;
 - (instancetype)borderWithColor:(UIColor *)color;
 /// @return 在快照节点上方渲染标题的节点
 ///         使用视图中指定的标题文本（如果指定）
-+ (instancetype)header:(FHSViewSnapshot *)view;
++ (instancetype)header:(DYYYFHSViewSnapshot *)view;
 
 /// @return 递归渲染从指定快照开始的
 ///         UI元素层次结构的SceneKit节点
-+ (instancetype)snapshot:(FHSViewSnapshot *)view
-                  parent:(FHSViewSnapshot *)parentView
++ (instancetype)snapshot:(DYYYFHSViewSnapshot *)view
+                  parent:(DYYYFHSViewSnapshot *)parentView
               parentNode:(SCNNode *)parentNode
                     root:(SCNNode *)rootNode
                    depth:(NSInteger *)depthOut
-                nodesMap:(NSMutableDictionary<NSString *, FHSSnapshotNodes *> *)nodesMap
+                nodesMap:(NSMutableDictionary<NSString *, DYYYFHSSnapshotNodes *> *)nodesMap
              hideHeaders:(BOOL)hideHeaders;
 
 @end

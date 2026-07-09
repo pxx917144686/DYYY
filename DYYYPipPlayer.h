@@ -15,6 +15,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIView *floatContainerLayer;
 @property (nonatomic, strong) UIView *keyboardContainerLayer;
 @property (nonatomic, strong) UIButton *restoreButton;
+@property (nonatomic, strong) UIButton *closeButton;
+@property (nonatomic, strong) UIImageView *playPauseIconView;
+@property (nonatomic, strong) UIView *progressBarView;
+@property (nonatomic, strong) UIView *progressBarFillView;
 @property (nonatomic, weak) UIView *originalParentView;
 @property (nonatomic, assign) CGRect originalFrame;
 @property (nonatomic, weak) UIView *playerView;
@@ -22,12 +26,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) AVPlayer *pipPlayer;
 @property (nonatomic, strong) AVPlayerLayer *pipPlayerLayer;
 @property (nonatomic, assign) BOOL isPlayingInPip;
+@property (nonatomic, strong) id timeObserver;
 
 - (void)dyyy_restoreFullScreen;
 - (NSString *)getAwemeId;
 - (void)setupPipPlayerWithAwemeModel:(AWEAwemeModel *)awemeModel;
 - (void)updatePipPlayerWithAwemeModel:(AWEAwemeModel *)awemeModel;
 - (void)dyyy_closeAndStopPip;
+- (void)dyyy_togglePlayPause;
 
 @end
 

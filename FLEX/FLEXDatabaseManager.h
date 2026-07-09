@@ -12,7 +12,7 @@
 //  which Flying Meat Inc. licenses this file to you.
 
 #import <Foundation/Foundation.h>
-#import "FLEXSQLResult.h"
+#import "DYYYFLEXSQLResult.h"
 
 /// Conformers should automatically open and close the database
 @protocol FLEXDatabaseManager <NSObject>
@@ -30,6 +30,6 @@
 @optional
 
 - (NSArray<NSString *> *)queryRowIDsInTable:(NSString *)tableName;
-- (FLEXSQLResult *)executeStatement:(NSString *)SQLStatement;
+- (DYYYFLEXSQLResult *)executeStatement:(NSString *)SQLStatement;
 
 @end

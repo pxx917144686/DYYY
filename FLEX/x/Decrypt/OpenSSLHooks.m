@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import "fishhook.h"
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 
 #define LOG(fmt, ...) NSLog(@"[OpenSSLHooks] " fmt, ##__VA_ARGS__)
 
@@ -146,7 +146,7 @@ static void FinalizeEVPCtx(const void *ctx, const void *finalOut, size_t finalLe
     int enc = [entry[@"enc"] intValue];
     BOOL isDecrypt = (enc == 0);
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     NSString *keyHex = entry[@"keyHex"] ?: @"(null)";
     NSString *keyB64 = entry[@"keyB64"] ?: @"(null)";
@@ -289,7 +289,7 @@ void my_AES_cbc_encrypt(const unsigned char *in, unsigned char *out, size_t leng
     orig_AES_cbc_encrypt(in, out, length, key, ivec, enc);
     if (!in || !out || !key || !ivec) return;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL isDecrypt = (enc == 0);
 
     NSString *info = [NSString stringWithFormat:
@@ -310,7 +310,7 @@ void my_AES_encrypt(const unsigned char *in, unsigned char *out, const void *key
     orig_AES_encrypt(in, out, key);
     if (!in || !out || !key) return;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     NSString *info = [NSString stringWithFormat:
                       @"[AES_encrypt] 单块加密\n输入 Hex: %@\n输出 Hex: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
@@ -324,7 +324,7 @@ void my_AES_decrypt(const unsigned char *in, unsigned char *out, const void *key
     orig_AES_decrypt(in, out, key);
     if (!in || !out || !key) return;
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
     NSString *info = [NSString stringWithFormat:
                       @"[AES_decrypt] 单块解密\n输入 Hex: %@\n输出 Hex: %@\n输出 UTF8: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",

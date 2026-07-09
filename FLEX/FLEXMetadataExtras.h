@@ -6,9 +6,9 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "FLEXMethodBase.h"
-#import "FLEXProperty.h"
-#import "FLEXIvar.h"
+#import "DYYYFLEXMethodBase.h"
+#import "DYYYFLEXProperty.h"
+#import "DYYYFLEXIvar.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -22,9 +22,9 @@ extern NSString * const FLEXAuxiliarynfoKeyFieldLabels;
 
 @end
 
-@interface FLEXMethodBase (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
-@interface FLEXProperty (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
-@interface FLEXIvar (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
+@interface DYYYFLEXMethodBase (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
+@interface DYYYFLEXProperty (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
+@interface DYYYFLEXIvar (Auxiliary) <FLEXMetadataAuxiliaryInfo> @end
 
 
 NS_ASSUME_NONNULL_END

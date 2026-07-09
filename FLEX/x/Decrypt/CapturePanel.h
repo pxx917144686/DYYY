@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface CapturePanelViewController : UIViewController
+@interface DYYYCapturePanelViewController : UIViewController
 
 @end
 

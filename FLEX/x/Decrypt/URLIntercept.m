@@ -11,13 +11,13 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <zlib.h>
 #import <dlfcn.h>
-#import "DatabaseManager.h"
+#import "DYYYDatabaseManager.h"
 #include "fishhook.h"
 
 extern NSString *CurrentBundleID(void);
 
 static BOOL URLInterceptEnabled(void) {
-    return [[DatabaseManager sharedManager] getSwitch:@"zongkaiguan"
+    return [[DYYYDatabaseManager sharedManager] getSwitch:@"zongkaiguan"
                                              bundleID:CurrentBundleID()
                                          defaultValue:NO];
 }
@@ -29,7 +29,7 @@ static void SaveInterceptRecord(NSString *title, NSString *detail) {
     if (!URLInterceptEnabled() || !title.length) return;
     NSString *info = [NSString stringWithFormat:@"%@\n%@", title, detail ?: @""];
     NSString *bundleID = CurrentBundleID();
-    DatabaseManager *db = [DatabaseManager sharedManager];
+    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     dispatch_async(gInterceptQueue, ^{
         [db insertDataIntoTable:@"url_responses" bundleID:bundleID text:info];
         [db insertLogText:[NSString stringWithFormat:@"[拦截] %@", title]];
@@ -365,11 +365,11 @@ static char kResumeRecordedKey;
 static char kKVOObserverKey;
 static char kResponseDataKey;
 
-@interface IZXKVOObserver : NSObject
+@interface DYYYIZXKVOObserver : NSObject
 @property (copy, nonatomic) void (^completionHandler)(NSURLSessionTask *task);
 @end
 
-@implementation IZXKVOObserver
+@implementation DYYYIZXKVOObserver
 - (void)observeValueForKeyPath:(NSString *)keyPath
                       ofObject:(id)object
                         change:(NSDictionary<NSKeyValueChangeKey, id> *)change
@@ -579,7 +579,7 @@ static void RecordTaskRequest(NSURLSessionTask *task) {
     }
 
     @try {
-        IZXKVOObserver *observer = [[IZXKVOObserver alloc] init];
+        DYYYIZXKVOObserver *observer = [[DYYYIZXKVOObserver alloc] init];
         observer.completionHandler = ^(NSURLSessionTask *completedTask) {
             NSURLResponse *response = completedTask.response;
             if (response) {

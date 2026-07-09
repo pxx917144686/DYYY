@@ -2,7 +2,23 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class YYAnimatedImageView;
+
 @interface DYYYUtils : NSObject
+
+#pragma mark - Advertisement Filtering Utilities (广告过滤工具)
+
+/** 使用抖音模型自身的广告判定及明确广告字段识别广告作品。 */
++ (BOOL)isAdvertisementAwemeModel:(id)model;
+
+/** 识别作品模型或搜索结果包装模型中的广告。 */
++ (BOOL)isAdvertisementContainerModel:(id)model;
+
+/** 从列表中移除广告模型；未启用屏蔽广告时原样返回。 */
++ (NSArray *)arrayByRemovingAdvertisements:(id)array;
+
+/** 在作品模型字段尚未完成映射时，从原始响应中识别明确广告标记。 */
++ (BOOL)isAdvertisementRawData:(id)rawData;
 
 /**
  * 显示 Toast 消息
@@ -22,6 +38,14 @@ NS_ASSUME_NONNULL_BEGIN
  * @return 找到的视图控制器，未找到返回 nil
  */
 + (UIViewController *)findViewControllerFromView:(UIView *)view;
+
+/**
+ * 在视图控制器层级中查找指定类的控制器
+ * @param targetClass 目标类
+ * @param vc 起始视图控制器
+ * @return 找到的视图控制器，未找到返回 nil
+ */
++ (UIViewController *)findViewControllerOfClass:(Class)targetClass inViewController:(UIViewController *)vc;
 
 + (NSUInteger)clearDirectoryContents:(NSString *)directoryPath;
 
@@ -58,6 +82,51 @@ NS_ASSUME_NONNULL_BEGIN
  * 在主线程安全延迟执行：对 owner 进行弱引用，回调时校验 owner 仍存活
  */
  + (void)dispatchAfter:(NSTimeInterval)delaySeconds owner:(id)owner block:(dispatch_block_t)block;
+
+#pragma mark - Animated Sticker / GIF Utilities (动图表情/GIF工具)
+
+/**
+ * 判断图片是否为带 heif/heic URL 的 BDImage
+ */
++ (BOOL)isBDImageWithHeifURL:(UIImage *)image;
+
+/**
+ * 从 YYAnimatedImageView 提取帧数组
+ */
++ (NSArray *)getImagesFromYYAnimatedImageView:(YYAnimatedImageView *)imageView;
+
+/**
+ * 获取 YYAnimatedImageView 动图总时长
+ */
++ (CGFloat)getDurationFromYYAnimatedImageView:(YYAnimatedImageView *)imageView;
+
+/**
+ * 使用 YYImage 解码动图数据，返回帧图像和总时长
+ */
++ (BOOL)framesFromAnimatedData:(NSData *)data
+                         scale:(CGFloat)scale
+                        images:(NSArray<UIImage *> *_Nullable *)images
+                 totalDuration:(CGFloat *_Nullable)totalDuration;
+
+/**
+ * 根据帧数组生成 GIF 文件
+ */
++ (BOOL)createGIFWithImages:(NSArray *)images duration:(CGFloat)duration path:(NSString *)path progress:(void (^)(float progress))progressBlock;
+
+/**
+ * 保存 GIF 到相册并清理临时文件
+ */
++ (void)saveGIFToPhotoLibrary:(NSString *)path completion:(void (^)(BOOL success, NSError *error))completion;
+
+/**
+ * 保存 GIF(URL) 到相册并删除源文件
+ */
++ (void)saveGifToPhotoLibrary:(NSURL *)gifURL completion:(void (^)(BOOL success))completion;
+
+/**
+ * 将 HEIC/HEIF 动图转换为 GIF
+ */
++ (void)convertHeicToGif:(NSURL *)heicURL completion:(void (^)(NSURL *gifURL, BOOL success))completion;
 
 @end
 

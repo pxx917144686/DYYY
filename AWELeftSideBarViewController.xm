@@ -11,7 +11,7 @@
 #define DYYYCustomInputView_DEFINED
 
 #import "AwemeHeaders.h"
-#import "CityManager.h"
+#import "DYYYCityManager.h"
 #import "DYYYManager.h"
 #import "DYYYSettingViewController.h"
 #import "DYYYToast.h"
