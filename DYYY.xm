@@ -2033,6 +2033,21 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 #pragma mark - DataController 广告过滤
 
+// 过滤结果标记：getter 命中标记(且 count 未变)时跳过 O(n) 全量过滤
+static char kDYYYAdFilteredMarkKey;
+
+static void DYYYMarkAdFiltered(NSArray *array) {
+    if ([array isKindOfClass:[NSArray class]]) {
+        objc_setAssociatedObject(array, &kDYYYAdFilteredMarkKey, @(array.count), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+static BOOL DYYYIsAdFilteredValid(NSArray *array) {
+    if (![array isKindOfClass:[NSArray class]]) return NO;
+    NSNumber *marked = objc_getAssociatedObject(array, &kDYYYAdFilteredMarkKey);
+    return marked && marked.unsignedIntegerValue == array.count;
+}
+
 %hook AWEListDataController
 
 - (void)setDataSource:(NSMutableArray *)dataSource {
@@ -2042,12 +2057,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (NSMutableArray *)dataSource {
     NSMutableArray *dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return [filtered mutableCopy];
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2058,12 +2077,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (NSMutableArray *)filteredDataSource {
     NSMutableArray *filteredDataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(filteredDataSource)) {
+        return filteredDataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:filteredDataSource];
     if (filtered != filteredDataSource && [filteredDataSource isKindOfClass:[NSMutableArray class]]) {
         [filteredDataSource setArray:filtered];
     } else if (filtered != filteredDataSource) {
         return [filtered mutableCopy];
     }
+    DYYYMarkAdFiltered(filteredDataSource);
     return filteredDataSource;
 }
 
@@ -2078,12 +2101,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (id)dataSource {
     id dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return filtered;
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2107,12 +2134,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (id)dataSource {
     id dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return filtered;
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2609,62 +2640,70 @@ static Class tabBarButtonClass = nil;
         self.frame = frame;
     }
 
-    BOOL hideShop = DYYYGetBool(@"DYYYHideShopButton");
-    BOOL hideMsg = DYYYGetBool(@"DYYYHideMessageButton");
-    BOOL hideFri = DYYYGetBool(@"DYYYHideFriendsButton");
-    BOOL hideMe = DYYYGetBool(@"DYYYHideMyButton");
-    BOOL hidePlus = DYYYGetBool(@"DYYYisHiddenJia");
+    BOOL hideShop = DYYYCachedBool(@"DYYYHideShopButton");
+    BOOL hideMsg = DYYYCachedBool(@"DYYYHideMessageButton");
+    BOOL hideFri = DYYYCachedBool(@"DYYYHideFriendsButton");
+    BOOL hideMe = DYYYCachedBool(@"DYYYHideMyButton");
+    BOOL hidePlus = DYYYCachedBool(@"DYYYisHiddenJia");
     BOOL isPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 
-    NSMutableArray *visibleButtons = [NSMutableArray array];
-    UIView *ipadContainerView = nil;
+    // 脏标记：开关/宽度/subviews 集合未变化时跳过按钮遍历、排序与重排
+    static NSArray *gTabBarLayoutKey = nil;
+    NSArray *layoutKey = @[@(hideShop), @(hideMsg), @(hideFri), @(hideMe), @(hidePlus),
+                           @(isPad), @(self.bounds.size.width), self.subviews];
+    if (![layoutKey isEqualToArray:gTabBarLayoutKey]) {
+        gTabBarLayoutKey = [layoutKey copy];
 
-    for (UIView *subview in self.subviews) {
-        if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
-            (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
-            NSString *label = subview.accessibilityLabel;
-            BOOL isPlusButton = [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
-                                (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass]) ||
-                                [label isEqualToString:@"拍摄"];
-            BOOL shouldHide = (isPlusButton && hidePlus) || ([label containsString:@"商城"] && hideShop) || ([label containsString:@"消息"] && hideMsg) || ([label containsString:@"朋友"] && hideFri) ||
-                              ([label isEqualToString:@"我"] && hideMe);
+        NSMutableArray *visibleButtons = [NSMutableArray array];
+        UIView *ipadContainerView = nil;
 
-            subview.userInteractionEnabled = !shouldHide;
-            subview.hidden = shouldHide;
+        for (UIView *subview in self.subviews) {
+            if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
+                (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
+                NSString *label = subview.accessibilityLabel;
+                BOOL isPlusButton = [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
+                                    (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass]) ||
+                                    [label isEqualToString:@"拍摄"];
+                BOOL shouldHide = (isPlusButton && hidePlus) || ([label containsString:@"商城"] && hideShop) || ([label containsString:@"消息"] && hideMsg) || ([label containsString:@"朋友"] && hideFri) ||
+                                  ([label isEqualToString:@"我"] && hideMe);
 
-            if (!shouldHide) {
-                [visibleButtons addObject:subview];
+                subview.userInteractionEnabled = !shouldHide;
+                subview.hidden = shouldHide;
+
+                if (!shouldHide) {
+                    [visibleButtons addObject:subview];
+                }
+            } else if ([subview isKindOfClass:tabBarButtonClass]) {
+                subview.userInteractionEnabled = NO;
+                subview.hidden = YES;
+            } else if (isPad && !ipadContainerView && [subview isMemberOfClass:UIView.class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
+                ipadContainerView = subview;
             }
-        } else if ([subview isKindOfClass:tabBarButtonClass]) {
-            subview.userInteractionEnabled = NO;
-            subview.hidden = YES;
-        } else if (isPad && !ipadContainerView && [subview isMemberOfClass:UIView.class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
-            ipadContainerView = subview;
+        }
+
+        [visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+          return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
+        }];
+
+        CGFloat offsetX, totalWidth;
+        if (ipadContainerView) {
+            offsetX = ipadContainerView.frame.origin.x;
+            totalWidth = ipadContainerView.bounds.size.width;
+        } else {
+            offsetX = 0;
+            totalWidth = self.bounds.size.width;
+        }
+        CGFloat buttonWidth = (visibleButtons.count > 0) ? (totalWidth / visibleButtons.count) : 0;
+
+        // 均匀布局按钮
+        for (NSInteger i = 0; i < visibleButtons.count; i++) {
+            UIView *button = visibleButtons[i];
+            button.frame = CGRectMake(offsetX + i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
         }
     }
 
-    [visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
-      return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
-    }];
-
-    CGFloat offsetX, totalWidth;
-    if (ipadContainerView) {
-        offsetX = ipadContainerView.frame.origin.x;
-        totalWidth = ipadContainerView.bounds.size.width;
-    } else {
-        offsetX = 0;
-        totalWidth = self.bounds.size.width;
-    }
-    CGFloat buttonWidth = (visibleButtons.count > 0) ? (totalWidth / visibleButtons.count) : 0;
-
-    // 均匀布局按钮
-    for (NSInteger i = 0; i < visibleButtons.count; i++) {
-        UIView *button = visibleButtons[i];
-        button.frame = CGRectMake(offsetX + i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
-    }
-
     // 禁用首页刷新功能
-    if (DYYYGetBool(@"DYYYDisableHomeRefresh")) {
+    if (DYYYCachedBool(@"DYYYDisableHomeRefresh")) {
         for (UIView *subview in self.subviews) {
             if ([subview isKindOfClass:generalButtonClass]) {
                 AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
@@ -2678,7 +2717,7 @@ static Class tabBarButtonClass = nil;
 
     // 背景和分隔线处理
     BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
-    BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
+    BOOL enableFullScreen = DYYYCachedBool(@"DYYYisEnableFullScreen");
 
     if (hideBottomBg || enableFullScreen) {
         if (self.skinContainerView) {
@@ -2702,7 +2741,7 @@ static Class tabBarButtonClass = nil;
             }
         }
 
-        BOOL hideFriendsButton = DYYYGetBool(@"DYYYHideFriendsButton");
+        BOOL hideFriendsButton = DYYYCachedBool(@"DYYYHideFriendsButton");
         BOOL shouldHideBackgrounds = hideBottomBg || (enableFullScreen && (isHomeSelected || (isFriendsSelected && !hideFriendsButton)));
 
         // 单次遍历处理所有背景和分割线
@@ -2737,10 +2776,10 @@ static Class tabBarButtonClass = nil;
 - (void)setHidden:(BOOL)hidden {
     %orig(hidden);
 
-    BOOL disableHomeRefresh = DYYYGetBool(@"DYYYDisableHomeRefresh");
-    BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
-    BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
-    BOOL hideFriendsButton = DYYYGetBool(@"DYYYHideFriendsButton");
+    BOOL disableHomeRefresh = DYYYCachedBool(@"DYYYDisableHomeRefresh");
+    BOOL enableFullScreen = DYYYCachedBool(@"DYYYisEnableFullScreen");
+    BOOL hideBottomBg = DYYYCachedBool(@"DYYYisHiddenBottomBg");
+    BOOL hideFriendsButton = DYYYCachedBool(@"DYYYHideFriendsButton");
 
     BOOL isHomeSelected = NO;
     BOOL isFriendsSelected = NO;
