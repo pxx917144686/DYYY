@@ -31,6 +31,14 @@
 
 typedef DYYYSelfTestResult * (^DYYYSelfTestBlock)(void);
 
+// 状态：0=通过 ✅ 1=警告 ⚠️ 2=失败 ❌ 3=信息 ℹ️（抖音版本差异提示，不计入警告数）
+typedef NS_ENUM(NSInteger, DYYYSelfTestStatus) {
+    DYYYSelfTestStatusPass = 0,
+    DYYYSelfTestStatusWarn = 1,
+    DYYYSelfTestStatusFail = 2,
+    DYYYSelfTestStatusInfo = 3,
+};
+
 static DYYYSelfTestResult *DYYYMakeResult(NSString *name, NSInteger status, NSString *detail) {
     DYYYSelfTestResult *r = [[DYYYSelfTestResult alloc] init];
     r.name = name;
@@ -39,18 +47,37 @@ static DYYYSelfTestResult *DYYYMakeResult(NSString *name, NSInteger status, NSSt
     return r;
 }
 
-// 类存在性检测辅助：全部存在=✅，部分缺失=⚠️（抖音版本差异属正常）
-static DYYYSelfTestResult *DYYYCheckClasses(NSString *name, NSArray<NSString *> *classNames) {
-    NSMutableString *missing = [NSMutableString string];
-    for (NSString *className in classNames) {
+// 类存在性检测：核心类缺失=⚠️(1)；可选类缺失=ℹ️(3，抖音版本差异非插件问题)
+static DYYYSelfTestResult *DYYYCheckClassesWithOptional(NSString *name,
+                                                         NSArray<NSString *> *coreNames,
+                                                         NSArray<NSString *> *optionalNames) {
+    NSMutableString *missingCore = [NSMutableString string];
+    NSMutableString *missingOptional = [NSMutableString string];
+    for (NSString *className in coreNames) {
         if (!NSClassFromString(className)) {
-            [missing appendFormat:@"%@; ", className];
+            [missingCore appendFormat:@"%@; ", className];
         }
     }
-    if (missing.length == 0) {
-        return DYYYMakeResult(name, 0, [NSString stringWithFormat:@"全部 %lu 个关键类存在", (unsigned long)classNames.count]);
+    for (NSString *className in optionalNames) {
+        if (!NSClassFromString(className)) {
+            [missingOptional appendFormat:@"%@; ", className];
+        }
     }
-    return DYYYMakeResult(name, 1, [NSString stringWithFormat:@"缺失类: %@(部分缺失可能是抖音版本差异, 相关功能失效)", missing]);
+    if (missingCore.length == 0 && missingOptional.length == 0) {
+        return DYYYMakeResult(name, DYYYSelfTestStatusPass,
+            [NSString stringWithFormat:@"全部 %lu 个关键类存在", (unsigned long)(coreNames.count + optionalNames.count)]);
+    }
+    if (missingCore.length > 0) {
+        return DYYYMakeResult(name, DYYYSelfTestStatusWarn,
+            [NSString stringWithFormat:@"缺失核心类: %@相关功能失效", missingCore]);
+    }
+    return DYYYMakeResult(name, DYYYSelfTestStatusInfo,
+        [NSString stringWithFormat:@"版本差异类缺失: %@(抖音版本差异, 非插件问题; 对应定制功能本版不生效)", missingOptional]);
+}
+
+// 类存在性检测（无可选类时的便捷入口）
+static DYYYSelfTestResult *DYYYCheckClasses(NSString *name, NSArray<NSString *> *classNames) {
+    return DYYYCheckClassesWithOptional(name, classNames, @[]);
 }
 
 #pragma mark - 测试项
@@ -99,15 +126,14 @@ static DYYYSelfTestResult *DYYYTestConfigCache(void) {
 
 // 3. 播放页 Hook 类
 static DYYYSelfTestResult *DYYYTestPlaybackHooks(void) {
-    return DYYYCheckClasses(@"播放页 Hook", @[
-        @"AWEPlayInteractionViewController",
-        @"AWEAwemePlayVideoViewController",
-        @"AWEPlayInteractionTimestampElement",
-        @"AWEStoryProgressContainerView",
-        @"AWEPlayInteractionProgressContainerView",
-        @"AWEDPlayerProgressContainerView",
-        @"AWEPlayerPlayControlHandler"
-    ]);
+    return DYYYCheckClassesWithOptional(@"播放页 Hook",
+        @[@"AWEPlayInteractionViewController",
+          @"AWEAwemePlayVideoViewController",
+          @"AWEPlayInteractionTimestampElement",
+          @"AWEStoryProgressContainerView",
+          @"AWEPlayInteractionProgressContainerView",
+          @"AWEDPlayerProgressContainerView"],
+        @[@"AWEPlayerPlayControlHandler"]);
 }
 
 // 4. feed 功能类与配置
@@ -152,12 +178,11 @@ static DYYYSelfTestResult *DYYYTestSpeedClear(void) {
 
 // 6. 长按面板/评论类
 static DYYYSelfTestResult *DYYYTestPanelComment(void) {
-    return DYYYCheckClasses(@"长按面板/评论", @[
-        @"AWEModernLongPressPanelTableViewController",
-        @"AWELongPressPanelManager",
-        @"AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView",
-        @"AWECommentInputViewSwiftImpl.CommentInputContainerView"
-    ]);
+    return DYYYCheckClassesWithOptional(@"长按面板/评论",
+        @[@"AWEModernLongPressPanelTableViewController",
+          @"AWELongPressPanelManager",
+          @"AWECommentInputViewSwiftImpl.CommentInputContainerView"],
+        @[@"AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView"]);
 }
 
 // 7. 下载/保存模块
@@ -420,7 +445,9 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
 - (void)copyReport {
     NSMutableString *report = [NSMutableString stringWithFormat:@"DYYY++ 自检报告 (%@)\n\n", [NSDate date]];
     for (DYYYSelfTestResult *r in self.results) {
-        NSString *mark = r.status == 0 ? @"✅" : (r.status == 1 ? @"⚠️" : @"❌");
+        NSString *mark = (r.status == DYYYSelfTestStatusPass) ? @"✅" :
+                         (r.status == DYYYSelfTestStatusWarn) ? @"⚠️" :
+                         (r.status == DYYYSelfTestStatusInfo) ? @"ℹ️" : @"❌";
         [report appendFormat:@"%@ %@\n%@\n\n", mark, r.name, r.detail];
     }
     if (self.finished) {
@@ -490,17 +517,25 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
             strongSelf.finished = YES;
-            NSUInteger pass = 0, warn = 0, fail = 0;
+            NSUInteger pass = 0, warn = 0, fail = 0, info = 0;
             for (DYYYSelfTestResult *r in strongSelf.results) {
-                if (r.status == 0) pass++;
-                else if (r.status == 1) warn++;
+                if (r.status == DYYYSelfTestStatusPass) pass++;
+                else if (r.status == DYYYSelfTestStatusWarn) warn++;
+                else if (r.status == DYYYSelfTestStatusInfo) info++;
                 else fail++;
             }
             strongSelf.title = @"自检完成";
-            strongSelf.summaryLabel.text = [NSString stringWithFormat:
-                @"✅ %lu / ⚠️ %lu / ❌ %lu（共 %lu 项）",
-                (unsigned long)pass, (unsigned long)warn, (unsigned long)fail,
-                (unsigned long)strongSelf.results.count];
+            if (info > 0) {
+                strongSelf.summaryLabel.text = [NSString stringWithFormat:
+                    @"✅ %lu / ⚠️ %lu / ❌ %lu / ℹ️ %lu（共 %lu 项）",
+                    (unsigned long)pass, (unsigned long)warn, (unsigned long)fail,
+                    (unsigned long)info, (unsigned long)strongSelf.results.count];
+            } else {
+                strongSelf.summaryLabel.text = [NSString stringWithFormat:
+                    @"✅ %lu / ⚠️ %lu / ❌ %lu（共 %lu 项）",
+                    (unsigned long)pass, (unsigned long)warn, (unsigned long)fail,
+                    (unsigned long)strongSelf.results.count];
+            }
             [strongSelf.tableView reloadData];
         });
     });
@@ -525,7 +560,9 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
 
     if (indexPath.row < self.results.count) {
         DYYYSelfTestResult *result = self.results[indexPath.row];
-        NSString *mark = result.status == 0 ? @"✅" : (result.status == 1 ? @"⚠️" : @"❌");
+        NSString *mark = (result.status == DYYYSelfTestStatusPass) ? @"✅" :
+                         (result.status == DYYYSelfTestStatusWarn) ? @"⚠️" :
+                         (result.status == DYYYSelfTestStatusInfo) ? @"ℹ️" : @"❌";
         cell.textLabel.text = [NSString stringWithFormat:@"%@ %@", mark, result.name];
         cell.detailTextLabel.text = result.detail;
         cell.detailTextLabel.numberOfLines = 0;
