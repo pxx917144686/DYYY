@@ -12,6 +12,7 @@
 #import "DYYYUtils.h"
 #import "DYYYSwitchManager.h"
 #import "DYYYABTestHook.h"
+#import "DYYYSelfTest.h"
 
 @interface UISwitch (DYYY_FuturisticEffects)
 - (void)applyFuturisticEffects;
@@ -1191,7 +1192,8 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"清除设置" key:@"DYYYCleanSettings" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"清理缓存" key:@"DYYYCleanCache" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"备份设置" key:@"DYYYBackupSettings" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"恢复设置" key:@"DYYYRestoreSettings" type:DYYYSettingItemTypeSwitch]
+                [DYYYSettingItem itemWithTitle:@"恢复设置" key:@"DYYYRestoreSettings" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"一键自检" key:@"DYYYSelfTest" type:DYYYSettingItemTypeButton]
             ],
             
             // 第八部分 - 热更新功能
@@ -1978,6 +1980,12 @@ NSDictionary *getCurrentABTestData(void) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         return cell;
     }
+    // 特殊处理一键自检
+    if ([item.key isEqualToString:@"DYYYSelfTest"]) {
+        cell.accessoryView = nil;
+        cell.accessoryType = UITableViewCellAccessoryDetailButton;
+        return cell;
+    }
     // 特殊处理热更新功能
     if ([item.key isEqualToString:@"SaveCurrentABTestData"] ||
         [item.key isEqualToString:@"LoadABTestConfigFile"] ||
@@ -2555,6 +2563,13 @@ NSDictionary *getCurrentABTestData(void) {
     // 添加清理缓存功能处理
     if ([item.key isEqualToString:@"DYYYCleanCache"]) {
         [self handleCleanCache];
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        return;
+    }
+    
+    // 一键自检功能处理
+    if ([item.key isEqualToString:@"DYYYSelfTest"]) {
+        [DYYYSelfTest runAndPresentReportFromViewController:self];
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         return;
     }
