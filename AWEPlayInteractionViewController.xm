@@ -2654,7 +2654,8 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         [menuModules addObject:copyTextModule];
     }
     
-    // FLEX调试功能模块
+#ifndef DYYY_RELEASE_BUILD
+    // FLEX调试功能模块（发布版不含 FLEX，隐藏菜单项）
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFLEX"] || 
         ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnableFLEX"]) {
         
@@ -2677,6 +2678,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
         }];
         [menuModules addObject:flexModule];
     }
+#endif
     
     // 评论功能模块
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDoubleTapComment"] || 

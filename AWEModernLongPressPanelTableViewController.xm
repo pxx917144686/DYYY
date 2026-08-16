@@ -106,7 +106,7 @@
 
 %new
 - (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {    
-    // 直接打开 FLEX 调试器
+    // 直接打开 FLEX 调试器（发布版无 FLEX 类，nil 安全 no-op；入口已在调用侧条件编译隐藏）
     [[%c(DYYYFLEXManager) sharedManager] showExplorer];
 }
 
@@ -864,7 +864,8 @@
         [viewModels addObject:timerCloseViewModel];
     }
 
-    // FLEX调试功能
+#ifndef DYYY_RELEASE_BUILD
+    // FLEX调试功能（发布版不含 FLEX，隐藏面板项）
     if (enableFLEX) {
         AWELongPressPanelBaseViewModel *flexViewModel = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
         flexViewModel.awemeModel = self.awemeModel;
@@ -880,6 +881,7 @@
         };
         [viewModels addObject:flexViewModel];
     }
+#endif
     
     // 小窗PIP播放功能
     if (enablePip && self.awemeModel.awemeType != 68) {

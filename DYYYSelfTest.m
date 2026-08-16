@@ -3,7 +3,9 @@
 #import "DYYYCityManager.h"
 #import "DYYYManager.h"
 #import "DYYYToast.h"
+#ifndef DYYY_RELEASE_BUILD
 #import "FLEX/x/Decrypt/DYYYDatabaseManager.h"
+#endif
 #import <objc/runtime.h>
 
 #pragma mark - 测试结果模型
@@ -60,7 +62,8 @@ static DYYYSelfTestResult *DYYYTestConfigCache(void) {
     return DYYYMakeResult(@"配置缓存", 2, [NSString stringWithFormat:@"异常 cached=%d cacheCleared=%d", cached, cacheCleared]);
 }
 
-// 3. 逆向助手数据库读写与上限裁剪
+// 3. 逆向助手数据库读写与上限裁剪（发布版不含逆向助手，跳过）
+#ifndef DYYY_RELEASE_BUILD
 static DYYYSelfTestResult *DYYYTestDatabase(void) {
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     NSString *probeBundle = @"com.dyyy.selftest.probe";
@@ -83,6 +86,7 @@ static DYYYSelfTestResult *DYYYTestDatabase(void) {
     }
     return DYYYMakeResult(@"逆向助手数据库", 2, @"写入后未能查询到测试数据");
 }
+#endif
 
 // 4. 城市库地址生成
 static DYYYSelfTestResult *DYYYTestCityManager(void) {
@@ -131,12 +135,17 @@ static DYYYSelfTestResult *DYYYTestHookPresence(void) {
                              @"AWEFeedVideoButton",
                              @"AWEListDataController",
                              @"AWENormalModeTabBar",
-                             @"AWEUserModel",
-                             @"DYYYIZXURLCaptureProtocol"]) {
+                             @"AWEUserModel"]) {
         if (!NSClassFromString(name)) {
             [missing appendFormat:@"%@; ", name];
         }
     }
+#ifndef DYYY_RELEASE_BUILD
+    // 逆向助手抓包协议类仅调试版存在
+    if (!NSClassFromString(@"DYYYIZXURLCaptureProtocol")) {
+        [missing appendString:@"DYYYIZXURLCaptureProtocol; "];
+    }
+#endif
 
     // NSDictionary hook 命中检测：class cluster 子类若覆盖 objectForKey:
     // 则 %hook NSDictionary 会被绕过（实例走子类 IMP）
@@ -185,15 +194,19 @@ static DYYYSelfTestResult *DYYYTestNetwork(void) {
     [DYYYManager showToast:@"自检中…"];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSArray *tests = @[
+        NSMutableArray *tests = [NSMutableArray arrayWithArray:@[
             ^DYYYSelfTestResult *(void){ return DYYYTestEnvironment(); },
-            ^DYYYSelfTestResult *(void){ return DYYYTestConfigCache(); },
-            ^DYYYSelfTestResult *(void){ return DYYYTestDatabase(); },
+            ^DYYYSelfTestResult *(void){ return DYYYTestConfigCache(); }
+        ]];
+#ifndef DYYY_RELEASE_BUILD
+        [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestDatabase(); }];
+#endif
+        [tests addObjectsFromArray:@[
             ^DYYYSelfTestResult *(void){ return DYYYTestCityManager(); },
             ^DYYYSelfTestResult *(void){ return DYYYTestFileSystem(); },
             ^DYYYSelfTestResult *(void){ return DYYYTestHookPresence(); },
             ^DYYYSelfTestResult *(void){ return DYYYTestNetwork(); }
-        ];
+        ]];
 
         NSMutableArray<DYYYSelfTestResult *> *results = [NSMutableArray array];
         for (NSUInteger i = 0; i < tests.count; i++) {
