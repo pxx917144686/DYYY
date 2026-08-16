@@ -6,6 +6,7 @@
 #import "DYYYPipPlayer.h"
 #import "DYYYScreenshot.h"
 #import "DYYYFloatSpeedButton.h"
+#import "DYYYCrashCatcher.h"
 #ifndef DYYY_RELEASE_BUILD
 #import "FLEX/x/Decrypt/DYYYDatabaseManager.h"
 #endif
@@ -335,6 +336,19 @@ static DYYYSelfTestResult *DYYYTestNetwork(void) {
     return DYYYMakeResult(@"网络可达性", status, detail);
 }
 
+// 17. 崩溃日志抓取
+static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
+    NSArray<NSString *> *logs = [DYYYCrashCatcher savedLogFilePaths];
+    NSString *doc = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *dir = [doc stringByAppendingPathComponent:@"DYYY/CrashLogs"];
+    BOOL dirExists = [[NSFileManager defaultManager] fileExistsAtPath:dir];
+    if (dirExists) {
+        return DYYYMakeResult(@"崩溃日志抓取", 0,
+            [NSString stringWithFormat:@"已安装, 日志目录: DYYY/CrashLogs, 已有 %lu 份日志", (unsigned long)logs.count]);
+    }
+    return DYYYMakeResult(@"崩溃日志抓取", 2, @"日志目录未创建");
+}
+
 #pragma mark - 实时自检页面
 
 @interface DYYYSelfTestViewController : UIViewController <UITableViewDataSource, UITableViewDelegate>
@@ -422,6 +436,7 @@ static DYYYSelfTestResult *DYYYTestNetwork(void) {
     [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestDatabase(); }];
     [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestFlexEntry(); }];
 #endif
+    [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestCrashCatcher(); }];
     [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestNetwork(); }];
 
     self.totalCount = tests.count;

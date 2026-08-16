@@ -884,6 +884,6 @@ static void initTargetClassNames(void) {
     return result;
 }
 %end
-%ctor {
-	signal(SIGSEGV, SIG_IGN);
-}
+// 注意：原 %ctor 中 signal(SIGSEGV, SIG_IGN) 已移除。
+// 忽略 SIGSEGV 会让段错误崩溃被吞掉(App 状态损坏却不闪退), 且会覆盖
+// DYYYCrashCatcher 安装的信号处理器; 崩溃统一由崩溃日志抓取模块捕获。
