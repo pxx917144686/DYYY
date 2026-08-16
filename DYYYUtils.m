@@ -28,6 +28,54 @@
 
 static const NSTimeInterval kDYYYUtilsDefaultFrameDelay = 0.1f;
 
+#pragma mark - 配置内存缓存
+
+static NSMutableDictionary *DYYYConfigCache(void) {
+    static NSMutableDictionary *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [NSMutableDictionary dictionary];
+    });
+    return cache;
+}
+
+BOOL DYYYCachedBool(NSString *key) {
+    if (!key) return NO;
+    NSMutableDictionary *cache = DYYYConfigCache();
+    NSString *cacheKey = [@"B:" stringByAppendingString:key];
+    @synchronized (cache) {
+        NSNumber *cached = cache[cacheKey];
+        if (cached) return cached.boolValue;
+    }
+    BOOL value = [[NSUserDefaults standardUserDefaults] boolForKey:key];
+    @synchronized (cache) {
+        cache[cacheKey] = @(value);
+    }
+    return value;
+}
+
+NSString *DYYYCachedString(NSString *key) {
+    if (!key) return nil;
+    NSMutableDictionary *cache = DYYYConfigCache();
+    NSString *cacheKey = [@"S:" stringByAppendingString:key];
+    @synchronized (cache) {
+        NSString *cached = cache[cacheKey];
+        if (cached) return cached;
+    }
+    NSString *value = [[NSUserDefaults standardUserDefaults] stringForKey:key];
+    if (!value) value = @"";
+    @synchronized (cache) {
+        cache[cacheKey] = value;
+    }
+    return value;
+}
+
+void DYYYConfigCacheInvalidate(void) {
+    @synchronized (DYYYConfigCache()) {
+        [DYYYConfigCache() removeAllObjects];
+    }
+}
+
 static inline CGFloat DYYYUtilsNormalizedDelay(CGFloat delay) {
     if (!isfinite(delay) || delay < 0.01f) {
         return kDYYYUtilsDefaultFrameDelay;

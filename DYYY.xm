@@ -1201,11 +1201,11 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 
 - (void)setFrame:(CGRect)frame {
 
-    if ([self isKindOfClass:%c(AWEIMSkylightListView)] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenAvatarList"]) {
+    if ([self isKindOfClass:%c(AWEIMSkylightListView)] && DYYYCachedBool(@"DYYYisHiddenAvatarList")) {
         frame = CGRectZero;
     }
 
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+    if (!DYYYCachedBool(@"DYYYisEnableCommentBlur") && !DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         %orig;
         return;
     }
@@ -1221,9 +1221,9 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
     
     if (isPlayVC) {
 
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && frame.origin.x != 0) {
+        if (DYYYCachedBool(@"DYYYisEnableCommentBlur") && frame.origin.x != 0) {
             return;
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] && frame.origin.x != 0 && frame.origin.y != 0) {
+        } else if (DYYYCachedBool(@"DYYYisEnableFullScreen") && frame.origin.x != 0 && frame.origin.y != 0) {
             %orig;
             return;
         } else {
@@ -1247,7 +1247,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
     UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
     
     if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
-        NSString *transparentValue = [[NSUserDefaults standardUserDefaults] stringForKey:@"DYYYGlobalTransparency"];
+        NSString *transparentValue = DYYYCachedString(@"DYYYGlobalTransparency");
         if (transparentValue.length > 0) {
             CGFloat alphaValue = transparentValue.floatValue;
             if (alphaValue >= 0.0 && alphaValue <= 1.0) {
@@ -1267,7 +1267,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
         return;
     }
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
         if ([vc isKindOfClass:%c(AWEAwemeDetailTableViewController)] ||
             [vc isKindOfClass:%c(AWEAwemeDetailCellViewController)]) {
@@ -1282,7 +1282,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 - (void)layoutSubviews {
     %orig;
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         if (self.frame.size.height == tabHeight && tabHeight > 0) {
             UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
             if ([vc isKindOfClass:NSClassFromString(@"AWEMixVideoPanelDetailTableViewController")] || [vc isKindOfClass:NSClassFromString(@"AWECommentInputViewController")] ||
@@ -1292,7 +1292,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
         }
     }
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen") || DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
         UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
         if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
             for (UIView *subview in self.subviews) {
@@ -2879,7 +2879,7 @@ static Class tabBarButtonClass = nil;
 %hook UILabel
 
 - (void)setText:(NSString *)text {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisDarkKeyBoard"]) {
+    if (DYYYCachedBool(@"DYYYisDarkKeyBoard")) {
         if ([text hasPrefix:@"善语"] || [text hasPrefix:@"友爱评论"] || [text hasPrefix:@"回复"]) {
             self.textColor = [UIColor colorWithRed:125/255.0 green:125/255.0 blue:125/255.0 alpha:0.6];
         }
@@ -2890,7 +2890,7 @@ static Class tabBarButtonClass = nil;
 - (void)layoutSubviews {
 	%orig;
 
-	BOOL hideRightLabel = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideRightLable"];
+	BOOL hideRightLabel = DYYYCachedBool(@"DYYYHideRightLable");
 	if (!hideRightLabel)
 		return;
 
@@ -2931,7 +2931,7 @@ static Class tabBarButtonClass = nil;
 - (void)setImage:(UIImage *)image forState:(UIControlState)state {
     NSString *label = self.accessibilityLabel;
     if ([label isEqualToString:@"表情"] || [label isEqualToString:@"at"] || [label isEqualToString:@"图片"] || [label isEqualToString:@"键盘"]) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisDarkKeyBoard"]) {
+        if (DYYYCachedBool(@"DYYYisDarkKeyBoard")) {
             
             UIImage *whiteImage = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
             
@@ -2951,7 +2951,7 @@ static Class tabBarButtonClass = nil;
     
     if ([title isEqualToString:@"加入挑战"]) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideChallengeStickers"]) {
+            if (DYYYCachedBool(@"DYYYHideChallengeStickers")) {
                 UIResponder *responder = self;
                 BOOL isInPlayInteractionViewController = NO;
 
@@ -3836,7 +3836,7 @@ static Class tabBarButtonClass = nil;
 %hook UIImageView
 - (void)layoutSubviews {
 	%orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideCommentDiscover"]) {
+	if (DYYYCachedBool(@"DYYYHideCommentDiscover")) {
 		if (!self.accessibilityLabel) {
 			UIView *parentView = self.superview;
 
@@ -5903,6 +5903,12 @@ static CLLocationManager *locationManager = nil;
     }
     
     %orig;
+    DYYYConfigCacheInvalidate();
+}
+
+- (void)setObject:(id)value forKey:(NSString *)defaultName {
+    %orig;
+    DYYYConfigCacheInvalidate();
 }
 
 %end
