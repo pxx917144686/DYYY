@@ -1081,6 +1081,12 @@ void RegisterURLInterceptHooks(void) {
 
         RegisterFishhookHooks();
 
+        // 注意：本文件中的 NSURLSession 系列 swizzle（IZXSwizzleResumeSelector /
+        // HookTaskResume / HookSessionAsyncMethods / HookUploadMethods /
+        // SwizzleSessionDelegate / RecordTaskRequest 等）从未在此注册，属于死代码。
+        // 若未来启用，必须先加 URLInterceptEnabled() 开关门，否则会无条件
+        // 拦截全 App 每个请求/每次 resume（NSURLSession 抓包由 URLCapture.m 负责）。
+
         NSLog(@"[URLIntercept] 底层拦截 hooks 已注册:");
         NSLog(@"  - NSURLConnection (同步/异步)");
         NSLog(@"  - fishhook (connect/getaddrinfo/CFStream)");
