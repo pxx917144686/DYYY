@@ -12,6 +12,8 @@
 #import "DYYYUtils.h"
 #import "DYYYSwitchManager.h"
 #import "DYYYABTestHook.h"
+#import "DYYYSelfTest.h"
+#import "DYYYPaths.h"
 
 @interface UISwitch (DYYY_FuturisticEffects)
 - (void)applyFuturisticEffects;
@@ -1191,7 +1193,8 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"清除设置" key:@"DYYYCleanSettings" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"清理缓存" key:@"DYYYCleanCache" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"备份设置" key:@"DYYYBackupSettings" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"恢复设置" key:@"DYYYRestoreSettings" type:DYYYSettingItemTypeSwitch]
+                [DYYYSettingItem itemWithTitle:@"恢复设置" key:@"DYYYRestoreSettings" type:DYYYSettingItemTypeSwitch],
+                [DYYYSettingItem itemWithTitle:@"一键自检" key:@"DYYYSelfTest" type:DYYYSettingItemTypeButton]
             ],
             
             // 第八部分 - 热更新功能
@@ -1287,9 +1290,9 @@ NSDictionary *getCurrentABTestData(void) {
 
     // 备份图标文件
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
-    NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.gif" ];
+    NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.png" ];
 
     NSMutableDictionary *iconBase64Dict = [NSMutableDictionary dictionary];
 
@@ -1405,7 +1408,7 @@ NSDictionary *getCurrentABTestData(void) {
         NSDictionary *iconBase64Dict = dyyySettings[@"DYYYIconsBase64"];
         if (iconBase64Dict && [iconBase64Dict isKindOfClass:[NSDictionary class]]) {
             NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-            NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+            NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
             // 确保DYYY文件夹存在
             if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {
@@ -1596,7 +1599,7 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (NSString *)saveCustomAlbumImage:(UIImage *)image {
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolder = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolder = [DYYYPaths iconsDir];
     
     NSError *error;
     [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolder 
@@ -1978,6 +1981,12 @@ NSDictionary *getCurrentABTestData(void) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         return cell;
     }
+    // 特殊处理一键自检
+    if ([item.key isEqualToString:@"DYYYSelfTest"]) {
+        cell.accessoryView = nil;
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        return cell;
+    }
     // 特殊处理热更新功能
     if ([item.key isEqualToString:@"SaveCurrentABTestData"] ||
         [item.key isEqualToString:@"LoadABTestConfigFile"] ||
@@ -2004,7 +2013,7 @@ NSDictionary *getCurrentABTestData(void) {
         }
         if (saveFilename) {
             NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-            NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+            NSString *dyyyFolderPath = [DYYYPaths iconsDir];
             NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
             BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
             UIButton *iconButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -2219,7 +2228,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     if (saveFilename) {
         NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+        NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
         BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
@@ -2240,7 +2249,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     // 保存到文档目录
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_config.json"];
     
     NSError *error;
@@ -2303,7 +2312,7 @@ NSDictionary *getCurrentABTestData(void) {
 - (void)deleteABTestConfigFile {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths firstObject];
-    NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -2559,6 +2568,13 @@ NSDictionary *getCurrentABTestData(void) {
         return;
     }
     
+    // 一键自检功能处理
+    if ([item.key isEqualToString:@"DYYYSelfTest"]) {
+        [DYYYSelfTest presentFromViewController:self];
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        return;
+    }
+    
     // 添加清除设置功能
     if ([item.key isEqualToString:@"DYYYCleanSettings"]) {
         [DYYYBottomAlertView showAlertWithTitle:@"清除抖音设置"
@@ -2703,7 +2719,7 @@ NSDictionary *getCurrentABTestData(void) {
     if (saveFilename) {
         // 获取图标路径
         NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+        NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
         // 检查是否已有自定义图标
@@ -2721,7 +2737,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     // 确保DYYY文件夹存在
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths iconsDir];
     NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {

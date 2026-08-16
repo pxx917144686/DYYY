@@ -28,6 +28,92 @@
 
 static const NSTimeInterval kDYYYUtilsDefaultFrameDelay = 0.1f;
 
+#pragma mark - 配置内存缓存
+
+static NSMutableDictionary *DYYYConfigCache(void) {
+    static NSMutableDictionary *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [NSMutableDictionary dictionary];
+    });
+    return cache;
+}
+
+BOOL DYYYCachedBool(NSString *key) {
+    if (!key) return NO;
+    NSMutableDictionary *cache = DYYYConfigCache();
+    NSString *cacheKey = [@"B:" stringByAppendingString:key];
+    @synchronized (cache) {
+        NSNumber *cached = cache[cacheKey];
+        if (cached) return cached.boolValue;
+    }
+    BOOL value = [[NSUserDefaults standardUserDefaults] boolForKey:key];
+    @synchronized (cache) {
+        cache[cacheKey] = @(value);
+    }
+    return value;
+}
+
+NSString *DYYYCachedString(NSString *key) {
+    if (!key) return nil;
+    NSMutableDictionary *cache = DYYYConfigCache();
+    NSString *cacheKey = [@"S:" stringByAppendingString:key];
+    @synchronized (cache) {
+        NSString *cached = cache[cacheKey];
+        if (cached) return cached;
+    }
+    NSString *value = [[NSUserDefaults standardUserDefaults] stringForKey:key];
+    if (!value) value = @"";
+    @synchronized (cache) {
+        cache[cacheKey] = value;
+    }
+    return value;
+}
+
+// 关键词列表预编译缓存（逗号分隔配置 → trim 后的字符串数组）
+static NSMutableDictionary *DYYYKeywordListCache(void) {
+    static NSMutableDictionary *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [NSMutableDictionary dictionary];
+    });
+    return cache;
+}
+
+void DYYYConfigCacheInvalidate(void) {
+    @synchronized (DYYYConfigCache()) {
+        [DYYYConfigCache() removeAllObjects];
+    }
+    // 关键词预编译缓存与配置缓存联动失效
+    @synchronized (DYYYKeywordListCache()) {
+        [DYYYKeywordListCache() removeAllObjects];
+    }
+}
+
+NSArray<NSString *> *DYYYCachedKeywordList(NSString *configKey) {
+    if (!configKey) return @[];
+    NSMutableDictionary *cache = DYYYKeywordListCache();
+    @synchronized (cache) {
+        NSArray *cached = cache[configKey];
+        if (cached) return cached;
+    }
+    NSString *raw = [[NSUserDefaults standardUserDefaults] objectForKey:configKey];
+    NSMutableArray<NSString *> *result = [NSMutableArray array];
+    if (raw.length > 0) {
+        for (NSString *part in [raw componentsSeparatedByString:@","]) {
+            NSString *trimmed = [part stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (trimmed.length > 0) {
+                [result addObject:trimmed];
+            }
+        }
+    }
+    NSArray *immutable = [result copy];
+    @synchronized (cache) {
+        cache[configKey] = immutable;
+    }
+    return immutable;
+}
+
 static inline CGFloat DYYYUtilsNormalizedDelay(CGFloat delay) {
     if (!isfinite(delay) || delay < 0.01f) {
         return kDYYYUtilsDefaultFrameDelay;

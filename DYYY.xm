@@ -2,6 +2,7 @@
 #import <objc/runtime.h>
 #import <CoreLocation/CoreLocation.h>
 #import "DYYYUtils.h"
+#import "DYYYPaths.h"
 
 #define DYYYBottomAlertView_DEFINED
 #define DYYYToast_DEFINED
@@ -1197,20 +1198,34 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 %end
 
 
+// findViewControllerFromView 单元素缓存：同一视图连续布局时避免反复沿 responder 链遍历
+// view 与 VC 均用 weak：视图释放自动失效，避免 static 强引用阻止视图释放
+static UIViewController *DYYYFindVCWithCache(UIView *view) {
+    static __weak UIView *gLastQueriedView = nil;
+    static __weak UIViewController *gLastQueriedVC = nil;
+    if (view == gLastQueriedView && gLastQueriedVC) {
+        return gLastQueriedVC;
+    }
+    UIViewController *vc = [DYYYUtils findViewControllerFromView:view];
+    gLastQueriedView = view;
+    gLastQueriedVC = vc;
+    return vc;
+}
+
 %hook UIView
 
 - (void)setFrame:(CGRect)frame {
 
-    if ([self isKindOfClass:%c(AWEIMSkylightListView)] && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisHiddenAvatarList"]) {
+    if ([self isKindOfClass:%c(AWEIMSkylightListView)] && DYYYCachedBool(@"DYYYisHiddenAvatarList")) {
         frame = CGRectZero;
     }
 
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"]) {
+    if (!DYYYCachedBool(@"DYYYisEnableCommentBlur") && !DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         %orig;
         return;
     }
 
-    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    UIViewController *vc = DYYYFindVCWithCache(self);
     Class PlayVCClass1 = %c(AWEAwemePlayVideoViewController);
     Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
     Class PlayVCClass3 = NSClassFromString(@"AWEDPlayerViewController_Merge");
@@ -1221,9 +1236,9 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
     
     if (isPlayVC) {
 
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableCommentBlur"] && frame.origin.x != 0) {
+        if (DYYYCachedBool(@"DYYYisEnableCommentBlur") && frame.origin.x != 0) {
             return;
-        } else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisEnableFullScreen"] && frame.origin.x != 0 && frame.origin.y != 0) {
+        } else if (DYYYCachedBool(@"DYYYisEnableFullScreen") && frame.origin.x != 0 && frame.origin.y != 0) {
             %orig;
             return;
         } else {
@@ -1244,10 +1259,10 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 }
 
 - (void)setAlpha:(CGFloat)alpha {
-    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    UIViewController *vc = DYYYFindVCWithCache(self);
     
     if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
-        NSString *transparentValue = [[NSUserDefaults standardUserDefaults] stringForKey:@"DYYYGlobalTransparency"];
+        NSString *transparentValue = DYYYCachedString(@"DYYYGlobalTransparency");
         if (transparentValue.length > 0) {
             CGFloat alphaValue = transparentValue.floatValue;
             if (alphaValue >= 0.0 && alphaValue <= 1.0) {
@@ -1260,15 +1275,17 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 }
 
 - (void)setBackgroundColor:(UIColor *)backgroundColor {
+    // 保留主线程防护：后台线程直碰 UIKit 有崩溃风险，重派发到主线程执行(重派发后主线程走 %orig，无递归)
     if (![NSThread isMainThread]) {
+        __weak UIView *weakSelf = self;
         dispatch_async(dispatch_get_main_queue(), ^{
-          [self setBackgroundColor:backgroundColor];
+            [weakSelf setBackgroundColor:backgroundColor];
         });
         return;
     }
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen")) {
-        UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
+        UIViewController *vc = DYYYFindVCWithCache(self);
         if ([vc isKindOfClass:%c(AWEAwemeDetailTableViewController)] ||
             [vc isKindOfClass:%c(AWEAwemeDetailCellViewController)]) {
             %orig([UIColor clearColor]);
@@ -1282,9 +1299,9 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 - (void)layoutSubviews {
     %orig;
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         if (self.frame.size.height == tabHeight && tabHeight > 0) {
-            UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+            UIViewController *vc = DYYYFindVCWithCache(self);
             if ([vc isKindOfClass:NSClassFromString(@"AWEMixVideoPanelDetailTableViewController")] || [vc isKindOfClass:NSClassFromString(@"AWECommentInputViewController")] ||
                 [vc isKindOfClass:NSClassFromString(@"AWEAwemeDetailTableViewController")]) {
                 self.backgroundColor = [UIColor clearColor];
@@ -1292,8 +1309,8 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
         }
     }
 
-    if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
-        UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen") || DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
+        UIViewController *vc = DYYYFindVCWithCache(self);
         if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
             for (UIView *subview in self.subviews) {
                 if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
@@ -1848,13 +1865,13 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 %new
 - (BOOL)contentFilter {
-	BOOL noAds = DYYYGetBool(@"DYYYNoAds");
-	BOOL skipLive = DYYYGetBool(@"DYYYisSkipLive");
-	BOOL skipHotSpot = DYYYGetBool(@"DYYYisSkipHotSpot");
-	BOOL skipPhoto = DYYYGetBool(@"DYYYSkipPhoto");
-	BOOL skipPhotoText = DYYYGetBool(@"DYYYSkipPhotoText");
-	BOOL skipMusic = DYYYGetBool(@"DYYYSkipMusic");
-	BOOL skipAIInteraction = DYYYGetBool(@"DYYYSkipAIInteraction");
+	BOOL noAds = DYYYCachedBool(@"DYYYNoAds");
+	BOOL skipLive = DYYYCachedBool(@"DYYYisSkipLive");
+	BOOL skipHotSpot = DYYYCachedBool(@"DYYYisSkipHotSpot");
+	BOOL skipPhoto = DYYYCachedBool(@"DYYYSkipPhoto");
+	BOOL skipPhotoText = DYYYCachedBool(@"DYYYSkipPhotoText");
+	BOOL skipMusic = DYYYCachedBool(@"DYYYSkipMusic");
+	BOOL skipAIInteraction = DYYYCachedBool(@"DYYYSkipAIInteraction");
 
 	// P2-4：广告检测改用 DYYYUtils 统一判定，覆盖 checkIsAd/isHardAd/isAds 等明确广告标记
 	BOOL shouldFilterAds = noAds && [DYYYUtils isAdvertisementAwemeModel:self];
@@ -1877,24 +1894,15 @@ static void applyTopBarTransparency(UIView *topBar) {
 	BOOL shouldFilterProp = NO;
 	BOOL shouldFilterUser = NO;
 
-	// 获取用户设置的需要过滤的关键词
-	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
-	NSArray *keywordsList = nil;
+	// 获取用户设置的需要过滤的关键词（预编译缓存）
+	NSArray *keywordsList = DYYYCachedKeywordList(@"DYYYfilterKeywords");
 
-	if (filterKeywords.length > 0) {
-		keywordsList = [filterKeywords componentsSeparatedByString:@","];
-	}
-
-	// 过滤包含指定拍同款的视频
-	NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterProp"];
-	NSArray *propKeywordsList = nil;
-
-	if (filterProp.length > 0) {
-		propKeywordsList = [filterProp componentsSeparatedByString:@","];
-	}
+	// 过滤包含指定拍同款的视频（预编译缓存）
+	NSArray *propKeywordsList = DYYYCachedKeywordList(@"DYYYFilterProp");
 
 	// 获取需要过滤的用户列表
-	NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterUsers"];
+	NSString *filterUsers = DYYYCachedString(@"DYYYFilterUsers");
+	NSArray *usersList = DYYYCachedKeywordList(@"DYYYFilterUsers");
 
 	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
 
@@ -1916,8 +1924,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 			// 检查视频标题
 			if (self.itemTitle.length > 0) {
 				for (NSString *keyword in keywordsList) {
-					NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-					if (trimmedKeyword.length > 0 && [self.itemTitle containsString:trimmedKeyword]) {
+					if ([self.itemTitle containsString:keyword]) {
 						shouldFilterKeywords = YES;
 						break;
 					}
@@ -1930,8 +1937,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 					NSString *hashtagName = textExtra.hashtagName;
 					if (hashtagName.length > 0) {
 						for (NSString *keyword in keywordsList) {
-							NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-							if (trimmedKeyword.length > 0 && [hashtagName containsString:trimmedKeyword]) {
+							if ([hashtagName containsString:keyword]) {
 								shouldFilterKeywords = YES;
 								break;
 							}
@@ -1959,7 +1965,6 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 	// 按用户 ID/昵称过滤（解析"昵称-id"格式）
 	if (isRecommendFeed && filterUsers.length > 0 && self.author) {
-		NSArray *usersList = [filterUsers componentsSeparatedByString:@","];
 		NSString *currentShortID = self.author.shortID;
 
 		if (currentShortID.length > 0) {
@@ -1981,8 +1986,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 		NSString *propName = self.propGuideV2.propName;
 		if (propName.length > 0) {
 			for (NSString *propKeyword in propKeywordsList) {
-				NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-				if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+				if ([propName containsString:propKeyword]) {
 					shouldFilterProp = YES;
 					break;
 				}
@@ -2026,6 +2030,33 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 #pragma mark - DataController 广告过滤
 
+// 过滤结果标记：getter 命中标记时跳过 O(n) 全量过滤。
+// 快照 = count + 首/尾元素指针：同 count 换内容(下拉刷新同条数替换)时首尾指针变化，标记失效重滤
+static char kDYYYAdFilteredMarkKey;
+
+static void DYYYMarkAdFiltered(NSArray *array) {
+    if ([array isKindOfClass:[NSArray class]] && array.count > 0) {
+        NSDictionary *snapshot = @{
+            @"count": @(array.count),
+            @"first": @((uintptr_t)(__bridge void *)array.firstObject),
+            @"last": @((uintptr_t)(__bridge void *)array.lastObject)
+        };
+        objc_setAssociatedObject(array, &kDYYYAdFilteredMarkKey, snapshot, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+static BOOL DYYYIsAdFilteredValid(NSArray *array) {
+    if (![array isKindOfClass:[NSArray class]]) return NO;
+    NSDictionary *snapshot = objc_getAssociatedObject(array, &kDYYYAdFilteredMarkKey);
+    if (!snapshot) return NO;
+    if ([snapshot[@"count"] unsignedIntegerValue] != array.count) return NO;
+    if (array.count == 0) return YES; // 空数组无内容可替换
+    uintptr_t first = [snapshot[@"first"] unsignedLongValue];
+    uintptr_t last = [snapshot[@"last"] unsignedLongValue];
+    return first == (uintptr_t)(__bridge void *)array.firstObject &&
+           last == (uintptr_t)(__bridge void *)array.lastObject;
+}
+
 %hook AWEListDataController
 
 - (void)setDataSource:(NSMutableArray *)dataSource {
@@ -2035,12 +2066,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (NSMutableArray *)dataSource {
     NSMutableArray *dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return [filtered mutableCopy];
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2051,12 +2086,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (NSMutableArray *)filteredDataSource {
     NSMutableArray *filteredDataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(filteredDataSource)) {
+        return filteredDataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:filteredDataSource];
     if (filtered != filteredDataSource && [filteredDataSource isKindOfClass:[NSMutableArray class]]) {
         [filteredDataSource setArray:filtered];
     } else if (filtered != filteredDataSource) {
         return [filtered mutableCopy];
     }
+    DYYYMarkAdFiltered(filteredDataSource);
     return filteredDataSource;
 }
 
@@ -2071,12 +2110,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (id)dataSource {
     id dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return filtered;
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2100,12 +2143,16 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 - (id)dataSource {
     id dataSource = %orig;
+    if (!DYYYCachedBool(@"DYYYNoAds") || DYYYIsAdFilteredValid(dataSource)) {
+        return dataSource;
+    }
     NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
     if (filtered != dataSource && [dataSource isKindOfClass:[NSMutableArray class]]) {
         [dataSource setArray:filtered];
     } else if (filtered != dataSource) {
         return filtered;
     }
+    DYYYMarkAdFiltered(dataSource);
     return dataSource;
 }
 
@@ -2602,16 +2649,14 @@ static Class tabBarButtonClass = nil;
         self.frame = frame;
     }
 
-    BOOL hideShop = DYYYGetBool(@"DYYYHideShopButton");
-    BOOL hideMsg = DYYYGetBool(@"DYYYHideMessageButton");
-    BOOL hideFri = DYYYGetBool(@"DYYYHideFriendsButton");
-    BOOL hideMe = DYYYGetBool(@"DYYYHideMyButton");
-    BOOL hidePlus = DYYYGetBool(@"DYYYisHiddenJia");
+    BOOL hideShop = DYYYCachedBool(@"DYYYHideShopButton");
+    BOOL hideMsg = DYYYCachedBool(@"DYYYHideMessageButton");
+    BOOL hideFri = DYYYCachedBool(@"DYYYHideFriendsButton");
+    BOOL hideMe = DYYYCachedBool(@"DYYYHideMyButton");
+    BOOL hidePlus = DYYYCachedBool(@"DYYYisHiddenJia");
     BOOL isPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 
-    NSMutableArray *visibleButtons = [NSMutableArray array];
-    UIView *ipadContainerView = nil;
-
+    // 可见性断言每次执行：外部改动按钮显隐/label 后仍能恢复
     for (UIView *subview in self.subviews) {
         if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
             (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
@@ -2621,43 +2666,58 @@ static Class tabBarButtonClass = nil;
                                 [label isEqualToString:@"拍摄"];
             BOOL shouldHide = (isPlusButton && hidePlus) || ([label containsString:@"商城"] && hideShop) || ([label containsString:@"消息"] && hideMsg) || ([label containsString:@"朋友"] && hideFri) ||
                               ([label isEqualToString:@"我"] && hideMe);
-
             subview.userInteractionEnabled = !shouldHide;
             subview.hidden = shouldHide;
-
-            if (!shouldHide) {
-                [visibleButtons addObject:subview];
-            }
         } else if ([subview isKindOfClass:tabBarButtonClass]) {
             subview.userInteractionEnabled = NO;
             subview.hidden = YES;
-        } else if (isPad && !ipadContainerView && [subview isMemberOfClass:UIView.class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
-            ipadContainerView = subview;
         }
     }
 
-    [visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
-      return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
-    }];
+    // 脏标记：开关/宽度/subviews 集合未变化时跳过收集、排序与重排
+    static NSArray *gTabBarLayoutKey = nil;
+    NSArray *layoutKey = @[@(hideShop), @(hideMsg), @(hideFri), @(hideMe), @(hidePlus),
+                           @(isPad), @(self.bounds.size.width), self.subviews];
+    if (![layoutKey isEqualToArray:gTabBarLayoutKey]) {
+        gTabBarLayoutKey = [layoutKey copy];
 
-    CGFloat offsetX, totalWidth;
-    if (ipadContainerView) {
-        offsetX = ipadContainerView.frame.origin.x;
-        totalWidth = ipadContainerView.bounds.size.width;
-    } else {
-        offsetX = 0;
-        totalWidth = self.bounds.size.width;
-    }
-    CGFloat buttonWidth = (visibleButtons.count > 0) ? (totalWidth / visibleButtons.count) : 0;
+        NSMutableArray *visibleButtons = [NSMutableArray array];
+        UIView *ipadContainerView = nil;
 
-    // 均匀布局按钮
-    for (NSInteger i = 0; i < visibleButtons.count; i++) {
-        UIView *button = visibleButtons[i];
-        button.frame = CGRectMake(offsetX + i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
+        for (UIView *subview in self.subviews) {
+            if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
+                (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
+                if (!subview.hidden) {
+                    [visibleButtons addObject:subview];
+                }
+            } else if (isPad && !ipadContainerView && [subview isMemberOfClass:UIView.class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
+                ipadContainerView = subview;
+            }
+        }
+
+        [visibleButtons sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+          return [@(a.frame.origin.x) compare:@(b.frame.origin.x)];
+        }];
+
+        CGFloat offsetX, totalWidth;
+        if (ipadContainerView) {
+            offsetX = ipadContainerView.frame.origin.x;
+            totalWidth = ipadContainerView.bounds.size.width;
+        } else {
+            offsetX = 0;
+            totalWidth = self.bounds.size.width;
+        }
+        CGFloat buttonWidth = (visibleButtons.count > 0) ? (totalWidth / visibleButtons.count) : 0;
+
+        // 均匀布局按钮
+        for (NSInteger i = 0; i < visibleButtons.count; i++) {
+            UIView *button = visibleButtons[i];
+            button.frame = CGRectMake(offsetX + i * buttonWidth, button.frame.origin.y, buttonWidth, button.frame.size.height);
+        }
     }
 
     // 禁用首页刷新功能
-    if (DYYYGetBool(@"DYYYDisableHomeRefresh")) {
+    if (DYYYCachedBool(@"DYYYDisableHomeRefresh")) {
         for (UIView *subview in self.subviews) {
             if ([subview isKindOfClass:generalButtonClass]) {
                 AWENormalModeTabBarGeneralButton *button = (AWENormalModeTabBarGeneralButton *)subview;
@@ -2671,7 +2731,7 @@ static Class tabBarButtonClass = nil;
 
     // 背景和分隔线处理
     BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
-    BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
+    BOOL enableFullScreen = DYYYCachedBool(@"DYYYisEnableFullScreen");
 
     if (hideBottomBg || enableFullScreen) {
         if (self.skinContainerView) {
@@ -2695,7 +2755,7 @@ static Class tabBarButtonClass = nil;
             }
         }
 
-        BOOL hideFriendsButton = DYYYGetBool(@"DYYYHideFriendsButton");
+        BOOL hideFriendsButton = DYYYCachedBool(@"DYYYHideFriendsButton");
         BOOL shouldHideBackgrounds = hideBottomBg || (enableFullScreen && (isHomeSelected || (isFriendsSelected && !hideFriendsButton)));
 
         // 单次遍历处理所有背景和分割线
@@ -2730,10 +2790,10 @@ static Class tabBarButtonClass = nil;
 - (void)setHidden:(BOOL)hidden {
     %orig(hidden);
 
-    BOOL disableHomeRefresh = DYYYGetBool(@"DYYYDisableHomeRefresh");
-    BOOL enableFullScreen = DYYYGetBool(@"DYYYisEnableFullScreen");
-    BOOL hideBottomBg = DYYYGetBool(@"DYYYisHiddenBottomBg");
-    BOOL hideFriendsButton = DYYYGetBool(@"DYYYHideFriendsButton");
+    BOOL disableHomeRefresh = DYYYCachedBool(@"DYYYDisableHomeRefresh");
+    BOOL enableFullScreen = DYYYCachedBool(@"DYYYisEnableFullScreen");
+    BOOL hideBottomBg = DYYYCachedBool(@"DYYYisHiddenBottomBg");
+    BOOL hideFriendsButton = DYYYCachedBool(@"DYYYHideFriendsButton");
 
     BOOL isHomeSelected = NO;
     BOOL isFriendsSelected = NO;
@@ -2879,7 +2939,7 @@ static Class tabBarButtonClass = nil;
 %hook UILabel
 
 - (void)setText:(NSString *)text {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisDarkKeyBoard"]) {
+    if (DYYYCachedBool(@"DYYYisDarkKeyBoard")) {
         if ([text hasPrefix:@"善语"] || [text hasPrefix:@"友爱评论"] || [text hasPrefix:@"回复"]) {
             self.textColor = [UIColor colorWithRed:125/255.0 green:125/255.0 blue:125/255.0 alpha:0.6];
         }
@@ -2890,7 +2950,7 @@ static Class tabBarButtonClass = nil;
 - (void)layoutSubviews {
 	%orig;
 
-	BOOL hideRightLabel = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideRightLable"];
+	BOOL hideRightLabel = DYYYCachedBool(@"DYYYHideRightLable");
 	if (!hideRightLabel)
 		return;
 
@@ -2931,7 +2991,7 @@ static Class tabBarButtonClass = nil;
 - (void)setImage:(UIImage *)image forState:(UIControlState)state {
     NSString *label = self.accessibilityLabel;
     if ([label isEqualToString:@"表情"] || [label isEqualToString:@"at"] || [label isEqualToString:@"图片"] || [label isEqualToString:@"键盘"]) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYisDarkKeyBoard"]) {
+        if (DYYYCachedBool(@"DYYYisDarkKeyBoard")) {
             
             UIImage *whiteImage = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
             
@@ -2951,7 +3011,7 @@ static Class tabBarButtonClass = nil;
     
     if ([title isEqualToString:@"加入挑战"]) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideChallengeStickers"]) {
+            if (DYYYCachedBool(@"DYYYHideChallengeStickers")) {
                 UIResponder *responder = self;
                 BOOL isInPlayInteractionViewController = NO;
 
@@ -3836,7 +3896,7 @@ static Class tabBarButtonClass = nil;
 %hook UIImageView
 - (void)layoutSubviews {
 	%orig;
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideCommentDiscover"]) {
+	if (DYYYCachedBool(@"DYYYHideCommentDiscover")) {
 		if (!self.accessibilityLabel) {
 			UIView *parentView = self.superview;
 
@@ -4250,6 +4310,25 @@ static Class tabBarButtonClass = nil;
 %hook AWEFeedVideoButton
 
 - (void)setImage:(id)arg1 {
+	static NSCache *iconCache = nil;
+	static NSDictionary *iconMapping = nil;
+	static NSString *dyyyFolderPath = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		iconCache = [[NSCache alloc] init];
+		iconMapping = @{
+			@"icon_home_like_after" : @"like_after.png",
+			@"icon_home_like_before" : @"like_before.png",
+			@"icon_home_comment" : @"comment.png",
+			@"icon_home_unfavorite" : @"unfavorite.png",
+			@"icon_home_favorite" : @"favorite.png",
+			@"iconHomeShareRight" : @"share.png"
+		};
+		dyyyFolderPath = [DYYYPaths iconsDir];
+		// 目录创建移出热路径，仅首次执行一次
+		[[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
+	});
+
 	NSString *nameString = nil;
 
 	if ([self respondsToSelector:@selector(imageNameString)]) {
@@ -4260,20 +4339,6 @@ static Class tabBarButtonClass = nil;
 		%orig;
 		return;
 	}
-
-	NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-	NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
-
-	[[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
-
-	NSDictionary *iconMapping = @{
-		@"icon_home_like_after" : @"like_after.png",
-		@"icon_home_like_before" : @"like_before.png",
-		@"icon_home_comment" : @"comment.png",
-		@"icon_home_unfavorite" : @"unfavorite.png",
-		@"icon_home_favorite" : @"favorite.png",
-		@"iconHomeShareRight" : @"share.png"
-	};
 
 	NSString *customFileName = nil;
 	if ([nameString containsString:@"_comment"]) {
@@ -4294,6 +4359,13 @@ static Class tabBarButtonClass = nil;
 	}
 
 	if (customFileName) {
+		// 优先命中内存缓存，避免每次设图都做磁盘 IO + 主线程重采样
+		UIImage *cachedImage = [iconCache objectForKey:customFileName];
+		if (cachedImage) {
+			%orig(cachedImage);
+			return;
+		}
+
 		NSString *customImagePath = [dyyyFolderPath stringByAppendingPathComponent:customFileName];
 
 		if ([[NSFileManager defaultManager] fileExistsAtPath:customImagePath]) {
@@ -4313,6 +4385,7 @@ static Class tabBarButtonClass = nil;
 				UIGraphicsEndImageContext();
 
 				if (resizedImage) {
+					[iconCache setObject:resizedImage forKey:customFileName];
 					%orig(resizedImage);
 					return;
 				}
@@ -5053,6 +5126,20 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 
 %end
 
+// 一次递归同时收集两类视图，替代两次 findAllSubviewsOfClass 全树遍历
+static void DYYYCollectSubviewsOfClasses(UIView *view, Class classA, Class classB,
+                                          NSMutableArray<UIView *> *outA, NSMutableArray<UIView *> *outB) {
+    if (classA && [view isKindOfClass:classA]) {
+        [outA addObject:view];
+    }
+    if (classB && [view isKindOfClass:classB]) {
+        [outB addObject:view];
+    }
+    for (UIView *subview in view.subviews) {
+        DYYYCollectSubviewsOfClasses(subview, classA, classB, outA, outB);
+    }
+}
+
 // 拦截抖音视频界面的双击事件处理方法
 %hook AWEPlayInteractionViewController
 
@@ -5071,7 +5158,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
     %orig;
 
     // 隐藏黑色背景视图，让毛玻璃效果显示视频内容
-    if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen") || DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
         for (UIView *subview in self.view.subviews) {
             if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
                 subview.hidden = YES;
@@ -5079,13 +5166,19 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
         }
     }
 
-    if (DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+    if (DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
         Class containerViewClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputContainerView");
-        NSArray<UIView *> *containerViews = [DYYYUtils findAllSubviewsOfClass:containerViewClass inContainer:self.view];
+        Class middleContainerClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer");
+
+        // 合并遍历：一次递归同时收集两类命中视图
+        NSMutableArray<UIView *> *containerViews = [NSMutableArray array];
+        NSMutableArray<UIView *> *middleContainers = [NSMutableArray array];
+        DYYYCollectSubviewsOfClasses(self.view, containerViewClass, middleContainerClass, containerViews, middleContainers);
+
         for (UIView *containerView in containerViews) {
             for (UIView *subview in containerView.subviews) {
                 if (subview.hidden == NO && subview.backgroundColor && CGColorGetAlpha(subview.backgroundColor.CGColor) == 1) {
-                    float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+                    float userTransparency = [DYYYCachedString(@"DYYYCommentBlurTransparent") floatValue];
                     if (userTransparency <= 0 || userTransparency > 1) {
                         userTransparency = 0.8;
                     }
@@ -5094,8 +5187,6 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
             }
         }
 
-        Class middleContainerClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer");
-        NSArray<UIView *> *middleContainers = [DYYYUtils findAllSubviewsOfClass:middleContainerClass inContainer:self.view];
         for (UIView *middleContainer in middleContainers) {
             BOOL containsDanmu = NO;
             for (UIView *innerSubviewCheck in middleContainer.subviews) {
@@ -5131,7 +5222,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
     }
 
     // 全屏模式：调整交互视图高度（移植自 DYYY12345/DYYY.xm:11517-11591）
-    if (!DYYYGetBool(@"DYYYisEnableFullScreen")) {
+    if (!DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         return;
     }
 
@@ -5577,25 +5668,29 @@ static CLLocationManager *locationManager = nil;
 	NSString *secondLine = @"";
 	
 	// 处理时间和日期显示
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
-		NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+	if (DYYYCachedBool(@"DYYYShowDateTime")) {
+		static NSDateFormatter *formatter = nil;
+		static dispatch_once_t formatterOnce;
+		dispatch_once(&formatterOnce, ^{
+			formatter = [[NSDateFormatter alloc] init];
+		});
 		
 		// 根据子开关决定日期格式
 		NSString *dateFormat = @"yyyy-MM-dd HH:mm"; // 默认格式
 		
-		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"]) {
+		if (DYYYCachedBool(@"DYYYDateTimeFormat_YMDHM")) {
 			dateFormat = @"yyyy-MM-dd HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_MDHM")) {
 			dateFormat = @"MM-dd HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_HMS")) {
 			dateFormat = @"HH:mm:ss";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_HM")) {
 			dateFormat = @"HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_YMD")) {
 			dateFormat = @"yyyy-MM-dd";
 		} else {
 			// 检查是否有旧的格式设置
-			NSString *oldFormat = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDateTimeFormat"];
+			NSString *oldFormat = DYYYCachedString(@"DYYYDateTimeFormat");
 			if (oldFormat && oldFormat.length > 0) {
 				dateFormat = oldFormat;
 			}
@@ -5903,6 +5998,18 @@ static CLLocationManager *locationManager = nil;
     }
     
     %orig;
+    DYYYConfigCacheInvalidate();
+}
+
+- (void)setObject:(id)value forKey:(NSString *)defaultName {
+    %orig;
+    DYYYConfigCacheInvalidate();
+}
+
+- (void)removeObjectForKey:(NSString *)defaultName {
+    %orig;
+    // 设置页"重置/清除"走 removeObjectForKey，同样需失效配置缓存
+    DYYYConfigCacheInvalidate();
 }
 
 %end

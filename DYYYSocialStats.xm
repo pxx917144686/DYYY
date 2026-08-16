@@ -849,64 +849,10 @@ void showVideoStatsListController(UIViewController *parentVC) {
 %end
 
 
-// 字典数据源
-%hook NSDictionary
-- (id)objectForKey:(id)aKey {
-    id originalValue = %orig;
-    if (!socialStatsEnabled || !aKey || !originalValue || ![aKey isKindOfClass:[NSString class]]) {
-        return originalValue;
-    }
-    
-    NSString *keyString = (NSString *)aKey;
-    
-    // 粉丝
-    if (cachedFollowersNumber && 
-        ([keyString isEqualToString:@"follower_count"] ||
-         [keyString isEqualToString:@"fans_count"] ||
-         [keyString isEqualToString:@"follower"] ||
-         [keyString isEqualToString:@"fans"])) {
-        if ([originalValue isKindOfClass:[NSNumber class]]) {
-            return cachedFollowersNumber;
-        }
-    }
-    
-    // 获赞
-    if (cachedLikesNumber && 
-        ([keyString isEqualToString:@"total_favorited"] ||
-         [keyString isEqualToString:@"favorite_count"] ||
-         [keyString isEqualToString:@"digg_count"] ||
-         [keyString isEqualToString:@"like_count"] ||
-         [keyString isEqualToString:@"praise_count"])) {
-        if ([originalValue isKindOfClass:[NSNumber class]]) {
-            return cachedLikesNumber;
-        }
-    }
-    
-    // 关注
-    if (cachedFollowingNumber && 
-        ([keyString isEqualToString:@"following_count"] ||
-         [keyString isEqualToString:@"follow_count"] ||
-         [keyString isEqualToString:@"following"] ||
-         [keyString isEqualToString:@"follow"])) {
-        if ([originalValue isKindOfClass:[NSNumber class]]) {
-            return cachedFollowingNumber;
-        }
-    }
-    
-    // 互关
-    if (cachedMutualNumber && 
-        ([keyString isEqualToString:@"friend_count"] ||
-         [keyString isEqualToString:@"mutual_friend_count"] ||
-         [keyString isEqualToString:@"mutual_count"] ||
-         [keyString isEqualToString:@"friendship_count"])) {
-        if ([originalValue isKindOfClass:[NSNumber class]]) {
-            return cachedMutualNumber;
-        }
-    }
-    
-    return originalValue;
-}
-%end
+// 字典数据源：已移除 %hook NSDictionary objectForKey:。
+// 真机自检 IMP 检测确认该 hook 被 class cluster 绕过(__NSDictionaryI 等
+// 子类自带实现, 从不走 NSDictionary 主类方法), 从未生效。社交统计
+// 主路径由 AWEUserModel / AWEProfileSocialStatisticView 精准 hook 承担。
 
 @interface AWEFeedTableCell : UIView
 - (void)setNeedsLayout;

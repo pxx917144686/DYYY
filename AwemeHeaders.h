@@ -26,6 +26,19 @@ typedef double CGFloat;
 #define DYYYGetInteger(key) [[NSUserDefaults standardUserDefaults] integerForKey:key]
 #define DYYYGetString(key) [[NSUserDefaults standardUserDefaults] stringForKey:key]
 #define DYYY_IGNORE_GLOBAL_ALPHA_TAG 114514
+
+// 配置内存缓存：供高频 hook 读取，NSUserDefaults 写入时失效
+#ifdef __cplusplus
+extern "C" {
+#endif
+BOOL DYYYCachedBool(NSString *key);
+NSString *DYYYCachedString(NSString *key);
+NSArray<NSString *> *DYYYCachedKeywordList(NSString *configKey);
+void DYYYConfigCacheInvalidate(void);
+#ifdef __cplusplus
+}
+#endif
+
 typedef NS_ENUM(NSInteger, MediaType) {
   MediaTypeVideo,
   MediaTypeImage,

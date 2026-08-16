@@ -3,6 +3,7 @@
 #import <signal.h>
 #import "DYYYManager.h"
 #import "DYYYUtils.h"
+#import "DYYYPaths.h"
 
 // 添加变量跟踪是否在目标视图控制器中
 static BOOL isInPlayInteractionVC = NO;
@@ -357,9 +358,8 @@ static void initTargetClassNames(void) {
             return;
         }
     }
-    // 兼容旧逻辑
-    NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *iconPath = [documentsPath stringByAppendingPathComponent:@"DYYY/qingping.png"];
+    // 兼容旧逻辑（图标已统一归入 DYYY/Icons，旧路径由 DYYYPaths 迁移）
+    NSString *iconPath = [[DYYYPaths iconsDir] stringByAppendingPathComponent:@"qingping.png"];
     UIImage *customIcon = [UIImage imageWithContentsOfFile:iconPath];
     if (customIcon) {
         self.showIcon = customIcon;
@@ -884,6 +884,6 @@ static void initTargetClassNames(void) {
     return result;
 }
 %end
-%ctor {
-	signal(SIGSEGV, SIG_IGN);
-}
+// 注意：原 %ctor 中 signal(SIGSEGV, SIG_IGN) 已移除。
+// 忽略 SIGSEGV 会让段错误崩溃被吞掉(App 状态损坏却不闪退), 且会覆盖
+// DYYYCrashCatcher 安装的信号处理器; 崩溃统一由崩溃日志抓取模块捕获。

@@ -973,8 +973,13 @@ static void HookNSURLConnectionClassMethods(void) {
 static int (*orig_connect)(int, const struct sockaddr *, socklen_t);
 
 static int hooked_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+    // 开关关闭时直接透传，避免每次 TCP connect 做 inet_ntop + 字符串格式化
+    if (!URLInterceptEnabled()) {
+        return orig_connect ? orig_connect(sockfd, addr, addrlen) : connect(sockfd, addr, addrlen);
+    }
+
     NSString *target = SockAddrToString(addr);
-    if (target && URLInterceptEnabled()) {
+    if (target) {
 
         BOOL isDNSPort = NO;
         if (addr->sa_family == AF_INET) {
@@ -1075,6 +1080,12 @@ void RegisterURLInterceptHooks(void) {
         HookNSURLConnectionClassMethods();
 
         RegisterFishhookHooks();
+
+        // 注意：本文件中的 NSURLSession 系列 swizzle（IZXSwizzleResumeSelector /
+        // HookTaskResume / HookSessionAsyncMethods / HookUploadMethods /
+        // SwizzleSessionDelegate / RecordTaskRequest 等）从未在此注册，属于死代码。
+        // 若未来启用，必须先加 URLInterceptEnabled() 开关门，否则会无条件
+        // 拦截全 App 每个请求/每次 resume（NSURLSession 抓包由 URLCapture.m 负责）。
 
         NSLog(@"[URLIntercept] 底层拦截 hooks 已注册:");
         NSLog(@"  - NSURLConnection (同步/异步)");

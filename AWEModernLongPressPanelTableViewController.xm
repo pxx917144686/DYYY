@@ -10,7 +10,9 @@
 #import <objc/runtime.h>
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
+#ifndef DYYY_RELEASE_BUILD
 #import "FLEXHeaders.h"
+#endif
 #import "DYYYConfirmCloseView.h"
 #import "DYYYUtils.h"
 #import "DYYYKeywordListView.h"
@@ -106,8 +108,13 @@
 
 %new
 - (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {    
-    // 直接打开 FLEX 调试器
-    [[%c(DYYYFLEXManager) sharedManager] showExplorer];
+    // 直接打开 FLEX 调试器（发布版无 FLEX 类，nil 安全 no-op；入口已在调用侧条件编译隐藏）
+    // performSelector 避免依赖 FLEXHeaders.h 的方法声明（发布版已 guard）
+    id flexManagerClass = %c(DYYYFLEXManager);
+    id flexManager = [flexManagerClass sharedManager];
+    if (flexManager) {
+        [flexManager performSelector:@selector(showExplorer)];
+    }
 }
 
 %new
@@ -864,7 +871,8 @@
         [viewModels addObject:timerCloseViewModel];
     }
 
-    // FLEX调试功能
+#ifndef DYYY_RELEASE_BUILD
+    // FLEX调试功能（发布版不含 FLEX，隐藏面板项）
     if (enableFLEX) {
         AWELongPressPanelBaseViewModel *flexViewModel = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
         flexViewModel.awemeModel = self.awemeModel;
@@ -880,6 +888,7 @@
         };
         [viewModels addObject:flexViewModel];
     }
+#endif
     
     // 小窗PIP播放功能
     if (enablePip && self.awemeModel.awemeType != 68) {

@@ -1,10 +1,13 @@
 #import "DYYYDatabaseManager.h"
+#import "DYYYPaths.h"
 #import <sqlite3.h>
 
 @interface DYYYDatabaseManager ()
 @property (nonatomic, copy) NSString *dbPath;
 @property (nonatomic) sqlite3 *db;
 @property (nonatomic) dispatch_queue_t dbQueue;
+// 开关内存缓存：避免高频 hash/hmac hook 每次做同步 SQL 查询拖慢主流程
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *switchCache;
 - (BOOL)isAllowedSwitch:(NSString *)switchName;
 @end
 
@@ -23,14 +26,23 @@
     self = [super init];
     if (self) {
         _dbQueue = dispatch_queue_create("com.database.queue", DISPATCH_QUEUE_SERIAL);
+        _switchCache = [NSMutableDictionary dictionary];
         [self setupDatabase];
     }
     return self;
 }
 
 - (void)setupDatabase {
-    NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    _dbPath = [docPath stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+    NSString *logsDir = [DYYYPaths logsDir];
+    _dbPath = [logsDir stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+    // 迁移兜底：新路径不存在且旧路径(Documents 根)存在时回退，避免迁移失败丢数据
+    if (![[NSFileManager defaultManager] fileExistsAtPath:_dbPath]) {
+        NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *legacyPath = [docPath stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:legacyPath]) {
+            _dbPath = legacyPath;
+        }
+    }
     [self openDatabase];
     [self createTables];
 }
@@ -84,6 +96,9 @@
     for (NSString *sql in sqls) {
         [self execSQL:sql];
     }
+
+    // 启动时异步裁剪历史超限数据（仅影响本模块数据库，不影响插件主功能）
+    [self trimOversizedTablesAsync];
 }
 
 - (BOOL)isAllowedTable:(NSString *)table {
@@ -96,6 +111,56 @@
                                                @"url_responses", @"crypto_keys"]];
     });
     return [allowedTables containsObject:table];
+}
+
+// 每个数据表保留的最大记录数（防止刷视频时无限增长）
+static const int kMaxRecordsPerTable = 500;
+// 运行日志表保留的最大条数
+static const int kMaxLogRecords = 200;
+
+// 数据表清单（kaiguan 除外——开关设置必须保留）
+static NSArray<NSString *> *DYYYDataTables(void) {
+    static NSArray *tables = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        tables = @[@"zhaiyao", @"hanmiyao", @"jiamisuanfa", @"yunxingrizhi",
+                   @"ssl_certificates", @"ssl_challenges", @"ssl_psk", @"proxy_settings",
+                   @"rsa_data", @"decrypt_data", @"url_responses", @"crypto_keys"];
+    });
+    return tables;
+}
+
+// 启动时异步裁剪超限旧数据，并在文件过大时 VACUUM 压缩物理大小
+- (void)trimOversizedTablesAsync {
+    dispatch_async(self.dbQueue, ^{
+        if (![self openDatabase]) return;
+        BOOL deletedAny = NO;
+        for (NSString *table in DYYYDataTables()) {
+            int keep = [table isEqualToString:@"yunxingrizhi"] ? kMaxLogRecords : kMaxRecordsPerTable;
+            NSString *sql = [NSString stringWithFormat:
+                @"DELETE FROM %@ WHERE ROWID NOT IN (SELECT ROWID FROM %@ ORDER BY ROWID DESC LIMIT %d)",
+                table, table, keep];
+            char *err = NULL;
+            if (sqlite3_exec(self.db, sql.UTF8String, NULL, NULL, &err) == SQLITE_OK) {
+                if (sqlite3_changes(self.db) > 0) deletedAny = YES;
+            } else {
+                NSLog(@"[DYYYDatabaseManager] trim failed for table %@: %s", table, err ?: "?");
+                if (err) sqlite3_free(err);
+            }
+        }
+        // 裁剪后若数据库物理文件仍然较大，执行 VACUUM 回收空间
+        if (deletedAny && self.dbPath) {
+            NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:self.dbPath error:NULL];
+            long long fileSize = [attrs[NSFileSize] longLongValue];
+            if (fileSize > 1024 * 1024) { // 超过 1MB 才压缩，避免每次启动都做昂贵的 VACUUM
+                char *vacErr = NULL;
+                if (sqlite3_exec(self.db, "VACUUM", NULL, NULL, &vacErr) != SQLITE_OK) {
+                    NSLog(@"[DYYYDatabaseManager] VACUUM failed: %s", vacErr ?: "?");
+                    if (vacErr) sqlite3_free(vacErr);
+                }
+            }
+        }
+    });
 }
 
 - (void)insertDataIntoTable:(NSString *)table bundleID:(NSString *)bundleID text:(NSString *)text {
@@ -121,6 +186,17 @@
             NSLog(@"[DYYYDatabaseManager] prepare failed for table %@: %d (%s)", table, rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(stmt);
+
+        // 每表只保留最近 kMaxRecordsPerTable 条，超出部分自动删除，防止文件无限膨胀
+        NSString *cleanup = [NSString stringWithFormat:
+            @"DELETE FROM %@ WHERE ROWID NOT IN (SELECT ROWID FROM %@ ORDER BY ROWID DESC LIMIT %d)",
+            table, table, kMaxRecordsPerTable];
+        char *cleanupErr = NULL;
+        sqlite3_exec(self.db, cleanup.UTF8String, NULL, NULL, &cleanupErr);
+        if (cleanupErr) {
+            NSLog(@"[DYYYDatabaseManager] cleanup failed for table %@: %s", table, cleanupErr);
+            sqlite3_free(cleanupErr);
+        }
     });
 }
 
@@ -206,6 +282,13 @@
 - (BOOL)getSwitch:(NSString *)switchName bundleID:(NSString *)bundleID defaultValue:(BOOL)defaultValue {
     if (![self isAllowedSwitch:switchName] || !bundleID) return defaultValue;
 
+    // 内存缓存优先，避免高频 hook 每次同步查库
+    NSNumber *cached = nil;
+    @synchronized (self.switchCache) {
+        cached = self.switchCache[switchName];
+    }
+    if (cached) return cached.boolValue;
+
     __block BOOL value = defaultValue;
     dispatch_sync(self.dbQueue, ^{
         if (![self openDatabase]) return;
@@ -220,11 +303,20 @@
         }
         sqlite3_finalize(stmt);
     });
+    @synchronized (self.switchCache) {
+        self.switchCache[switchName] = @(value);
+    }
     return value;
 }
 
 - (void)setSwitch:(NSString *)switchName bundleID:(NSString *)bundleID value:(BOOL)value {
     if (![self isAllowedSwitch:switchName] || !bundleID) return;
+
+    // 失效全部缓存（部分开关默认值回落到其他开关，如 jiamisuanfakaiguan → zongkaiguan），
+    // 下次读取统一重新查库。kaiguan 表仅一行，全量失效开销可忽略
+    @synchronized (self.switchCache) {
+        [self.switchCache removeAllObjects];
+    }
 
     dispatch_async(self.dbQueue, ^{
         if (![self openDatabase]) return;
@@ -289,6 +381,32 @@
     return [self getSwitch:@"hanmiyaokaiguan" bundleID:bundleID defaultValue:[self getSwitch:@"zongkaiguan" bundleID:bundleID defaultValue:NO]];
 }
 
+- (BOOL)anyCaptureActiveForBundle:(NSString *)bundleID {
+    if (!bundleID) return NO;
+
+    static NSString *const kAnyActiveCacheKey = @"__anyCaptureActive__";
+    NSNumber *cached = nil;
+    @synchronized (self.switchCache) {
+        cached = self.switchCache[kAnyActiveCacheKey];
+    }
+    if (cached) return cached.boolValue;
+
+    BOOL active =
+        [self getSwitch:@"zongkaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"zhaiyaokaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"hanmiyaokaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"jiamisuanfakaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"ssl3kaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_encrypt" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_decrypt" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_sign" bundleID:bundleID defaultValue:NO];
+
+    @synchronized (self.switchCache) {
+        self.switchCache[kAnyActiveCacheKey] = @(active);
+    }
+    return active;
+}
+
 - (void)insertLogText:(NSString *)logText {
     if (!logText) return;
 
@@ -307,6 +425,15 @@
             NSLog(@"[DYYYDatabaseManager] insert log prepare failed: %d (%s)", rc, sqlite3_errmsg(self.db));
         }
         sqlite3_finalize(stmt);
+
+        // 运行日志只保留最近 kMaxLogRecords 条，防止无限增长
+        char *cleanupErr = NULL;
+        const char *cleanup = "DELETE FROM yunxingrizhi WHERE ROWID NOT IN (SELECT ROWID FROM yunxingrizhi ORDER BY ROWID DESC LIMIT 200)";
+        sqlite3_exec(self.db, cleanup, NULL, NULL, &cleanupErr);
+        if (cleanupErr) {
+            NSLog(@"[DYYYDatabaseManager] log cleanup failed: %s", cleanupErr);
+            sqlite3_free(cleanupErr);
+        }
     });
 }
 

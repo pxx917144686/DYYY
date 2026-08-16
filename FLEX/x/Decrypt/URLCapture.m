@@ -159,6 +159,7 @@ static BOOL IZXRequestWasHandledByProtocol(NSURLRequest *request) {
 
 static NSURLSessionConfiguration *IZXConfigurationByAddingProtocol(NSURLSessionConfiguration *configuration) {
     if (!configuration) return configuration;
+    if (!URLCaptureEnabled()) return configuration;
     Class protocolClass = NSClassFromString(@"DYYYIZXURLCaptureProtocol");
     if (!protocolClass) return configuration;
     NSArray *classes = configuration.protocolClasses ?: @[];
@@ -485,11 +486,12 @@ static NSURLSessionDataTask *HookedDataTaskWithRequest(id self, SEL command,
                                                        URLDataCompletion completion) {
     IMP imp = OriginalIMP(self, &kRequestTaskOriginalKey, (IMP)HookedDataTaskWithRequest);
     if (!imp) return nil;
+    NSURLSessionDataTask *(*original)(id, SEL, NSURLRequest *, URLDataCompletion) = (void *)imp;
+    if (!URLCaptureEnabled()) return original(self, command, request, completion);
     URLDataCompletion wrapped = completion ? ^(NSData *data, NSURLResponse *response, NSError *error) {
         SaveURLResponse(request, response, data, error, NO, @"completion/request");
         completion(data, response, error);
     } : nil;
-    NSURLSessionDataTask *(*original)(id, SEL, NSURLRequest *, URLDataCompletion) = (void *)imp;
     NSURLSessionDataTask *task = original(self, command, request, wrapped);
     if (wrapped && task) objc_setAssociatedObject(task, &kCompletionTaskKey, @YES,
                                                    OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -501,12 +503,13 @@ static NSURLSessionDataTask *HookedDataTaskWithURL(id self, SEL command,
                                                    URLDataCompletion completion) {
     IMP imp = OriginalIMP(self, &kURLTaskOriginalKey, (IMP)HookedDataTaskWithURL);
     if (!imp) return nil;
+    NSURLSessionDataTask *(*original)(id, SEL, NSURL *, URLDataCompletion) = (void *)imp;
+    if (!URLCaptureEnabled()) return original(self, command, URL, completion);
     NSURLRequest *request = URL ? [NSURLRequest requestWithURL:URL] : nil;
     URLDataCompletion wrapped = completion ? ^(NSData *data, NSURLResponse *response, NSError *error) {
         SaveURLResponse(request, response, data, error, NO, @"completion/URL");
         completion(data, response, error);
     } : nil;
-    NSURLSessionDataTask *(*original)(id, SEL, NSURL *, URLDataCompletion) = (void *)imp;
     NSURLSessionDataTask *task = original(self, command, URL, wrapped);
     if (wrapped && task) objc_setAssociatedObject(task, &kCompletionTaskKey, @YES,
                                                    OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -515,11 +518,11 @@ static NSURLSessionDataTask *HookedDataTaskWithURL(id self, SEL command,
 
 static void AppendDelegateData(NSURLSessionDataTask *task, NSData *data) {
     if (!task || data.length == 0) return;
+    if (!URLCaptureEnabled()) return;
     NSValue *key = [NSValue valueWithNonretainedObject:task];
     dispatch_async(gResponseQueue, ^{
         NSMutableDictionary *state = gTaskStates[key];
         if (!state) {
-            if (!URLCaptureEnabled()) return;
             state = [@{@"data": [NSMutableData data], @"truncated": @NO} mutableCopy];
             gTaskStates[key] = state;
         }
@@ -537,6 +540,7 @@ static void AppendDelegateData(NSURLSessionDataTask *task, NSData *data) {
 
 static void CompleteDelegateTask(NSURLSessionTask *task, NSError *error) {
     if (!task || objc_getAssociatedObject(task, &kCompletionTaskKey)) return;
+    if (!URLCaptureEnabled()) return;
     NSValue *key = [NSValue valueWithNonretainedObject:task];
     NSURLRequest *request = task.currentRequest ?: task.originalRequest;
     NSURLResponse *response = task.response;
@@ -571,6 +575,7 @@ static void HookedDidComplete(id self, SEL command, NSURLSession *session,
 
 static void HookDelegateClass(Class cls) {
     if (!cls) return;
+    if (!URLCaptureEnabled()) return;
     HookMethod(cls, @selector(URLSession:dataTask:didReceiveData:),
                (IMP)HookedDidReceiveData, &kDelegateDataOriginalKey, "v@:@@@", YES);
     HookMethod(cls, @selector(URLSession:task:didCompleteWithError:),
@@ -632,7 +637,16 @@ static char kTaskResumeOriginalKey;
 
 static void HookedTaskResume(id self, SEL command) {
     IMP imp = OriginalIMP(self, &kTaskResumeOriginalKey, (IMP)HookedTaskResume);
-    
+
+    // 开关关闭时直接透传，避免每次 resume 做 KVC 与 delegate 类 hook
+    if (!URLCaptureEnabled()) {
+        if (imp) {
+            void (*original)(id, SEL) = (void *)imp;
+            original(self, command);
+        }
+        return;
+    }
+
     // 如果是 data task 且没有 completion handler，确保 delegate 被 hook
     if ([self isKindOfClass:[NSURLSessionDataTask class]]) {
         NSURLSessionTask *task = (NSURLSessionTask *)self;

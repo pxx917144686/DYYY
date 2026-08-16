@@ -62,11 +62,17 @@ $(TWEAK_NAME)_FILES = DYYY.xm \
 $(TWEAK_NAME)_FILES += DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 $(TWEAK_NAME)_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
 $(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
+$(TWEAK_NAME)_FILES += DYYYSelfTest.m DYYYCrashCatcher.m DYYYPaths.m
 
 # Swift 源文件
 $(TWEAK_NAME)_FILES += DYYYSDKPatch.m
 
-# 添加 FLEX 源文件
+# ===== 发布版 / 调试版开关 =====
+# make            调试版（默认）：主功能 + FLEX + Capstone 反汇编 + 逆向助手 + 一键自检，dylib 约 14.6MB
+# make DYYY_RELEASE=1  发布版：主功能 + 一键自检（唯一保留的调试功能），dylib 约 1.65MB
+#   排除 FLEX 全部 / Capstone / 逆向助手 Decrypt / flex_fishhook；长按面板 FLEX 菜单与设置页调试入口随之隐藏
+ifneq ($(DYYY_RELEASE),1)
+# 调试版：添加 FLEX 源文件
 FLEX_FILES := $(shell find FLEX -name '*.m' -o -name '*.mm' | grep -v 'FLEX/x/retdec' | grep -v 'FLEX/x/capstone' | grep -v 'UCDecompiler')
 $(TWEAK_NAME)_FILES += $(FLEX_FILES) FLEX/flex_fishhook.c
 
@@ -75,9 +81,14 @@ CAPSTONE_CORE := $(shell find FLEX/x/capstone -maxdepth 1 -name "*.c")
 CAPSTONE_ARM := $(shell find FLEX/x/capstone/arch/ARM -name "*.c")
 CAPSTONE_ARM64 := $(shell find FLEX/x/capstone/arch/AArch64 -name "*.c")
 $(TWEAK_NAME)_FILES += $(CAPSTONE_CORE) $(CAPSTONE_ARM) $(CAPSTONE_ARM64)
+endif
 
 # 编译标志
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
+# 发布版宏（必须在基础 CFLAGS 赋值之后追加，否则被覆盖）
+ifeq ($(DYYY_RELEASE),1)
+$(TWEAK_NAME)_CFLAGS += -DDYYY_RELEASE_BUILD=1
+endif
 # 解决class_ro_t指针签名警告
 $(TWEAK_NAME)_CFLAGS += -Wno-deprecated-declarations -Wno-sign-compare -Wno-pointer-sign
 # 统一启用class_ro_t指针签名，避免混合编译警告
