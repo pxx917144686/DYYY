@@ -56,12 +56,16 @@ CFDictionaryRef hooked_CFNetworkCopySystemProxySettings(void) {
 
 void ssl2_kill(void) {
     LOG(@"SSL2 kill activated");
-    [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL2 kill activated"];
+    if ([[DYYYDatabaseManager sharedManager] getSwitch:@"zongkaiguan" bundleID:CurrentBundleID() defaultValue:NO]) {
+        [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL2 kill activated"];
+    }
 }
 
 void ssl3_kill(void) {
     LOG(@"SSL3 kill activated");
-    [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL3 kill activated"];
+    if ([[DYYYDatabaseManager sharedManager] getSwitch:@"zongkaiguan" bundleID:CurrentBundleID() defaultValue:NO]) {
+        [[DYYYDatabaseManager sharedManager] insertLogText:@"SSL3 kill activated"];
+    }
 }
 
 static const char* (*orig_SSL_get_psk_identity)(void *ssl);
@@ -70,9 +74,13 @@ const char* replaced_SSL_get_psk_identity(void *ssl) {
     const char* identity = orig_SSL_get_psk_identity(ssl);
     if (identity) {
         NSString *bundleID = CurrentBundleID();
-        NSString *pskInfo = [NSString stringWithFormat:@"PSK Identity: %s", identity];
-        [[DYYYDatabaseManager sharedManager] insertDataIntoTable:@"ssl_psk" bundleID:bundleID text:pskInfo];
-        LOG(@"%@", pskInfo);
+        DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
+        // 开关保护：仅当 SSL 捕获开关开启时才写库
+        if ([db getSwitch:@"ssl3kaiguan" bundleID:bundleID defaultValue:NO]) {
+            NSString *pskInfo = [NSString stringWithFormat:@"PSK Identity: %s", identity];
+            [db insertDataIntoTable:@"ssl_psk" bundleID:bundleID text:pskInfo];
+            LOG(@"%@", pskInfo);
+        }
     }
     return identity;
 }

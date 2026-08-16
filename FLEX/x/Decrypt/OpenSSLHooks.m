@@ -166,11 +166,12 @@ static void FinalizeEVPCtx(const void *ctx, const void *finalOut, size_t finalLe
                       Base64StringFromBytes(fullOutput.bytes, fullOutput.length),
                       ReadableStringFromBytes(fullOutput.bytes, fullOutput.length),
                       (unsigned long)fullOutput.length];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    if (isDecrypt || !isDecrypt) {
+    // 开关保护：仅当加密捕获开关开启时才写库，避免刷视频时无限制增长
+    if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
+        [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
         [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
+        LOG(@"%@", info);
     }
-    LOG(@"%@", info);
 
     NSData *keyData = entry[@"keyData"];
     NSData *ivData = entry[@"ivData"];
@@ -292,17 +293,20 @@ void my_AES_cbc_encrypt(const unsigned char *in, unsigned char *out, size_t leng
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL isDecrypt = (enc == 0);
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[AES_cbc_encrypt] %@\nIV Hex: %@\nIV Base64: %@\n输入 Hex: %@\n输入 Base64: %@\n输入 UTF8: %@\n输入长度: %lu\n输出 Hex: %@\n输出 Base64: %@\n输出 UTF8: %@\n输出长度: %lu\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
-                      isDecrypt ? @"Decrypt" : @"Encrypt",
-                      HexStringFromBytes(ivec, 16), Base64StringFromBytes(ivec, 16),
-                      HexStringFromBytes(in, length), Base64StringFromBytes(in, length),
-                      ReadableStringFromBytes(in, length), (unsigned long)length,
-                      HexStringFromBytes(out, length), Base64StringFromBytes(out, length),
-                      ReadableStringFromBytes(out, length), (unsigned long)length];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+    // 开关保护：仅当加密捕获开关开启时才写库
+    if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
+        NSString *info = [NSString stringWithFormat:
+                          @"[AES_cbc_encrypt] %@\nIV Hex: %@\nIV Base64: %@\n输入 Hex: %@\n输入 Base64: %@\n输入 UTF8: %@\n输入长度: %lu\n输出 Hex: %@\n输出 Base64: %@\n输出 UTF8: %@\n输出长度: %lu\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
+                          isDecrypt ? @"Decrypt" : @"Encrypt",
+                          HexStringFromBytes(ivec, 16), Base64StringFromBytes(ivec, 16),
+                          HexStringFromBytes(in, length), Base64StringFromBytes(in, length),
+                          ReadableStringFromBytes(in, length), (unsigned long)length,
+                          HexStringFromBytes(out, length), Base64StringFromBytes(out, length),
+                          ReadableStringFromBytes(out, length), (unsigned long)length];
+        [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
+        LOG(@"%@", info);
+    }
 }
 
 void my_AES_encrypt(const unsigned char *in, unsigned char *out, const void *key) {
@@ -312,11 +316,14 @@ void my_AES_encrypt(const unsigned char *in, unsigned char *out, const void *key
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[AES_encrypt] 单块加密\n输入 Hex: %@\n输出 Hex: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
-                      HexStringFromBytes(in, 16), HexStringFromBytes(out, 16)];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+    // 开关保护：仅当加密捕获开关开启时才写库
+    if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
+        NSString *info = [NSString stringWithFormat:
+                          @"[AES_encrypt] 单块加密\n输入 Hex: %@\n输出 Hex: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
+                          HexStringFromBytes(in, 16), HexStringFromBytes(out, 16)];
+        [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        LOG(@"%@", info);
+    }
 }
 
 void my_AES_decrypt(const unsigned char *in, unsigned char *out, const void *key) {
@@ -326,13 +333,16 @@ void my_AES_decrypt(const unsigned char *in, unsigned char *out, const void *key
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[AES_decrypt] 单块解密\n输入 Hex: %@\n输出 Hex: %@\n输出 UTF8: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
-                      HexStringFromBytes(in, 16), HexStringFromBytes(out, 16),
-                      ReadableStringFromBytes(out, 16)];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+    // 开关保护：仅当加密捕获开关开启时才写库
+    if ([db isCryptoCaptureEnabledForBundle:bundleID]) {
+        NSString *info = [NSString stringWithFormat:
+                          @"[AES_decrypt] 单块解密\n输入 Hex: %@\n输出 Hex: %@\n输出 UTF8: %@\n(注: AES_KEY 为扩展密钥, 原始密钥无法直接提取)",
+                          HexStringFromBytes(in, 16), HexStringFromBytes(out, 16),
+                          ReadableStringFromBytes(out, 16)];
+        [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        [db insertDataIntoTable:@"decrypt_data" bundleID:bundleID text:info];
+        LOG(@"%@", info);
+    }
 }
 
 #pragma mark - 注册 Hook

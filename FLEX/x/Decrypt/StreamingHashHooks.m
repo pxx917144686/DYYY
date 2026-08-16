@@ -123,20 +123,29 @@ static void FinalizeHashCtx(const void *ctx, const unsigned char *md) {
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
-    NSString *hashHex = HexStringFromBytes(md, digestLen);
-    NSString *hashB64 = Base64StringFromBytes(md, digestLen);
+    // 开关保护：仅当对应捕获开关开启时才写库，避免刷视频时无限制增长
+    BOOL digestEnabled = [db isDigestCaptureEnabledForBundle:bundleID];
+    BOOL cryptoEnabled = [db isCryptoCaptureEnabledForBundle:bundleID];
+    if (digestEnabled || cryptoEnabled) {
+        NSString *hashHex = HexStringFromBytes(md, digestLen);
+        NSString *hashB64 = Base64StringFromBytes(md, digestLen);
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[流式Hash] %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nHash Hex: %@\nHash Base64: %@",
-                      algo,
-                      HexStringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      Base64StringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      ReadableStringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      (unsigned long)accumulatedData.length,
-                      hashHex, hashB64];
-    [db insertDataIntoTable:@"zhaiyao" bundleID:bundleID text:info];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+        NSString *info = [NSString stringWithFormat:
+                          @"[流式Hash] %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nHash Hex: %@\nHash Base64: %@",
+                          algo,
+                          HexStringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          Base64StringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          ReadableStringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          (unsigned long)accumulatedData.length,
+                          hashHex, hashB64];
+        if (digestEnabled) {
+            [db insertDataIntoTable:@"zhaiyao" bundleID:bundleID text:info];
+        }
+        if (cryptoEnabled) {
+            [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        }
+        LOG(@"%@", info);
+    }
 
     NSData *keyData = [NSData dataWithBytes:md length:digestLen];
     IZXAddDecryptionKeyCandidate(keyData, [NSData data],
@@ -191,20 +200,29 @@ static void FinalizeHMACCtx(const void *ctx, void *macOut) {
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
 
-    NSString *macHex = HexStringFromBytes(macOut, digestLen);
-    NSString *macB64 = Base64StringFromBytes(macOut, digestLen);
+    // 开关保护：仅当对应捕获开关开启时才写库，避免刷视频时无限制增长
+    BOOL hmacEnabled = [db isHMACCaptureEnabledForBundle:bundleID];
+    BOOL cryptoEnabled = [db isCryptoCaptureEnabledForBundle:bundleID];
+    if (hmacEnabled || cryptoEnabled) {
+        NSString *macHex = HexStringFromBytes(macOut, digestLen);
+        NSString *macB64 = Base64StringFromBytes(macOut, digestLen);
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[流式HMAC] %@\nKey Hex: %@\nKey Base64: %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nMAC Hex: %@\nMAC Base64: %@",
-                      algo, keyHex, keyB64,
-                      HexStringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      Base64StringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      ReadableStringFromBytes(accumulatedData.bytes, accumulatedData.length),
-                      (unsigned long)accumulatedData.length,
-                      macHex, macB64];
-    [db insertDataIntoTable:@"hanmiyao" bundleID:bundleID text:info];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+        NSString *info = [NSString stringWithFormat:
+                          @"[流式HMAC] %@\nKey Hex: %@\nKey Base64: %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nMAC Hex: %@\nMAC Base64: %@",
+                          algo, keyHex, keyB64,
+                          HexStringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          Base64StringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          ReadableStringFromBytes(accumulatedData.bytes, accumulatedData.length),
+                          (unsigned long)accumulatedData.length,
+                          macHex, macB64];
+        if (hmacEnabled) {
+            [db insertDataIntoTable:@"hanmiyao" bundleID:bundleID text:info];
+        }
+        if (cryptoEnabled) {
+            [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        }
+        LOG(@"%@", info);
+    }
 
     NSData *keyData = [NSData dataWithBytes:macOut length:digestLen];
     IZXAddDecryptionKeyCandidate(keyData, [NSData data],
@@ -374,20 +392,30 @@ int my_CCDigest(uint32_t algorithm, const void *data, size_t dataLength, void *o
 
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
-    NSString *hashHex = HexStringFromBytes(output, digestLen);
-    NSString *hashB64 = Base64StringFromBytes(output, digestLen);
 
-    NSString *info = [NSString stringWithFormat:
-                      @"[CCDigest] %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nHash Hex: %@\nHash Base64: %@",
-                      algoName,
-                      HexStringFromBytes(data, dataLength),
-                      Base64StringFromBytes(data, dataLength),
-                      ReadableStringFromBytes(data, dataLength),
-                      (unsigned long)dataLength,
-                      hashHex, hashB64];
-    [db insertDataIntoTable:@"zhaiyao" bundleID:bundleID text:info];
-    [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
-    LOG(@"%@", info);
+    // 开关保护：仅当对应捕获开关开启时才写库，避免刷视频时无限制增长
+    BOOL digestEnabled = [db isDigestCaptureEnabledForBundle:bundleID];
+    BOOL cryptoEnabled = [db isCryptoCaptureEnabledForBundle:bundleID];
+    if (digestEnabled || cryptoEnabled) {
+        NSString *hashHex = HexStringFromBytes(output, digestLen);
+        NSString *hashB64 = Base64StringFromBytes(output, digestLen);
+
+        NSString *info = [NSString stringWithFormat:
+                          @"[CCDigest] %@\n输入数据 Hex: %@\n输入数据 Base64: %@\n输入数据 UTF8: %@\n输入长度: %lu\nHash Hex: %@\nHash Base64: %@",
+                          algoName,
+                          HexStringFromBytes(data, dataLength),
+                          Base64StringFromBytes(data, dataLength),
+                          ReadableStringFromBytes(data, dataLength),
+                          (unsigned long)dataLength,
+                          hashHex, hashB64];
+        if (digestEnabled) {
+            [db insertDataIntoTable:@"zhaiyao" bundleID:bundleID text:info];
+        }
+        if (cryptoEnabled) {
+            [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
+        }
+        LOG(@"%@", info);
+    }
 
     NSData *keyData = [NSData dataWithBytes:output length:digestLen];
     IZXAddDecryptionKeyCandidate(keyData, [NSData data],
