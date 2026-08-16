@@ -1197,6 +1197,20 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 %end
 
 
+// findViewControllerFromView 单元素缓存：同一视图连续布局时避免反复沿 responder 链遍历
+// weak 引用 VC 防止视图复用/释放后的悬空指针
+static UIViewController *DYYYFindVCWithCache(UIView *view) {
+    static UIView *gLastQueriedView = nil;
+    static __weak UIViewController *gLastQueriedVC = nil;
+    if (view == gLastQueriedView && gLastQueriedVC) {
+        return gLastQueriedVC;
+    }
+    UIViewController *vc = [DYYYUtils findViewControllerFromView:view];
+    gLastQueriedView = view;
+    gLastQueriedVC = vc;
+    return vc;
+}
+
 %hook UIView
 
 - (void)setFrame:(CGRect)frame {
@@ -1210,7 +1224,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
         return;
     }
 
-    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    UIViewController *vc = DYYYFindVCWithCache(self);
     Class PlayVCClass1 = %c(AWEAwemePlayVideoViewController);
     Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
     Class PlayVCClass3 = NSClassFromString(@"AWEDPlayerViewController_Merge");
@@ -1244,7 +1258,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 }
 
 - (void)setAlpha:(CGFloat)alpha {
-    UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+    UIViewController *vc = DYYYFindVCWithCache(self);
     
     if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
         NSString *transparentValue = DYYYCachedString(@"DYYYGlobalTransparency");
@@ -1260,15 +1274,8 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 }
 
 - (void)setBackgroundColor:(UIColor *)backgroundColor {
-    if (![NSThread isMainThread]) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [self setBackgroundColor:backgroundColor];
-        });
-        return;
-    }
-
     if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
-        UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+        UIViewController *vc = DYYYFindVCWithCache(self);
         if ([vc isKindOfClass:%c(AWEAwemeDetailTableViewController)] ||
             [vc isKindOfClass:%c(AWEAwemeDetailCellViewController)]) {
             %orig([UIColor clearColor]);
@@ -1284,7 +1291,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 
     if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         if (self.frame.size.height == tabHeight && tabHeight > 0) {
-            UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+            UIViewController *vc = DYYYFindVCWithCache(self);
             if ([vc isKindOfClass:NSClassFromString(@"AWEMixVideoPanelDetailTableViewController")] || [vc isKindOfClass:NSClassFromString(@"AWECommentInputViewController")] ||
                 [vc isKindOfClass:NSClassFromString(@"AWEAwemeDetailTableViewController")]) {
                 self.backgroundColor = [UIColor clearColor];
@@ -1293,7 +1300,7 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
     }
 
     if (DYYYCachedBool(@"DYYYisEnableFullScreen") || DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
-        UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+        UIViewController *vc = DYYYFindVCWithCache(self);
         if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
             for (UIView *subview in self.subviews) {
                 if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
