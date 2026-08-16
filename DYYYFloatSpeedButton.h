@@ -25,7 +25,10 @@
 
 @end
 
-// 全局函数和变量声明
+// 全局函数和变量声明（extern "C" 使 C 编译单元如 DYYYSelfTest.m 可正确链接）
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern NSArray *getSpeedOptions(void);
 extern NSInteger getCurrentSpeedIndex(void);
 extern float getCurrentSpeed(void);
@@ -38,5 +41,8 @@ extern void updateSpeedButtonVisibility(void);
 
 // 添加全局变量声明
 extern DYYYFloatingSpeedButton *speedButton;
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DYYYFloatSpeedButton_h */

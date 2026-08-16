@@ -2569,7 +2569,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     // 一键自检功能处理
     if ([item.key isEqualToString:@"DYYYSelfTest"]) {
-        [DYYYSelfTest runAndPresentReportFromViewController:self];
+        [DYYYSelfTest presentFromViewController:self];
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         return;
     }
