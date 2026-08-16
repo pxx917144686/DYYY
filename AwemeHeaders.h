@@ -33,6 +33,7 @@ extern "C" {
 #endif
 BOOL DYYYCachedBool(NSString *key);
 NSString *DYYYCachedString(NSString *key);
+NSArray<NSString *> *DYYYCachedKeywordList(NSString *configKey);
 void DYYYConfigCacheInvalidate(void);
 #ifdef __cplusplus
 }

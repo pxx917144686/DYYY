@@ -1884,24 +1884,15 @@ static void applyTopBarTransparency(UIView *topBar) {
 	BOOL shouldFilterProp = NO;
 	BOOL shouldFilterUser = NO;
 
-	// 获取用户设置的需要过滤的关键词
-	NSString *filterKeywords = DYYYCachedString(@"DYYYfilterKeywords");
-	NSArray *keywordsList = nil;
+	// 获取用户设置的需要过滤的关键词（预编译缓存）
+	NSArray *keywordsList = DYYYCachedKeywordList(@"DYYYfilterKeywords");
 
-	if (filterKeywords.length > 0) {
-		keywordsList = [filterKeywords componentsSeparatedByString:@","];
-	}
-
-	// 过滤包含指定拍同款的视频
-	NSString *filterProp = DYYYCachedString(@"DYYYFilterProp");
-	NSArray *propKeywordsList = nil;
-
-	if (filterProp.length > 0) {
-		propKeywordsList = [filterProp componentsSeparatedByString:@","];
-	}
+	// 过滤包含指定拍同款的视频（预编译缓存）
+	NSArray *propKeywordsList = DYYYCachedKeywordList(@"DYYYFilterProp");
 
 	// 获取需要过滤的用户列表
 	NSString *filterUsers = DYYYCachedString(@"DYYYFilterUsers");
+	NSArray *usersList = DYYYCachedKeywordList(@"DYYYFilterUsers");
 
 	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
 
@@ -1923,8 +1914,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 			// 检查视频标题
 			if (self.itemTitle.length > 0) {
 				for (NSString *keyword in keywordsList) {
-					NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-					if (trimmedKeyword.length > 0 && [self.itemTitle containsString:trimmedKeyword]) {
+					if ([self.itemTitle containsString:keyword]) {
 						shouldFilterKeywords = YES;
 						break;
 					}
@@ -1937,8 +1927,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 					NSString *hashtagName = textExtra.hashtagName;
 					if (hashtagName.length > 0) {
 						for (NSString *keyword in keywordsList) {
-							NSString *trimmedKeyword = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-							if (trimmedKeyword.length > 0 && [hashtagName containsString:trimmedKeyword]) {
+							if ([hashtagName containsString:keyword]) {
 								shouldFilterKeywords = YES;
 								break;
 							}
@@ -1966,7 +1955,6 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 	// 按用户 ID/昵称过滤（解析"昵称-id"格式）
 	if (isRecommendFeed && filterUsers.length > 0 && self.author) {
-		NSArray *usersList = [filterUsers componentsSeparatedByString:@","];
 		NSString *currentShortID = self.author.shortID;
 
 		if (currentShortID.length > 0) {
@@ -1988,8 +1976,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 		NSString *propName = self.propGuideV2.propName;
 		if (propName.length > 0) {
 			for (NSString *propKeyword in propKeywordsList) {
-				NSString *trimmedKeyword = [propKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-				if (trimmedKeyword.length > 0 && [propName containsString:trimmedKeyword]) {
+				if ([propName containsString:propKeyword]) {
 					shouldFilterProp = YES;
 					break;
 				}
@@ -5113,6 +5100,20 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
 
 %end
 
+// 一次递归同时收集两类视图，替代两次 findAllSubviewsOfClass 全树遍历
+static void DYYYCollectSubviewsOfClasses(UIView *view, Class classA, Class classB,
+                                          NSMutableArray<UIView *> *outA, NSMutableArray<UIView *> *outB) {
+    if (classA && [view isKindOfClass:classA]) {
+        [outA addObject:view];
+    }
+    if (classB && [view isKindOfClass:classB]) {
+        [outB addObject:view];
+    }
+    for (UIView *subview in view.subviews) {
+        DYYYCollectSubviewsOfClasses(subview, classA, classB, outA, outB);
+    }
+}
+
 // 拦截抖音视频界面的双击事件处理方法
 %hook AWEPlayInteractionViewController
 
@@ -5131,7 +5132,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
     %orig;
 
     // 隐藏黑色背景视图，让毛玻璃效果显示视频内容
-    if (DYYYGetBool(@"DYYYisEnableFullScreen") || DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+    if (DYYYCachedBool(@"DYYYisEnableFullScreen") || DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
         for (UIView *subview in self.view.subviews) {
             if ([subview isKindOfClass:[UIView class]] && subview.backgroundColor && CGColorEqualToColor(subview.backgroundColor.CGColor, [UIColor blackColor].CGColor)) {
                 subview.hidden = YES;
@@ -5139,13 +5140,19 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
         }
     }
 
-    if (DYYYGetBool(@"DYYYisEnableCommentBlur")) {
+    if (DYYYCachedBool(@"DYYYisEnableCommentBlur")) {
         Class containerViewClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputContainerView");
-        NSArray<UIView *> *containerViews = [DYYYUtils findAllSubviewsOfClass:containerViewClass inContainer:self.view];
+        Class middleContainerClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer");
+
+        // 合并遍历：一次递归同时收集两类命中视图
+        NSMutableArray<UIView *> *containerViews = [NSMutableArray array];
+        NSMutableArray<UIView *> *middleContainers = [NSMutableArray array];
+        DYYYCollectSubviewsOfClasses(self.view, containerViewClass, middleContainerClass, containerViews, middleContainers);
+
         for (UIView *containerView in containerViews) {
             for (UIView *subview in containerView.subviews) {
                 if (subview.hidden == NO && subview.backgroundColor && CGColorGetAlpha(subview.backgroundColor.CGColor) == 1) {
-                    float userTransparency = [[[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYCommentBlurTransparent"] floatValue];
+                    float userTransparency = [DYYYCachedString(@"DYYYCommentBlurTransparent") floatValue];
                     if (userTransparency <= 0 || userTransparency > 1) {
                         userTransparency = 0.8;
                     }
@@ -5154,8 +5161,6 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
             }
         }
 
-        Class middleContainerClass = NSClassFromString(@"AWECommentInputViewSwiftImpl.CommentInputViewMiddleContainer");
-        NSArray<UIView *> *middleContainers = [DYYYUtils findAllSubviewsOfClass:middleContainerClass inContainer:self.view];
         for (UIView *middleContainer in middleContainers) {
             BOOL containsDanmu = NO;
             for (UIView *innerSubviewCheck in middleContainer.subviews) {
@@ -5191,7 +5196,7 @@ static __weak YYAnimatedImageView *targetStickerView = nil;
     }
 
     // 全屏模式：调整交互视图高度（移植自 DYYY12345/DYYY.xm:11517-11591）
-    if (!DYYYGetBool(@"DYYYisEnableFullScreen")) {
+    if (!DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         return;
     }
 
