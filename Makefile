@@ -69,11 +69,10 @@ $(TWEAK_NAME)_FILES += DYYYSDKPatch.m
 
 # ===== 发布版 / 调试版开关 =====
 # make            调试版（默认）：主功能 + FLEX + Capstone 反汇编 + 逆向助手 + 一键自检，dylib 约 14.6MB
-# make DYYY_RELEASE=1  发布版：主功能 + 一键自检（唯一保留的调试功能），dylib 约 2.5~3.5MB
+# make DYYY_RELEASE=1  发布版：主功能 + 一键自检（唯一保留的调试功能），dylib 约 1.65MB
 #   排除 FLEX 全部 / Capstone / 逆向助手 Decrypt / flex_fishhook；长按面板 FLEX 菜单与设置页调试入口随之隐藏
-ifeq ($(DYYY_RELEASE),1)
-else
-# 添加 FLEX 源文件
+ifneq ($(DYYY_RELEASE),1)
+# 调试版：添加 FLEX 源文件
 FLEX_FILES := $(shell find FLEX -name '*.m' -o -name '*.mm' | grep -v 'FLEX/x/retdec' | grep -v 'FLEX/x/capstone' | grep -v 'UCDecompiler')
 $(TWEAK_NAME)_FILES += $(FLEX_FILES) FLEX/flex_fishhook.c
 

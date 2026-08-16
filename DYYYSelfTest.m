@@ -138,7 +138,15 @@ static DYYYSelfTestResult *DYYYTestSpeedClear(void) {
         @"倍速按钮=%@(开关%@), 清屏按钮类=%@(开关%@)",
         button ? @"已创建" : @"未创建", speedEnabled ? @"开" : @"关",
         clearButtonClassExists ? @"存在" : @"缺失", clearEnabled ? @"开" : @"关"];
-    return DYYYMakeResult(@"倍速/清屏", (button || speedEnabled) && clearButtonClassExists ? 0 : 1, detail);
+
+    // 特性分别校验：两开关全关是合法配置(功能未启用)，不判失败
+    if (!clearButtonClassExists) {
+        return DYYYMakeResult(@"倍速/清屏", 2, [NSString stringWithFormat:@"%@; 清屏按钮类缺失", detail]);
+    }
+    if (speedEnabled && !button) {
+        return DYYYMakeResult(@"倍速/清屏", 1, [NSString stringWithFormat:@"%@; 倍速开启但按钮未创建(进入播放页后创建属正常)", detail]);
+    }
+    return DYYYMakeResult(@"倍速/清屏", 0, detail);
 }
 
 // 6. 长按面板/评论类
@@ -333,7 +341,13 @@ static DYYYSelfTestResult *DYYYTestNetwork(void) {
         }
         dispatch_semaphore_signal(sem);
     }] resume];
-    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)));
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.5 * NSEC_PER_SEC)));
+    if (!status) {
+        return DYYYMakeResult(@"网络可达性", status, detail);
+    }
+    if ([detail isEqualToString:@"未验证"]) {
+        detail = @"请求超时(5s)";
+    }
     return DYYYMakeResult(@"网络可达性", status, detail);
 }
 

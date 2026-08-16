@@ -62,16 +62,19 @@ static void DYYYSignalHandler(int sig) {
     gDYYYCrashHandling = 1;
 
     if (gDYYYCrashDirPath[0] != 0) {
-        time_t now = time(NULL);
+        // 纳秒时间戳防同秒两次崩溃互相覆盖；clock_gettime 是 async-signal-safe
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        long long nanos = (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
         char nameBuf[PATH_MAX];
-        snprintf(nameBuf, sizeof(nameBuf), "%s/Crash_%ld.txt", gDYYYCrashDirPath, (long)now);
+        snprintf(nameBuf, sizeof(nameBuf), "%s/Crash_%lld.txt", gDYYYCrashDirPath, nanos);
 
         int fd = open(nameBuf, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd >= 0) {
             char header[256];
             int len = snprintf(header, sizeof(header),
-                               "===== DYYY++ 崩溃日志 =====\n时间戳: %ld\n类型: 致命信号\n信号: %d (%s)\n\n调用栈:\n",
-                               (long)now, sig, DYYYSignalName(sig));
+                               "===== DYYY++ 崩溃日志 =====\n时间戳: %lld\n类型: 致命信号\n信号: %d (%s)\n\n调用栈:\n",
+                               nanos, sig, DYYYSignalName(sig));
             if (len > 0) write(fd, header, (size_t)len);
 
             void *frames[64];
@@ -99,7 +102,7 @@ static void DYYYUncaughtExceptionHandler(NSException *exception) {
 
     @try {
         NSString *dir = DYYYCrashLogDirectory();
-        long long ts = (long long)[[NSDate date] timeIntervalSince1970];
+        long long ts = (long long)([[NSDate date] timeIntervalSince1970] * 1000000.0);
         NSString *path = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"Crash_%lld.txt", ts]];
         NSString *stack = [[exception callStackSymbols] componentsJoinedByString:@"\n"] ?: @"(无调用栈)";
         NSString *content = [NSString stringWithFormat:
@@ -120,6 +123,9 @@ static void DYYYUncaughtExceptionHandler(NSException *exception) {
 + (void)install {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
+        // 先迁移旧文件再清理，保证首启迁移来的日志也受 3 份上限约束
+        [DYYYPaths runLegacyMigrationIfNeeded];
+
         // 准备目录 + 缓存 C 路径 + 清理旧日志
         NSString *dir = DYYYCrashLogDirectory();
         if (dir.fileSystemRepresentation) {

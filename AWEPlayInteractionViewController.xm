@@ -2,7 +2,9 @@
 #import <objc/runtime.h>
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
+#ifndef DYYY_RELEASE_BUILD
 #import "FLEXHeaders.h"
+#endif
 #import <PhotosUI/PhotosUI.h>
 #import "DYYYUtils.h"
 #import "DYYYBottomAlertView.h"

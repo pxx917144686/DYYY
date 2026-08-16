@@ -99,8 +99,15 @@ static void DYYYMigrateLegacyFiles(void) {
 
 __attribute__((constructor)) static void DYYYPathsMigrateOnLaunch(void) {
     @autoreleasepool {
-        DYYYMigrateLegacyFiles();
+        [DYYYPaths runLegacyMigrationIfNeeded];
     }
+}
+
++ (void)runLegacyMigrationIfNeeded {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        DYYYMigrateLegacyFiles();
+    });
 }
 
 @end

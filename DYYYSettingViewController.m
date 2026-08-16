@@ -1292,7 +1292,7 @@ NSDictionary *getCurrentABTestData(void) {
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
-    NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.gif" ];
+    NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.png" ];
 
     NSMutableDictionary *iconBase64Dict = [NSMutableDictionary dictionary];
 
@@ -1984,7 +1984,7 @@ NSDictionary *getCurrentABTestData(void) {
     // 特殊处理一键自检
     if ([item.key isEqualToString:@"DYYYSelfTest"]) {
         cell.accessoryView = nil;
-        cell.accessoryType = UITableViewCellAccessoryDetailButton;
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         return cell;
     }
     // 特殊处理热更新功能

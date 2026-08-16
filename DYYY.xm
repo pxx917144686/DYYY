@@ -1199,9 +1199,9 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 
 
 // findViewControllerFromView 单元素缓存：同一视图连续布局时避免反复沿 responder 链遍历
-// weak 引用 VC 防止视图复用/释放后的悬空指针
+// view 与 VC 均用 weak：视图释放自动失效，避免 static 强引用阻止视图释放
 static UIViewController *DYYYFindVCWithCache(UIView *view) {
-    static UIView *gLastQueriedView = nil;
+    static __weak UIView *gLastQueriedView = nil;
     static __weak UIViewController *gLastQueriedVC = nil;
     if (view == gLastQueriedView && gLastQueriedVC) {
         return gLastQueriedVC;
@@ -1275,6 +1275,15 @@ static UIViewController *DYYYFindVCWithCache(UIView *view) {
 }
 
 - (void)setBackgroundColor:(UIColor *)backgroundColor {
+    // 保留主线程防护：后台线程直碰 UIKit 有崩溃风险，重派发到主线程执行(重派发后主线程走 %orig，无递归)
+    if (![NSThread isMainThread]) {
+        __weak UIView *weakSelf = self;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf setBackgroundColor:backgroundColor];
+        });
+        return;
+    }
+
     if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
         UIViewController *vc = DYYYFindVCWithCache(self);
         if ([vc isKindOfClass:%c(AWEAwemeDetailTableViewController)] ||
@@ -2021,19 +2030,31 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 #pragma mark - DataController 广告过滤
 
-// 过滤结果标记：getter 命中标记(且 count 未变)时跳过 O(n) 全量过滤
+// 过滤结果标记：getter 命中标记时跳过 O(n) 全量过滤。
+// 快照 = count + 首/尾元素指针：同 count 换内容(下拉刷新同条数替换)时首尾指针变化，标记失效重滤
 static char kDYYYAdFilteredMarkKey;
 
 static void DYYYMarkAdFiltered(NSArray *array) {
-    if ([array isKindOfClass:[NSArray class]]) {
-        objc_setAssociatedObject(array, &kDYYYAdFilteredMarkKey, @(array.count), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if ([array isKindOfClass:[NSArray class]] && array.count > 0) {
+        NSDictionary *snapshot = @{
+            @"count": @(array.count),
+            @"first": @((uintptr_t)(__bridge void *)array.firstObject),
+            @"last": @((uintptr_t)(__bridge void *)array.lastObject)
+        };
+        objc_setAssociatedObject(array, &kDYYYAdFilteredMarkKey, snapshot, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
 static BOOL DYYYIsAdFilteredValid(NSArray *array) {
     if (![array isKindOfClass:[NSArray class]]) return NO;
-    NSNumber *marked = objc_getAssociatedObject(array, &kDYYYAdFilteredMarkKey);
-    return marked && marked.unsignedIntegerValue == array.count;
+    NSDictionary *snapshot = objc_getAssociatedObject(array, &kDYYYAdFilteredMarkKey);
+    if (!snapshot) return NO;
+    if ([snapshot[@"count"] unsignedIntegerValue] != array.count) return NO;
+    if (array.count == 0) return YES; // 空数组无内容可替换
+    uintptr_t first = [snapshot[@"first"] unsignedLongValue];
+    uintptr_t last = [snapshot[@"last"] unsignedLongValue];
+    return first == (uintptr_t)(__bridge void *)array.firstObject &&
+           last == (uintptr_t)(__bridge void *)array.lastObject;
 }
 
 %hook AWEListDataController
@@ -2635,7 +2656,25 @@ static Class tabBarButtonClass = nil;
     BOOL hidePlus = DYYYCachedBool(@"DYYYisHiddenJia");
     BOOL isPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 
-    // 脏标记：开关/宽度/subviews 集合未变化时跳过按钮遍历、排序与重排
+    // 可见性断言每次执行：外部改动按钮显隐/label 后仍能恢复
+    for (UIView *subview in self.subviews) {
+        if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
+            (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
+            NSString *label = subview.accessibilityLabel;
+            BOOL isPlusButton = [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
+                                (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass]) ||
+                                [label isEqualToString:@"拍摄"];
+            BOOL shouldHide = (isPlusButton && hidePlus) || ([label containsString:@"商城"] && hideShop) || ([label containsString:@"消息"] && hideMsg) || ([label containsString:@"朋友"] && hideFri) ||
+                              ([label isEqualToString:@"我"] && hideMe);
+            subview.userInteractionEnabled = !shouldHide;
+            subview.hidden = shouldHide;
+        } else if ([subview isKindOfClass:tabBarButtonClass]) {
+            subview.userInteractionEnabled = NO;
+            subview.hidden = YES;
+        }
+    }
+
+    // 脏标记：开关/宽度/subviews 集合未变化时跳过收集、排序与重排
     static NSArray *gTabBarLayoutKey = nil;
     NSArray *layoutKey = @[@(hideShop), @(hideMsg), @(hideFri), @(hideMe), @(hidePlus),
                            @(isPad), @(self.bounds.size.width), self.subviews];
@@ -2648,22 +2687,9 @@ static Class tabBarButtonClass = nil;
         for (UIView *subview in self.subviews) {
             if ([subview isKindOfClass:generalButtonClass] || [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
                 (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass])) {
-                NSString *label = subview.accessibilityLabel;
-                BOOL isPlusButton = [subview isKindOfClass:plusContainerButtonClass] || [subview isKindOfClass:plusButtonClass] ||
-                                    (plusInnerButtonClass && [subview isKindOfClass:plusInnerButtonClass]) ||
-                                    [label isEqualToString:@"拍摄"];
-                BOOL shouldHide = (isPlusButton && hidePlus) || ([label containsString:@"商城"] && hideShop) || ([label containsString:@"消息"] && hideMsg) || ([label containsString:@"朋友"] && hideFri) ||
-                                  ([label isEqualToString:@"我"] && hideMe);
-
-                subview.userInteractionEnabled = !shouldHide;
-                subview.hidden = shouldHide;
-
-                if (!shouldHide) {
+                if (!subview.hidden) {
                     [visibleButtons addObject:subview];
                 }
-            } else if ([subview isKindOfClass:tabBarButtonClass]) {
-                subview.userInteractionEnabled = NO;
-                subview.hidden = YES;
             } else if (isPad && !ipadContainerView && [subview isMemberOfClass:UIView.class] && fabs(subview.frame.size.width - self.bounds.size.width) > 0.1) {
                 ipadContainerView = subview;
             }
@@ -5977,6 +6003,12 @@ static CLLocationManager *locationManager = nil;
 
 - (void)setObject:(id)value forKey:(NSString *)defaultName {
     %orig;
+    DYYYConfigCacheInvalidate();
+}
+
+- (void)removeObjectForKey:(NSString *)defaultName {
+    %orig;
+    // 设置页"重置/清除"走 removeObjectForKey，同样需失效配置缓存
     DYYYConfigCacheInvalidate();
 }
 
