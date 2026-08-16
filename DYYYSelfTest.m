@@ -130,7 +130,8 @@ static DYYYSelfTestResult *DYYYTestFeedHooks(void) {
 // 5. 倍速/清屏模块
 static DYYYSelfTestResult *DYYYTestSpeedClear(void) {
     DYYYFloatingSpeedButton *button = getSpeedButton();
-    BOOL clearButtonClassExists = NSClassFromString(@"DYYYFloatClearButton") != nil;
+    // 清屏按钮实际类名为 DYYYHideUIButton（DYYYFloatClearButton.xm 定义）
+    BOOL clearButtonClassExists = NSClassFromString(@"DYYYHideUIButton") != nil;
     BOOL speedEnabled = DYYYCachedBool(@"DYYYEnableFloatSpeedButton");
     BOOL clearEnabled = DYYYCachedBool(@"DYYYEnableFloatClearButton");
 
@@ -165,6 +166,7 @@ static DYYYSelfTestResult *DYYYTestDownload(void) {
     if (!mgr) {
         return DYYYMakeResult(@"下载/保存", 2, @"DYYYManager 单例为空");
     }
+    // 核心方法均为 + 类方法，须用类对象检测
     NSMutableString *missing = [NSMutableString string];
     NSArray<NSString *> *selectors = @[
         @"saveMedia:mediaType:completion:",
@@ -174,7 +176,7 @@ static DYYYSelfTestResult *DYYYTestDownload(void) {
         @"saveCommentImages:currentIndex:completion:"
     ];
     for (NSString *selName in selectors) {
-        if (![mgr respondsToSelector:NSSelectorFromString(selName)]) {
+        if (![[mgr class] respondsToSelector:NSSelectorFromString(selName)]) {
             [missing appendFormat:@"%@; ", selName];
         }
     }
