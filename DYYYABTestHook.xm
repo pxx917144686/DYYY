@@ -1,5 +1,6 @@
 #import "DYYYABTestHook.h"
 #import "DYYYUtils.h"
+#import "DYYYPaths.h"
 #import <objc/runtime.h>
 
 @interface AWEABTestManager : NSObject
@@ -121,10 +122,7 @@ void ensureABTestDataLoaded(void) {
 		return;
 
 	dispatch_once(&onceToken, ^{
-	  NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	  NSString *documentsDirectory = [paths firstObject];
-
-	  NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+	  NSString *dyyyFolderPath = [DYYYPaths abTestDir];
 	  NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
 	  NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -132,7 +130,16 @@ void ensureABTestDataLoaded(void) {
 		  NSError *error = nil;
 		  [fileManager createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:&error];
 		  if (error) {
-			  NSLog(@"[DYYY] 创建DYYY目录失败: %@", error.localizedDescription);
+			  NSLog(@"[DYYY] 创建ABTest目录失败: %@", error.localizedDescription);
+		  }
+	  }
+
+	  // 迁移兜底：新路径缺失且旧路径(DYYY 根)存在时回退读取
+	  if (![fileManager fileExistsAtPath:jsonFilePath]) {
+		  NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		  NSString *legacyPath = [[paths firstObject] stringByAppendingPathComponent:@"DYYY/abtest_data_fixed.json"];
+		  if ([fileManager fileExistsAtPath:legacyPath]) {
+			  jsonFilePath = legacyPath;
 		  }
 	  }
 
@@ -244,9 +251,7 @@ void checkForRemoteConfigUpdate(BOOL notify) {
 	                                                                       validationError = [NSError errorWithDomain:@"com.dyyy.remoteconfig" code:-1 userInfo:@{NSLocalizedDescriptionKey : @"配置格式错误"}];
 	                                                                   }
 	                                                               } else {
-	                                                                   NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	                                                                   NSString *documentsDirectory = [paths firstObject];
-	                                                                   NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+	                                                                   NSString *dyyyFolderPath = [DYYYPaths abTestDir];
 	                                                                   NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 	                                                                   [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
 	                                                                   NSData *existingData = [NSData dataWithContentsOfFile:jsonFilePath];

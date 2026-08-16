@@ -3,6 +3,7 @@
 #import <signal.h>
 #import "DYYYManager.h"
 #import "DYYYUtils.h"
+#import "DYYYPaths.h"
 
 // 添加变量跟踪是否在目标视图控制器中
 static BOOL isInPlayInteractionVC = NO;
@@ -357,9 +358,8 @@ static void initTargetClassNames(void) {
             return;
         }
     }
-    // 兼容旧逻辑
-    NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *iconPath = [documentsPath stringByAppendingPathComponent:@"DYYY/qingping.png"];
+    // 兼容旧逻辑（图标已统一归入 DYYY/Icons，旧路径由 DYYYPaths 迁移）
+    NSString *iconPath = [[DYYYPaths iconsDir] stringByAppendingPathComponent:@"qingping.png"];
     UIImage *customIcon = [UIImage imageWithContentsOfFile:iconPath];
     if (customIcon) {
         self.showIcon = customIcon;

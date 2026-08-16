@@ -2,6 +2,7 @@
 #import <objc/runtime.h>
 #import <CoreLocation/CoreLocation.h>
 #import "DYYYUtils.h"
+#import "DYYYPaths.h"
 
 #define DYYYBottomAlertView_DEFINED
 #define DYYYToast_DEFINED
@@ -4297,8 +4298,7 @@ static Class tabBarButtonClass = nil;
 			@"icon_home_favorite" : @"favorite.png",
 			@"iconHomeShareRight" : @"share.png"
 		};
-		NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-		dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+		dyyyFolderPath = [DYYYPaths iconsDir];
 		// 目录创建移出热路径，仅首次执行一次
 		[[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
 	});

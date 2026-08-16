@@ -1,4 +1,5 @@
 #import "DYYYDatabaseManager.h"
+#import "DYYYPaths.h"
 #import <sqlite3.h>
 
 @interface DYYYDatabaseManager ()
@@ -32,8 +33,16 @@
 }
 
 - (void)setupDatabase {
-    NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    _dbPath = [docPath stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+    NSString *logsDir = [DYYYPaths logsDir];
+    _dbPath = [logsDir stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+    // 迁移兜底：新路径不存在且旧路径(Documents 根)存在时回退，避免迁移失败丢数据
+    if (![[NSFileManager defaultManager] fileExistsAtPath:_dbPath]) {
+        NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *legacyPath = [docPath stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:legacyPath]) {
+            _dbPath = legacyPath;
+        }
+    }
     [self openDatabase];
     [self createTables];
 }

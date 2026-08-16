@@ -1,4 +1,5 @@
 #import "DYYYCrashCatcher.h"
+#import "DYYYPaths.h"
 #import <UIKit/UIKit.h>
 #import <signal.h>
 #import <execinfo.h>
@@ -8,8 +9,7 @@
 #import <sys/stat.h>
 #import <string.h>
 
-#define DYYY_CRASH_LOG_SUBDIR @"DYYY/CrashLogs"
-#define DYYY_MAX_CRASH_LOGS 20
+#define DYYY_MAX_CRASH_LOGS 3
 
 // 崩溃日志目录的 C 路径缓存（constructor 阶段准备，signal handler 内只做 C 级操作）
 static char gDYYYCrashDirPath[PATH_MAX] = {0};
@@ -20,8 +20,7 @@ static NSUncaughtExceptionHandler *gDYYYPreviousExceptionHandler = NULL;
 static void (*gDYYYOldSignalHandlers[NSIG])(int);
 
 static NSString *DYYYCrashLogDirectory(void) {
-    NSString *doc = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *dir = [doc stringByAppendingPathComponent:DYYY_CRASH_LOG_SUBDIR];
+    NSString *dir = [DYYYPaths logsDir]; // 调试类统一平铺 Logs/
     [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     return dir;
 }

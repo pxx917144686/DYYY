@@ -62,7 +62,7 @@ $(TWEAK_NAME)_FILES = DYYY.xm \
 $(TWEAK_NAME)_FILES += DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
 $(TWEAK_NAME)_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
 $(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
-$(TWEAK_NAME)_FILES += DYYYSelfTest.m DYYYCrashCatcher.m
+$(TWEAK_NAME)_FILES += DYYYSelfTest.m DYYYCrashCatcher.m DYYYPaths.m
 
 # Swift 源文件
 $(TWEAK_NAME)_FILES += DYYYSDKPatch.m

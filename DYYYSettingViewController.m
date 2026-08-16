@@ -13,6 +13,7 @@
 #import "DYYYSwitchManager.h"
 #import "DYYYABTestHook.h"
 #import "DYYYSelfTest.h"
+#import "DYYYPaths.h"
 
 @interface UISwitch (DYYY_FuturisticEffects)
 - (void)applyFuturisticEffects;
@@ -1289,7 +1290,7 @@ NSDictionary *getCurrentABTestData(void) {
 
     // 备份图标文件
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
     NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.gif" ];
 
@@ -1407,7 +1408,7 @@ NSDictionary *getCurrentABTestData(void) {
         NSDictionary *iconBase64Dict = dyyySettings[@"DYYYIconsBase64"];
         if (iconBase64Dict && [iconBase64Dict isKindOfClass:[NSDictionary class]]) {
             NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-            NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+            NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
             // 确保DYYY文件夹存在
             if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {
@@ -1598,7 +1599,7 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (NSString *)saveCustomAlbumImage:(UIImage *)image {
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolder = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolder = [DYYYPaths iconsDir];
     
     NSError *error;
     [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolder 
@@ -2012,7 +2013,7 @@ NSDictionary *getCurrentABTestData(void) {
         }
         if (saveFilename) {
             NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-            NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+            NSString *dyyyFolderPath = [DYYYPaths iconsDir];
             NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
             BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
             UIButton *iconButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -2227,7 +2228,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     if (saveFilename) {
         NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+        NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
         BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
@@ -2248,7 +2249,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     // 保存到文档目录
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_config.json"];
     
     NSError *error;
@@ -2311,7 +2312,7 @@ NSDictionary *getCurrentABTestData(void) {
 - (void)deleteABTestConfigFile {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths firstObject];
-    NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -2718,7 +2719,7 @@ NSDictionary *getCurrentABTestData(void) {
     if (saveFilename) {
         // 获取图标路径
         NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+        NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
         // 检查是否已有自定义图标
@@ -2736,7 +2737,7 @@ NSDictionary *getCurrentABTestData(void) {
     
     // 确保DYYY文件夹存在
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyFolderPath = [DYYYPaths iconsDir];
     NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {

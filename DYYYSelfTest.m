@@ -7,6 +7,7 @@
 #import "DYYYScreenshot.h"
 #import "DYYYFloatSpeedButton.h"
 #import "DYYYCrashCatcher.h"
+#import "DYYYPaths.h"
 #ifndef DYYY_RELEASE_BUILD
 #import "FLEX/x/Decrypt/DYYYDatabaseManager.h"
 #endif
@@ -266,18 +267,18 @@ static DYYYSelfTestResult *DYYYTestABTest(void) {
 
 // 14. 文件系统
 static DYYYSelfTestResult *DYYYTestFileSystem(void) {
-    NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *dyyyPath = [docPath stringByAppendingPathComponent:@"DYYY"];
+    NSString *dyyyPath = [DYYYPaths dyyyRootDir];
     NSError *err = nil;
     [[NSFileManager defaultManager] createDirectoryAtPath:dyyyPath withIntermediateDirectories:YES attributes:nil error:&err];
     if (err) {
         return DYYYMakeResult(@"文件系统", 2, [NSString stringWithFormat:@"创建 DYYY 目录失败: %@", err.localizedDescription]);
     }
-    NSString *probeFile = [dyyyPath stringByAppendingPathComponent:@".selftest"];
+    NSString *probeFile = [[DYYYPaths tempDir] stringByAppendingPathComponent:@".selftest"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:[DYYYPaths tempDir] withIntermediateDirectories:YES attributes:nil error:nil];
     BOOL writable = [@"ok" writeToFile:probeFile atomically:YES encoding:NSUTF8StringEncoding error:&err];
     [[NSFileManager defaultManager] removeItemAtPath:probeFile error:nil];
     if (writable) {
-        return DYYYMakeResult(@"文件系统", 0, @"Documents/DYYY 目录可读写");
+        return DYYYMakeResult(@"文件系统", 0, @"Documents/DYYY 分类目录可读写");
     }
     return DYYYMakeResult(@"文件系统", 2, [NSString stringWithFormat:@"目录不可写: %@", err.localizedDescription]);
 }
@@ -339,12 +340,10 @@ static DYYYSelfTestResult *DYYYTestNetwork(void) {
 // 17. 崩溃日志抓取
 static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
     NSArray<NSString *> *logs = [DYYYCrashCatcher savedLogFilePaths];
-    NSString *doc = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *dir = [doc stringByAppendingPathComponent:@"DYYY/CrashLogs"];
-    BOOL dirExists = [[NSFileManager defaultManager] fileExistsAtPath:dir];
+    BOOL dirExists = [[NSFileManager defaultManager] fileExistsAtPath:[DYYYPaths logsDir]];
     if (dirExists) {
         return DYYYMakeResult(@"崩溃日志抓取", 0,
-            [NSString stringWithFormat:@"已安装, 日志目录: DYYY/CrashLogs, 已有 %lu 份日志", (unsigned long)logs.count]);
+            [NSString stringWithFormat:@"已安装, 日志平铺于 DYYY/Logs(保留最近 3 份), 已有 %lu 份", (unsigned long)logs.count]);
     }
     return DYYYMakeResult(@"崩溃日志抓取", 2, @"日志目录未创建");
 }
