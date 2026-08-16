@@ -973,8 +973,13 @@ static void HookNSURLConnectionClassMethods(void) {
 static int (*orig_connect)(int, const struct sockaddr *, socklen_t);
 
 static int hooked_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+    // 开关关闭时直接透传，避免每次 TCP connect 做 inet_ntop + 字符串格式化
+    if (!URLInterceptEnabled()) {
+        return orig_connect ? orig_connect(sockfd, addr, addrlen) : connect(sockfd, addr, addrlen);
+    }
+
     NSString *target = SockAddrToString(addr);
-    if (target && URLInterceptEnabled()) {
+    if (target) {
 
         BOOL isDNSPort = NO;
         if (addr->sa_family == AF_INET) {
