@@ -372,6 +372,32 @@ static NSArray<NSString *> *DYYYDataTables(void) {
     return [self getSwitch:@"hanmiyaokaiguan" bundleID:bundleID defaultValue:[self getSwitch:@"zongkaiguan" bundleID:bundleID defaultValue:NO]];
 }
 
+- (BOOL)anyCaptureActiveForBundle:(NSString *)bundleID {
+    if (!bundleID) return NO;
+
+    static NSString *const kAnyActiveCacheKey = @"__anyCaptureActive__";
+    NSNumber *cached = nil;
+    @synchronized (self.switchCache) {
+        cached = self.switchCache[kAnyActiveCacheKey];
+    }
+    if (cached) return cached.boolValue;
+
+    BOOL active =
+        [self getSwitch:@"zongkaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"zhaiyaokaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"hanmiyaokaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"jiamisuanfakaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"ssl3kaiguan" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_encrypt" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_decrypt" bundleID:bundleID defaultValue:NO] ||
+        [self getSwitch:@"rsa_sign" bundleID:bundleID defaultValue:NO];
+
+    @synchronized (self.switchCache) {
+        self.switchCache[kAnyActiveCacheKey] = @(active);
+    }
+    return active;
+}
+
 - (void)insertLogText:(NSString *)logText {
     if (!logText) return;
 

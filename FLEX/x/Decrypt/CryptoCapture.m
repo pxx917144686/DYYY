@@ -459,10 +459,11 @@ CCCryptorStatus my_CCCryptorCreateWithMode(CCOperation op, CCMode mode, CCAlgori
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
+    BOOL captureActive = [db anyCaptureActiveForBundle:bundleID];
 
     CCCryptorStatus status = orig_CCCryptorCreateWithMode(op, mode, alg, padding, iv, key, keyLen,
                                                           tweak, tweakLen, numRounds, options, cryptorRef);
-    if (status == kCCSuccess && cryptorRef && *cryptorRef) {
+    if (captureActive && status == kCCSuccess && cryptorRef && *cryptorRef) {
         NSData *keyData = DataFromBytesSafe(key, keyLen);
         NSData *ivData = (iv && IVLength(alg)) ? DataFromBytesSafe(iv, IVLength(alg)) : [NSData data];
         NSMutableDictionary *ctx = [@{
@@ -512,9 +513,10 @@ CCCryptorStatus my_CCCryptorCreate(CCOperation op, CCAlgorithm alg, CCOptions op
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
+    BOOL captureActive = [db anyCaptureActiveForBundle:bundleID];
 
     CCCryptorStatus status = orig_CCCryptorCreate(op, alg, options, key, keyLength, iv, cryptorRef);
-    if (status == kCCSuccess && cryptorRef && *cryptorRef) {
+    if (captureActive && status == kCCSuccess && cryptorRef && *cryptorRef) {
         NSData *keyData = DataFromBytesSafe(key, keyLength);
         NSData *ivData = (iv && IVLength(alg)) ? DataFromBytesSafe(iv, IVLength(alg)) : [NSData data];
         NSMutableDictionary *ctx = [@{
@@ -561,11 +563,11 @@ CCCryptorStatus my_CCCryptorUpdate(CCCryptorRef cryptorRef,
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
-    NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
     CCCryptorStatus status = orig_CCCryptorUpdate(cryptorRef, dataIn, dataInLength, dataOut, dataOutAvailable, dataOutMoved);
 
     if (enabled) {
+        NSDictionary *ctx = GetCryptorContext(cryptorRef);
         size_t moved = (status == kCCSuccess && dataOutMoved) ? *dataOutMoved : 0;
         moved = MIN(moved, dataOutAvailable);
         BOOL isDecrypt = [ctx[@"op"] unsignedIntValue] == kCCDecrypt;
@@ -597,11 +599,11 @@ CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
-    NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
     CCCryptorStatus status = orig_CCCryptorFinal(cryptorRef, dataOut, dataOutAvailable, dataOutMoved);
 
     if (enabled) {
+        NSDictionary *ctx = GetCryptorContext(cryptorRef);
         size_t moved = (status == kCCSuccess && dataOutMoved) ? *dataOutMoved : 0;
         moved = MIN(moved, dataOutAvailable);
         BOOL isDecrypt = [ctx[@"op"] unsignedIntValue] == kCCDecrypt;
@@ -633,6 +635,8 @@ CCCryptorStatus my_CCCryptorFinal(CCCryptorRef cryptorRef,
             }
         }
     }
+    // Final 是加密操作终点，主动清理上下文，避免无 Release 场景泄漏
+    RemoveCryptorContext(cryptorRef);
     return status;
 }
 
@@ -1160,11 +1164,11 @@ CCCryptorStatus my_CCCryptorGCMUpdate(CCCryptorRef cryptorRef, const void *dataI
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
-    NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
     CCCryptorStatus status = orig_CCCryptorGCMUpdate(cryptorRef, dataIn, dataInLength, dataOut);
 
     if (enabled) {
+        NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
         if (ctx && [ctx isKindOfClass:[NSMutableDictionary class]]) {
             NSMutableDictionary *mctx = (NSMutableDictionary *)ctx;
@@ -1193,11 +1197,11 @@ CCCryptorStatus my_CCCryptorGCMFinal(CCCryptorRef cryptorRef, void *dataOut, voi
     NSString *bundleID = CurrentBundleID();
     DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
     BOOL enabled = [db isCryptoCaptureEnabledForBundle:bundleID];
-    NSDictionary *ctx = GetCryptorContext(cryptorRef);
 
     CCCryptorStatus status = orig_CCCryptorGCMFinal(cryptorRef, dataOut, tagOut, tagLength);
 
     if (enabled) {
+        NSDictionary *ctx = GetCryptorContext(cryptorRef);
         size_t tagLen = (status == kCCSuccess && tagLength) ? *tagLength : 0;
         BOOL isDecrypt = ctx ? ([ctx[@"op"] unsignedIntValue] == kCCDecrypt) : NO;
         NSString *tagHex = HexStringFromBytes(tagOut, tagLen);
@@ -1230,6 +1234,7 @@ CCCryptorStatus my_CCCryptorGCMFinal(CCCryptorRef cryptorRef, void *dataOut, voi
             }
         }
     }
+    RemoveCryptorContext(cryptorRef);
     return status;
 }
 

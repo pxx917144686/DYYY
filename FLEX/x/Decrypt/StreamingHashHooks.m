@@ -89,7 +89,13 @@ static NSString *PtrKey(const void *ptr) {
     return [NSString stringWithFormat:@"%p", ptr];
 }
 
+// 捕获开关全关时短路，避免每次 hash 调用累积数据/加锁/格式化
+static BOOL StreamingCaptureActive(void) {
+    return [[DYYYDatabaseManager sharedManager] anyCaptureActiveForBundle:CurrentBundleID()];
+}
+
 static void StoreHashCtx(const void *ctx, NSString *algo, NSUInteger digestLen) {
+    if (!StreamingCaptureActive()) return;
     @synchronized (HashCtxMap()) {
         HashCtxMap()[PtrKey(ctx)] = [@{
             @"algo": algo,
@@ -100,6 +106,7 @@ static void StoreHashCtx(const void *ctx, NSString *algo, NSUInteger digestLen) 
 }
 
 static void AppendHashCtx(const void *ctx, const void *data, size_t len) {
+    if (!StreamingCaptureActive()) return;
     @synchronized (HashCtxMap()) {
         NSMutableDictionary *entry = HashCtxMap()[PtrKey(ctx)];
         if (entry) {
@@ -110,6 +117,8 @@ static void AppendHashCtx(const void *ctx, const void *data, size_t len) {
 }
 
 static void FinalizeHashCtx(const void *ctx, const unsigned char *md) {
+    if (!StreamingCaptureActive()) return;
+
     NSMutableDictionary *entry = nil;
     @synchronized (HashCtxMap()) {
         entry = [HashCtxMap()[PtrKey(ctx)] mutableCopy];
@@ -145,11 +154,11 @@ static void FinalizeHashCtx(const void *ctx, const unsigned char *md) {
             [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
         }
         LOG(@"%@", info);
-    }
 
-    NSData *keyData = [NSData dataWithBytes:md length:digestLen];
-    IZXAddDecryptionKeyCandidate(keyData, [NSData data],
-                                  [NSString stringWithFormat:@"流式Hash %@ 派生密钥", algo]);
+        NSData *keyData = [NSData dataWithBytes:md length:digestLen];
+        IZXAddDecryptionKeyCandidate(keyData, [NSData data],
+                                      [NSString stringWithFormat:@"流式Hash %@ 派生密钥", algo]);
+    }
 }
 
 #pragma mark - HMAC 上下文追踪
@@ -162,6 +171,7 @@ static NSMutableDictionary *HMACCtxMap(void) {
 }
 
 static void StoreHMACCtx(const void *ctx, CCHmacAlgorithm algorithm, const void *key, size_t keyLen) {
+    if (!StreamingCaptureActive()) return;
     @synchronized (HMACCtxMap()) {
         HMACCtxMap()[PtrKey(ctx)] = [@{
             @"algo": HMACAlgoName(algorithm),
@@ -175,6 +185,7 @@ static void StoreHMACCtx(const void *ctx, CCHmacAlgorithm algorithm, const void 
 }
 
 static void AppendHMACCtx(const void *ctx, const void *data, size_t len) {
+    if (!StreamingCaptureActive()) return;
     @synchronized (HMACCtxMap()) {
         NSMutableDictionary *entry = HMACCtxMap()[PtrKey(ctx)];
         if (entry) {
@@ -185,6 +196,8 @@ static void AppendHMACCtx(const void *ctx, const void *data, size_t len) {
 }
 
 static void FinalizeHMACCtx(const void *ctx, void *macOut) {
+    if (!StreamingCaptureActive()) return;
+
     NSMutableDictionary *entry = nil;
     @synchronized (HMACCtxMap()) {
         entry = [HMACCtxMap()[PtrKey(ctx)] mutableCopy];
@@ -222,11 +235,11 @@ static void FinalizeHMACCtx(const void *ctx, void *macOut) {
             [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
         }
         LOG(@"%@", info);
-    }
 
-    NSData *keyData = [NSData dataWithBytes:macOut length:digestLen];
-    IZXAddDecryptionKeyCandidate(keyData, [NSData data],
-                                  [NSString stringWithFormat:@"流式HMAC %@ 派生密钥", algo]);
+        NSData *keyData = [NSData dataWithBytes:macOut length:digestLen];
+        IZXAddDecryptionKeyCandidate(keyData, [NSData data],
+                                      [NSString stringWithFormat:@"流式HMAC %@ 派生密钥", algo]);
+    }
 }
 
 #pragma mark - 原始函数指针
@@ -415,11 +428,12 @@ int my_CCDigest(uint32_t algorithm, const void *data, size_t dataLength, void *o
             [db insertDataIntoTable:@"jiamisuanfa" bundleID:bundleID text:info];
         }
         LOG(@"%@", info);
+
+        NSData *keyData = [NSData dataWithBytes:output length:digestLen];
+        IZXAddDecryptionKeyCandidate(keyData, [NSData data],
+                                      [NSString stringWithFormat:@"CCDigest %@ 派生密钥", algoName]);
     }
 
-    NSData *keyData = [NSData dataWithBytes:output length:digestLen];
-    IZXAddDecryptionKeyCandidate(keyData, [NSData data],
-                                  [NSString stringWithFormat:@"CCDigest %@ 派生密钥", algoName]);
     return result;
 }
 
