@@ -850,6 +850,11 @@ void showVideoStatsListController(UIViewController *parentVC) {
 
 
 // 字典数据源
+// 注意：NSDictionary 是 class cluster，多数实例(__NSDictionaryI 等)自带
+// objectForKey: 实现，本 hook 可能被绕过(零开销也零功能)。自检单元的
+// "Hook 生效性"项会做 IMP 一致性检测；若报告"疑似被 cluster 绕过"，
+// 社交统计的主路径仍由 AWEUserModel / AWEProfileSocialStatisticView
+// 精准 hook 承担，届时可评估移除本 hook。
 %hook NSDictionary
 - (id)objectForKey:(id)aKey {
     id originalValue = %orig;
