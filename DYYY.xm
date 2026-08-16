@@ -1848,13 +1848,13 @@ static void applyTopBarTransparency(UIView *topBar) {
 
 %new
 - (BOOL)contentFilter {
-	BOOL noAds = DYYYGetBool(@"DYYYNoAds");
-	BOOL skipLive = DYYYGetBool(@"DYYYisSkipLive");
-	BOOL skipHotSpot = DYYYGetBool(@"DYYYisSkipHotSpot");
-	BOOL skipPhoto = DYYYGetBool(@"DYYYSkipPhoto");
-	BOOL skipPhotoText = DYYYGetBool(@"DYYYSkipPhotoText");
-	BOOL skipMusic = DYYYGetBool(@"DYYYSkipMusic");
-	BOOL skipAIInteraction = DYYYGetBool(@"DYYYSkipAIInteraction");
+	BOOL noAds = DYYYCachedBool(@"DYYYNoAds");
+	BOOL skipLive = DYYYCachedBool(@"DYYYisSkipLive");
+	BOOL skipHotSpot = DYYYCachedBool(@"DYYYisSkipHotSpot");
+	BOOL skipPhoto = DYYYCachedBool(@"DYYYSkipPhoto");
+	BOOL skipPhotoText = DYYYCachedBool(@"DYYYSkipPhotoText");
+	BOOL skipMusic = DYYYCachedBool(@"DYYYSkipMusic");
+	BOOL skipAIInteraction = DYYYCachedBool(@"DYYYSkipAIInteraction");
 
 	// P2-4：广告检测改用 DYYYUtils 统一判定，覆盖 checkIsAd/isHardAd/isAds 等明确广告标记
 	BOOL shouldFilterAds = noAds && [DYYYUtils isAdvertisementAwemeModel:self];
@@ -1878,7 +1878,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 	BOOL shouldFilterUser = NO;
 
 	// 获取用户设置的需要过滤的关键词
-	NSString *filterKeywords = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYfilterKeywords"];
+	NSString *filterKeywords = DYYYCachedString(@"DYYYfilterKeywords");
 	NSArray *keywordsList = nil;
 
 	if (filterKeywords.length > 0) {
@@ -1886,7 +1886,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 	}
 
 	// 过滤包含指定拍同款的视频
-	NSString *filterProp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterProp"];
+	NSString *filterProp = DYYYCachedString(@"DYYYFilterProp");
 	NSArray *propKeywordsList = nil;
 
 	if (filterProp.length > 0) {
@@ -1894,7 +1894,7 @@ static void applyTopBarTransparency(UIView *topBar) {
 	}
 
 	// 获取需要过滤的用户列表
-	NSString *filterUsers = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYFilterUsers"];
+	NSString *filterUsers = DYYYCachedString(@"DYYYFilterUsers");
 
 	NSInteger filterLowLikesThreshold = [[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYfilterLowLikes"];
 
@@ -4250,6 +4250,26 @@ static Class tabBarButtonClass = nil;
 %hook AWEFeedVideoButton
 
 - (void)setImage:(id)arg1 {
+	static NSCache *iconCache = nil;
+	static NSDictionary *iconMapping = nil;
+	static NSString *dyyyFolderPath = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		iconCache = [[NSCache alloc] init];
+		iconMapping = @{
+			@"icon_home_like_after" : @"like_after.png",
+			@"icon_home_like_before" : @"like_before.png",
+			@"icon_home_comment" : @"comment.png",
+			@"icon_home_unfavorite" : @"unfavorite.png",
+			@"icon_home_favorite" : @"favorite.png",
+			@"iconHomeShareRight" : @"share.png"
+		};
+		NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+		dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+		// 目录创建移出热路径，仅首次执行一次
+		[[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
+	});
+
 	NSString *nameString = nil;
 
 	if ([self respondsToSelector:@selector(imageNameString)]) {
@@ -4260,20 +4280,6 @@ static Class tabBarButtonClass = nil;
 		%orig;
 		return;
 	}
-
-	NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-	NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
-
-	[[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
-
-	NSDictionary *iconMapping = @{
-		@"icon_home_like_after" : @"like_after.png",
-		@"icon_home_like_before" : @"like_before.png",
-		@"icon_home_comment" : @"comment.png",
-		@"icon_home_unfavorite" : @"unfavorite.png",
-		@"icon_home_favorite" : @"favorite.png",
-		@"iconHomeShareRight" : @"share.png"
-	};
 
 	NSString *customFileName = nil;
 	if ([nameString containsString:@"_comment"]) {
@@ -4294,6 +4300,13 @@ static Class tabBarButtonClass = nil;
 	}
 
 	if (customFileName) {
+		// 优先命中内存缓存，避免每次设图都做磁盘 IO + 主线程重采样
+		UIImage *cachedImage = [iconCache objectForKey:customFileName];
+		if (cachedImage) {
+			%orig(cachedImage);
+			return;
+		}
+
 		NSString *customImagePath = [dyyyFolderPath stringByAppendingPathComponent:customFileName];
 
 		if ([[NSFileManager defaultManager] fileExistsAtPath:customImagePath]) {
@@ -4313,6 +4326,7 @@ static Class tabBarButtonClass = nil;
 				UIGraphicsEndImageContext();
 
 				if (resizedImage) {
+					[iconCache setObject:resizedImage forKey:customFileName];
 					%orig(resizedImage);
 					return;
 				}
@@ -5577,25 +5591,29 @@ static CLLocationManager *locationManager = nil;
 	NSString *secondLine = @"";
 	
 	// 处理时间和日期显示
-	if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYShowDateTime"]) {
-		NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+	if (DYYYCachedBool(@"DYYYShowDateTime")) {
+		static NSDateFormatter *formatter = nil;
+		static dispatch_once_t formatterOnce;
+		dispatch_once(&formatterOnce, ^{
+			formatter = [[NSDateFormatter alloc] init];
+		});
 		
 		// 根据子开关决定日期格式
 		NSString *dateFormat = @"yyyy-MM-dd HH:mm"; // 默认格式
 		
-		if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMDHM"]) {
+		if (DYYYCachedBool(@"DYYYDateTimeFormat_YMDHM")) {
 			dateFormat = @"yyyy-MM-dd HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_MDHM"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_MDHM")) {
 			dateFormat = @"MM-dd HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HMS"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_HMS")) {
 			dateFormat = @"HH:mm:ss";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_HM"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_HM")) {
 			dateFormat = @"HH:mm";
-		} else if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYDateTimeFormat_YMD"]) {
+		} else if (DYYYCachedBool(@"DYYYDateTimeFormat_YMD")) {
 			dateFormat = @"yyyy-MM-dd";
 		} else {
 			// 检查是否有旧的格式设置
-			NSString *oldFormat = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYDateTimeFormat"];
+			NSString *oldFormat = DYYYCachedString(@"DYYYDateTimeFormat");
 			if (oldFormat && oldFormat.length > 0) {
 				dateFormat = oldFormat;
 			}

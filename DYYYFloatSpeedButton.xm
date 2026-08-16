@@ -106,16 +106,33 @@ void updateSpeedButtonUI() {
     [speedButton setTitle:formattedSpeed forState:UIControlStateNormal];
 }
 
-// 实现 findViewControllersInHierarchy 函数
-NSArray *findViewControllersInHierarchy(UIViewController *rootViewController) {
+// 递归遍历实现（无频控，供顶层函数调用）
+static NSArray *DYYYFindViewControllersRecursive(UIViewController *rootViewController) {
     NSMutableArray *viewControllers = [NSMutableArray array];
     [viewControllers addObject:rootViewController];
 
     for (UIViewController *childVC in rootViewController.childViewControllers) {
-        [viewControllers addObjectsFromArray:findViewControllersInHierarchy(childVC)];
+        [viewControllers addObjectsFromArray:DYYYFindViewControllersRecursive(childVC)];
     }
 
     return viewControllers;
+}
+
+// 实现 findViewControllersInHierarchy 函数（带频控：同一 root 0.5s 内复用结果）
+NSArray *findViewControllersInHierarchy(UIViewController *rootViewController) {
+    static NSArray *cachedResult = nil;
+    static UIViewController *cachedRoot = nil;
+    static NSTimeInterval lastCallTime = 0;
+    NSTimeInterval now = [[NSDate date] timeIntervalSinceReferenceDate];
+    if (cachedResult && cachedRoot == rootViewController && (now - lastCallTime) < 0.5) {
+        return cachedResult;
+    }
+
+    NSArray *result = DYYYFindViewControllersRecursive(rootViewController);
+    cachedResult = result;
+    cachedRoot = rootViewController;
+    lastCallTime = now;
+    return result;
 }
 
 // 应用倍速到当前视频的函数
@@ -326,7 +343,10 @@ void updateSpeedButtonVisibility() {
     self.transform = CGAffineTransformIdentity;
     self.alpha = 1.0;
 
-    [self setupGestureRecognizers];
+    // 幂等：手势已存在则跳过重建，避免每次布局都重建全部手势并重复 addTarget
+    if (self.gestureRecognizers.count == 0) {
+        [self setupGestureRecognizers];
+    }
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
@@ -664,9 +684,6 @@ void updateSpeedButtonVisibility() {
     }
     
     updateSpeedButtonVisibility();
-    
-    // 确保新视频也应用倍速
-    applyCurrentSpeedToVideo();
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
