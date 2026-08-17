@@ -29,7 +29,6 @@ extern NSDictionary *dyyySettings;
 
 // 添加备份选择器代理
 @interface DYYYBackupPickerDelegate : NSObject <UIDocumentPickerDelegate>
-@property (nonatomic, strong) NSString *tempFilePath;
 @property (nonatomic, copy) void (^completionBlock)(NSURL *url);
 @end
 
@@ -157,18 +156,6 @@ extern NSDictionary *dyyySettings;
         if (self.completionBlock) {
             self.completionBlock(urls.firstObject);
         }
-        
-        // 清理临时文件
-        if (self.tempFilePath) {
-            [[NSFileManager defaultManager] removeItemAtPath:self.tempFilePath error:nil];
-        }
-    }
-}
-
-- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
-    // 清理临时文件
-    if (self.tempFilePath) {
-        [[NSFileManager defaultManager] removeItemAtPath:self.tempFilePath error:nil];
     }
 }
 
@@ -436,6 +423,7 @@ NSDictionary *getCurrentABTestData(void) {
 
 
 @interface DYYYSettingViewController ()
+@property (nonatomic, assign) BOOL isExiting;
 @end
 
 @implementation DYYYSettingViewController
@@ -589,19 +577,13 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    self.isExiting = YES;
     
     self.isSearching = NO;
     self.searchBar.text = @"";
     self.filteredSections = nil;
     self.filteredSectionTitles = nil;
     [self.expandedSections removeAllObjects];
-    
-    if (self.tableView && [self.tableView numberOfSections] > 0) {
-        @try {
-            [self.tableView reloadData];
-        } @catch (NSException *exception) {
-        }
-    }
     
     if (self.isKVOAdded && self.tableView) {
         @try {
@@ -881,6 +863,7 @@ NSDictionary *getCurrentABTestData(void) {
 }
 
 - (void)setupSettingItems {
+    __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSArray *sections = @[
             // 第一部分 - 基本设置
@@ -1207,15 +1190,20 @@ NSDictionary *getCurrentABTestData(void) {
             ]
         ];
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.settingSections = sections;
-            self.filteredSections = sections;
-            self.filteredSectionTitles = [self.sectionTitles mutableCopy];
-            if (self.tableView) {
-                [self.tableView reloadData];
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || strongSelf.isExiting) {
+                return;
+            }
+
+            strongSelf.settingSections = sections;
+            strongSelf.filteredSections = sections;
+            strongSelf.filteredSectionTitles = [strongSelf.sectionTitles mutableCopy];
+            if (strongSelf.tableView) {
+                [strongSelf.tableView reloadData];
             }
             
             // 设置备份功能
-            [self setupBackupFunctions];
+            [strongSelf setupBackupFunctions];
         });
     });
 }
@@ -1289,15 +1277,14 @@ NSDictionary *getCurrentABTestData(void) {
     }
 
     // 备份图标文件
-    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [DYYYPaths iconsDir];
+    NSString *iconsFolderPath = [DYYYPaths iconsDir];
 
     NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"qingping.png" ];
 
     NSMutableDictionary *iconBase64Dict = [NSMutableDictionary dictionary];
 
     for (NSString *iconFileName in iconFileNames) {
-        NSString *iconPath = [dyyyFolderPath stringByAppendingPathComponent:iconFileName];
+        NSString *iconPath = [iconsFolderPath stringByAppendingPathComponent:iconFileName];
         if ([[NSFileManager defaultManager] fileExistsAtPath:iconPath]) {
             // 读取图片数据并转换为Base64
             NSData *imageData = [NSData dataWithContentsOfFile:iconPath];
@@ -1323,65 +1310,45 @@ NSDictionary *getCurrentABTestData(void) {
     }
 
     // 确保目录存在
-    if (![[NSFileManager defaultManager] fileExistsAtPath:dyyyFolderPath]) {
-        [[NSFileManager defaultManager] createDirectoryAtPath:dyyyFolderPath withIntermediateDirectories:YES attributes:nil error:nil];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *backupDir = [DYYYPaths backupDir];
+    NSError *directoryError = nil;
+    if (![fileManager fileExistsAtPath:backupDir]) {
+        [fileManager createDirectoryAtPath:backupDir withIntermediateDirectories:YES attributes:nil error:&directoryError];
+    }
+    if (directoryError) {
+        [DYYYManager showToast:[NSString stringWithFormat:@"备份失败：无法创建备份目录 %@", directoryError.localizedDescription]];
+        return;
     }
 
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setDateFormat:@"yyyyMMdd_HHmmss"];
     NSString *timestamp = [formatter stringFromDate:[NSDate date]];
     NSString *backupFileName = [NSString stringWithFormat:@"DYYY_Backup_%@.json", timestamp];
-    NSString *tempDir = NSTemporaryDirectory();
-    NSString *tempFilePath = [tempDir stringByAppendingPathComponent:backupFileName];
+    NSString *backupFilePath = [backupDir stringByAppendingPathComponent:backupFileName];
 
-    BOOL success = [jsonData writeToFile:tempFilePath atomically:YES];
+    BOOL success = [jsonData writeToFile:backupFilePath atomically:YES];
 
     if (!success) {
-        [DYYYManager showToast:@"备份失败：无法创建临时文件"];
+        [DYYYManager showToast:@"备份失败：无法写入备份文件"];
         return;
     }
 
-    // 创建文档选择器让用户选择保存位置
-    NSURL *tempFileURL = [NSURL fileURLWithPath:tempFilePath];
-    
-    // 使用正确的模式和文档类型
-    UIDocumentPickerViewController *documentPicker;
-    if (@available(iOS 11.0, *)) {
-        documentPicker = [[UIDocumentPickerViewController alloc] initWithURLs:@[tempFileURL] inMode:UIDocumentPickerModeExportToService];
-    } else {
-        documentPicker = [[UIDocumentPickerViewController alloc] initWithURL:tempFileURL inMode:UIDocumentPickerModeExportToService];
-    }
-
-    // 强引用代理对象
-    self.backupPickerDelegate = [[DYYYBackupPickerDelegate alloc] init];
-    self.backupPickerDelegate.tempFilePath = tempFilePath;
-    self.backupPickerDelegate.completionBlock = ^(NSURL *url) {
-        // 备份成功
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [DYYYManager showToast:@"备份成功"];
-        });
-    };
-
-    // 使用实例变量而非关联对象
-    documentPicker.delegate = self.backupPickerDelegate;
-
-    // iPad上的展示方式
-    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        documentPicker.popoverPresentationController.sourceView = self.view;
-        documentPicker.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, 
-                                                                           self.view.bounds.size.height / 2, 
-                                                                           0, 0);
-    }
-
-    // 修复：安全地呈现视图控制器
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self presentViewController:documentPicker animated:YES completion:nil];
-    });
+    [DYYYManager showToast:[NSString stringWithFormat:@"备份成功：%@", backupFileName]];
 }
 
 - (void)restoreSettings {
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json", @"public.text"] inMode:UIDocumentPickerModeImport];
     documentPicker.allowsMultipleSelection = NO;
+
+    NSString *backupDir = [DYYYPaths backupDir];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager fileExistsAtPath:backupDir]) {
+        [fileManager createDirectoryAtPath:backupDir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    if (@available(iOS 13.0, *)) {
+        documentPicker.directoryURL = [NSURL fileURLWithPath:backupDir isDirectory:YES];
+    }
 
     // 强引用代理对象
     self.restorePickerDelegate = [[DYYYBackupPickerDelegate alloc] init];
@@ -3456,6 +3423,13 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    if (self.tableView) {
+        self.tableView.delegate = nil;
+        self.tableView.dataSource = nil;
+    }
+    if (self.searchBar) {
+        self.searchBar.delegate = nil;
+    }
 }
 
 - (void)showScheduleStylePicker {

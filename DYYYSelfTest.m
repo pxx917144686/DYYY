@@ -395,9 +395,14 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray<DYYYSelfTestResult *> *results;
 @property (nonatomic, strong) UILabel *summaryLabel;
+@property (nonatomic, strong) UIProgressView *progressView;
+@property (nonatomic, strong) UIView *glassCardView;
+@property (nonatomic, strong) CAGradientLayer *liquidGradient;
 @property (nonatomic, assign) NSUInteger totalCount;
 @property (nonatomic, assign) NSUInteger runningIndex;
 @property (nonatomic, assign) BOOL finished;
+@property (nonatomic, assign) BOOL refreshScheduled;
+@property (atomic, assign) BOOL isExiting;
 @end
 
 @implementation DYYYSelfTestViewController
@@ -405,9 +410,12 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"自检中…";
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [UIColor clearColor];
+    self.isExiting = NO;
 
     self.results = [NSMutableArray array];
+
+    [self setupNavigationBarAppearance];
 
     UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                                                                                  target:self
@@ -417,29 +425,119 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
     UIBarButtonItem *copyButton = [[UIBarButtonItem alloc] initWithTitle:@"复制报告"
                                                                    style:UIBarButtonItemStylePlain
                                                                   target:self
-                                                                  action:@selector(copyReport)];
+                                                                   action:@selector(copyReport)];
     self.navigationItem.rightBarButtonItem = copyButton;
 
-    self.summaryLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
-    self.summaryLabel.textAlignment = NSTextAlignmentCenter;
-    self.summaryLabel.font = [UIFont systemFontOfSize:14];
-    self.summaryLabel.textColor = [UIColor secondaryLabelColor];
-    self.summaryLabel.text = @"开始自检…";
+    UIView *dimmingView = [[UIView alloc] initWithFrame:self.view.bounds];
+    dimmingView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    dimmingView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.18];
+    [self.view addSubview:dimmingView];
 
-    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
+    self.glassCardView = [[UIView alloc] initWithFrame:CGRectInset(self.view.bounds, 14, 14)];
+    self.glassCardView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.glassCardView.backgroundColor = [UIColor clearColor];
+    self.glassCardView.layer.cornerRadius = 22;
+    self.glassCardView.layer.masksToBounds = NO;
+    self.glassCardView.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.glassCardView.layer.shadowOffset = CGSizeMake(0, 10);
+    self.glassCardView.layer.shadowOpacity = 0.18;
+    self.glassCardView.layer.shadowRadius = 18;
+
+    UIVisualEffectView *glassBlurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial]];
+    glassBlurView.frame = self.glassCardView.bounds;
+    glassBlurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    glassBlurView.layer.cornerRadius = 22;
+    glassBlurView.clipsToBounds = YES;
+    [self.glassCardView addSubview:glassBlurView];
+
+    UIView *liquidOverlayView = [[UIView alloc] initWithFrame:glassBlurView.bounds];
+    liquidOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    liquidOverlayView.backgroundColor = [UIColor clearColor];
+    liquidOverlayView.userInteractionEnabled = NO;
+    self.liquidGradient = [CAGradientLayer layer];
+    CAGradientLayer *liquidGradient = self.liquidGradient;
+    liquidGradient.frame = liquidOverlayView.bounds;
+    liquidGradient.cornerRadius = 22;
+    liquidGradient.colors = @[(id)[[UIColor systemBlueColor] colorWithAlphaComponent:0.22].CGColor,
+                              (id)[UIColor clearColor].CGColor];
+    liquidGradient.startPoint = CGPointMake(0.0, 0.0);
+    liquidGradient.endPoint = CGPointMake(1.0, 1.0);
+    [liquidOverlayView.layer addSublayer:liquidGradient];
+    [glassBlurView.contentView insertSubview:liquidOverlayView atIndex:0];
+
+    self.tableView = [[UITableView alloc] initWithFrame:glassBlurView.contentView.bounds style:UITableViewStyleGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
-    self.tableView.tableHeaderView = self.summaryLabel;
+    self.tableView.backgroundColor = [UIColor clearColor];
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 60;
-    [self.view addSubview:self.tableView];
+    [glassBlurView.contentView addSubview:self.tableView];
+    [self.view addSubview:self.glassCardView];
+
+    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 82)];
+    headerView.backgroundColor = [UIColor clearColor];
+
+    self.summaryLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 14, headerView.bounds.size.width - 32, 24)];
+    self.summaryLabel.textAlignment = NSTextAlignmentCenter;
+    self.summaryLabel.font = [UIFont boldSystemFontOfSize:16];
+    self.summaryLabel.textColor = [UIColor labelColor];
+    self.summaryLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    self.summaryLabel.text = @"开始自检…";
+
+    self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
+    self.progressView.frame = CGRectMake(16, 46, headerView.bounds.size.width - 32, 4);
+    self.progressView.progress = 0.0;
+    self.progressView.tintColor = [UIColor systemBlueColor];
+    self.progressView.trackTintColor = [UIColor separatorColor];
+    self.progressView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [headerView addSubview:self.summaryLabel];
+    [headerView addSubview:self.progressView];
+    self.tableView.tableHeaderView = headerView;
 
     [self startTests];
 }
 
+- (void)setupNavigationBarAppearance {
+    if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithTransparentBackground];
+        appearance.backgroundEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
+        appearance.backgroundColor = [UIColor clearColor];
+        appearance.shadowColor = [UIColor clearColor];
+
+        UINavigationBar *navigationBar = self.navigationController.navigationBar;
+        navigationBar.standardAppearance = appearance;
+        navigationBar.scrollEdgeAppearance = appearance;
+        navigationBar.translucent = YES;
+        navigationBar.backgroundColor = [UIColor clearColor];
+        navigationBar.tintColor = [UIColor labelColor];
+        navigationBar.titleTextAttributes = @{NSForegroundColorAttributeName: [UIColor labelColor]};
+    }
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.liquidGradient) {
+        self.liquidGradient.frame = self.liquidGradient.superlayer.bounds;
+    }
+}
+
 - (void)closeTapped {
+    self.isExiting = YES;
+    self.finished = YES;
     [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    self.isExiting = YES;
+    self.finished = YES;
+}
+
+- (void)dealloc {
+    self.tableView.delegate = nil;
+    self.tableView.dataSource = nil;
 }
 
 - (void)copyReport {
@@ -455,6 +553,24 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
     }
     [UIPasteboard generalPasteboard].string = report;
     [DYYYManager showToast:@"自检报告已复制"];
+}
+
+- (void)scheduleTableRefresh {
+    if (self.isExiting || self.finished || self.refreshScheduled) {
+        return;
+    }
+    self.refreshScheduled = YES;
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf || strongSelf.isExiting) {
+            return;
+        }
+        strongSelf.refreshScheduled = NO;
+        if (!strongSelf.finished) {
+            [strongSelf.tableView reloadData];
+        }
+    });
 }
 
 - (void)startTests {
@@ -489,6 +605,10 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
     __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         for (NSUInteger i = 0; i < tests.count; i++) {
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || strongSelf.isExiting) {
+                break;
+            }
             DYYYSelfTestBlock test = (DYYYSelfTestBlock)tests[i];
             DYYYSelfTestResult *result = nil;
             @autoreleasepool {
@@ -503,20 +623,23 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
             }
             dispatch_async(dispatch_get_main_queue(), ^{
                 __strong typeof(weakSelf) strongSelf = weakSelf;
-                if (!strongSelf) return;
+                if (!strongSelf || strongSelf.isExiting || strongSelf.finished) return;
                 [strongSelf.results addObject:result];
                 strongSelf.runningIndex = i + 1;
-                strongSelf.title = [NSString stringWithFormat:@"自检中 %lu/%lu",
-                                    (unsigned long)strongSelf.runningIndex,
-                                    (unsigned long)strongSelf.totalCount];
-                [strongSelf.tableView reloadData];
+                strongSelf.summaryLabel.text = [NSString stringWithFormat:@"自检中 %lu/%lu",
+                                                (unsigned long)strongSelf.runningIndex,
+                                                (unsigned long)strongSelf.totalCount];
+                [strongSelf.progressView setProgress:(CGFloat)strongSelf.runningIndex / (CGFloat)strongSelf.totalCount
+                                            animated:YES];
+                [strongSelf scheduleTableRefresh];
             });
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
+            if (!strongSelf || strongSelf.isExiting || strongSelf.finished) return;
             strongSelf.finished = YES;
+            [strongSelf.progressView setProgress:1.0 animated:YES];
             NSUInteger pass = 0, warn = 0, fail = 0, info = 0;
             for (DYYYSelfTestResult *r in strongSelf.results) {
                 if (r.status == DYYYSelfTestStatusPass) pass++;
@@ -557,6 +680,8 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:identifier];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
+    cell.backgroundColor = [UIColor clearColor];
+    cell.contentView.backgroundColor = [UIColor clearColor];
 
     if (indexPath.row < self.results.count) {
         DYYYSelfTestResult *result = self.results[indexPath.row];
@@ -586,7 +711,8 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
 + (void)presentFromViewController:(UIViewController *)viewController {
     DYYYSelfTestViewController *testVC = [[DYYYSelfTestViewController alloc] init];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:testVC];
-    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    nav.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    nav.view.backgroundColor = [UIColor clearColor];
     [viewController presentViewController:nav animated:YES completion:nil];
 }
 
