@@ -50,7 +50,6 @@ typedef NS_ENUM(NSInteger, DYYYButtonSize) {
 @property (nonatomic, strong) UIView *avatarContainerView;
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *avatarTapLabel;
-@property (nonatomic, strong) DYYYBackupPickerDelegate *backupPickerDelegate;
 @property (nonatomic, strong) DYYYBackupPickerDelegate *restorePickerDelegate;
 
 // 添加热更新功能相关方法
