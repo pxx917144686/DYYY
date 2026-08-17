@@ -1340,6 +1340,15 @@ NSDictionary *getCurrentABTestData(void) {
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json", @"public.text"] inMode:UIDocumentPickerModeImport];
     documentPicker.allowsMultipleSelection = NO;
 
+    NSString *backupDir = [DYYYPaths backupDir];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager fileExistsAtPath:backupDir]) {
+        [fileManager createDirectoryAtPath:backupDir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    if (@available(iOS 13.0, *)) {
+        documentPicker.directoryURL = [NSURL fileURLWithPath:backupDir isDirectory:YES];
+    }
+
     // 强引用代理对象
     self.restorePickerDelegate = [[DYYYBackupPickerDelegate alloc] init];
     self.restorePickerDelegate.completionBlock = ^(NSURL *url) {
