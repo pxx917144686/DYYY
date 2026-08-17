@@ -423,6 +423,7 @@ NSDictionary *getCurrentABTestData(void) {
 
 
 @interface DYYYSettingViewController ()
+@property (nonatomic, assign) BOOL isExiting;
 @end
 
 @implementation DYYYSettingViewController
@@ -576,19 +577,13 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    self.isExiting = YES;
     
     self.isSearching = NO;
     self.searchBar.text = @"";
     self.filteredSections = nil;
     self.filteredSectionTitles = nil;
     [self.expandedSections removeAllObjects];
-    
-    if (self.tableView && [self.tableView numberOfSections] > 0) {
-        @try {
-            [self.tableView reloadData];
-        } @catch (NSException *exception) {
-        }
-    }
     
     if (self.isKVOAdded && self.tableView) {
         @try {
@@ -868,6 +863,7 @@ NSDictionary *getCurrentABTestData(void) {
 }
 
 - (void)setupSettingItems {
+    __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSArray *sections = @[
             // 第一部分 - 基本设置
@@ -1194,15 +1190,20 @@ NSDictionary *getCurrentABTestData(void) {
             ]
         ];
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.settingSections = sections;
-            self.filteredSections = sections;
-            self.filteredSectionTitles = [self.sectionTitles mutableCopy];
-            if (self.tableView) {
-                [self.tableView reloadData];
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || strongSelf.isExiting) {
+                return;
+            }
+
+            strongSelf.settingSections = sections;
+            strongSelf.filteredSections = sections;
+            strongSelf.filteredSectionTitles = [strongSelf.sectionTitles mutableCopy];
+            if (strongSelf.tableView) {
+                [strongSelf.tableView reloadData];
             }
             
             // 设置备份功能
-            [self setupBackupFunctions];
+            [strongSelf setupBackupFunctions];
         });
     });
 }
@@ -3422,6 +3423,13 @@ NSDictionary *getCurrentABTestData(void) {
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    if (self.tableView) {
+        self.tableView.delegate = nil;
+        self.tableView.dataSource = nil;
+    }
+    if (self.searchBar) {
+        self.searchBar.delegate = nil;
+    }
 }
 
 - (void)showScheduleStylePicker {
