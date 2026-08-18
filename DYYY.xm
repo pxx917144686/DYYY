@@ -1198,18 +1198,9 @@ static void DYYYHandleCurrentSpeedAwemeChanged(id aweme) {
 %end
 
 
-// findViewControllerFromView 单元素缓存：同一视图连续布局时避免反复沿 responder 链遍历
-// view 与 VC 均用 weak：视图释放自动失效，避免 static 强引用阻止视图释放
+// findViewControllerFromView 直接查询：静态 weak 缓存会在对象 dealloc 时触发 objc_storeWeak 致命崩溃
 static UIViewController *DYYYFindVCWithCache(UIView *view) {
-    static __weak UIView *gLastQueriedView = nil;
-    static __weak UIViewController *gLastQueriedVC = nil;
-    if (view == gLastQueriedView && gLastQueriedVC) {
-        return gLastQueriedVC;
-    }
-    UIViewController *vc = [DYYYUtils findViewControllerFromView:view];
-    gLastQueriedView = view;
-    gLastQueriedVC = vc;
-    return vc;
+    return [DYYYUtils findViewControllerFromView:view];
 }
 
 %hook UIView
@@ -1259,15 +1250,16 @@ static UIViewController *DYYYFindVCWithCache(UIView *view) {
 }
 
 - (void)setAlpha:(CGFloat)alpha {
-    UIViewController *vc = DYYYFindVCWithCache(self);
-    
-    if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
+    if (alpha > 0) {
         NSString *transparentValue = DYYYCachedString(@"DYYYGlobalTransparency");
         if (transparentValue.length > 0) {
             CGFloat alphaValue = transparentValue.floatValue;
             if (alphaValue >= 0.0 && alphaValue <= 1.0) {
-                %orig(alphaValue);
-                return;
+                UIViewController *vc = DYYYFindVCWithCache(self);
+                if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
+                    %orig(alphaValue);
+                    return;
+                }
             }
         }
     }
