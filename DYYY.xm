@@ -1250,15 +1250,16 @@ static UIViewController *DYYYFindVCWithCache(UIView *view) {
 }
 
 - (void)setAlpha:(CGFloat)alpha {
-    UIViewController *vc = DYYYFindVCWithCache(self);
-    
-    if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)] && alpha > 0) {
+    if (alpha > 0) {
         NSString *transparentValue = DYYYCachedString(@"DYYYGlobalTransparency");
         if (transparentValue.length > 0) {
             CGFloat alphaValue = transparentValue.floatValue;
             if (alphaValue >= 0.0 && alphaValue <= 1.0) {
-                %orig(alphaValue);
-                return;
+                UIViewController *vc = DYYYFindVCWithCache(self);
+                if ([vc isKindOfClass:%c(AWEPlayInteractionViewController)]) {
+                    %orig(alphaValue);
+                    return;
+                }
             }
         }
     }
