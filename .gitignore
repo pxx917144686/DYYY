@@ -1,0 +1,6 @@
+/.theos/
+/.module-cache/
+/*.dylib
+/*.deb
+/.DS_Store
+/Sources/.DS_Store
