@@ -14,6 +14,9 @@
 	if (DYYYFullScreenCommentOriginalLayoutActive()) {
 		return;
 	}
+	if (DYYYViewControllerChainLooksLikeChat(self)) {
+		return;
+	}
 	// 检查是否启用了全屏模式
 	if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
 		UIView *contentView = self.contentView;
@@ -63,6 +66,9 @@
 - (void)viewDidLayoutSubviews {
     %orig;
     if (DYYYFullScreenCommentOriginalLayoutActive()) {
+        return;
+    }
+    if (DYYYViewControllerChainLooksLikeChat(self)) {
         return;
     }
     if (DYYYCachedBool(@"DYYYisEnableFullScreen")) {
@@ -183,6 +189,12 @@ static void DYYYCollectSubviewsOfClasses(UIView *view, Class classA, Class class
 
     // 评论打开且为 16:9 时交给抖音原生布局，关闭后恢复全屏调整
     if (DYYYFullScreenCommentOriginalLayoutActive()) {
+        return;
+    }
+
+    // 私信共享视频底部由抖音的快捷回复控制器占位；继续执行首页全屏高度改写
+    // 会把播放器/交互层扩到整页，而快捷回复仍贴底，二者之间就会留下空行。
+    if (DYYYViewControllerChainLooksLikeChat(self)) {
         return;
     }
 

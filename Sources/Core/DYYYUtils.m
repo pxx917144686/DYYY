@@ -215,7 +215,7 @@ BOOL DYYYViewControllerChainLooksLikeChat(UIViewController *vc) {
     static NSSet<NSString *> *markers;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        markers = [NSSet setWithObjects:@"Chat", @"Conversation", @"IMDetail", nil];
+        markers = [NSSet setWithObjects:@"Chat", @"Conversation", @"IMDetail", @"QuickReplay", nil];
     });
     for (int i = 0; vc && i < 12; i++) {
         NSString *name = NSStringFromClass(vc.class);

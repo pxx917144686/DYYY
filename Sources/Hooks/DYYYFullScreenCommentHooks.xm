@@ -164,6 +164,10 @@ static UIViewController *DYYYFindVCWithCache(UIView *view) {
     }
 
     UIViewController *vc = DYYYFindVCWithCache(self);
+    if (DYYYViewControllerChainLooksLikeChat(vc)) {
+        %orig(frame);
+        return;
+    }
     Class PlayVCClass1 = %c(AWEAwemePlayVideoViewController);
     Class PlayVCClass2 = NSClassFromString(@"AWEDPlayerFeedPlayerViewController");
     Class PlayVCClass3 = NSClassFromString(@"AWEDPlayerViewController_Merge");
@@ -325,7 +329,8 @@ static UIViewController *DYYYFindVCWithCache(UIView *view) {
 %hook AWEAwemeDetailTableView
 
 - (void)setFrame:(CGRect)frame {
-	if (DYYYFullScreenCommentOriginalLayoutActive()) {
+	UIViewController *vc = [DYYYUtils findViewControllerFromView:self];
+	if (DYYYFullScreenCommentOriginalLayoutActive() || DYYYViewControllerChainLooksLikeChat(vc)) {
 		%orig(frame);
 		return;
 	}
