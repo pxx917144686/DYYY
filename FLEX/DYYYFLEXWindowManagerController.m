@@ -47,12 +47,13 @@
 - (void)reloadData {
     self.keyWindow = UIApplication.sharedApplication.keyWindow;
     self.windows = UIApplication.sharedApplication.windows;
-    self.keyWindowSubtitle = self.windowSubtitles[[self.windows indexOfObject:self.keyWindow]];
     self.windowSubtitles = [self.windows flex_mapped:^id(UIWindow *window, NSUInteger idx) {
         return [NSString stringWithFormat:@"层级: %@ — 根控制器: %@",
             @(window.windowLevel), window.rootViewController
         ];
     }];
+    NSUInteger keyWindowIndex = [self.windows indexOfObject:self.keyWindow];
+    self.keyWindowSubtitle = keyWindowIndex == NSNotFound ? @"" : self.windowSubtitles[keyWindowIndex];
     
     if (@available(iOS 13, *)) {
         self.scenes = UIApplication.sharedApplication.connectedScenes.allObjects;
@@ -186,10 +187,7 @@
     }
     
     cell.textLabel.text = window.description;
-    cell.detailTextLabel.text = [NSString
-        stringWithFormat:@"层级: %@ — 根控制器: %@",
-        @((NSInteger)window.windowLevel), window.rootViewController.class
-    ];
+    cell.detailTextLabel.text = subtitle;
     
     return cell;
 }

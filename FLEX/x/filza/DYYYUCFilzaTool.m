@@ -1671,48 +1671,6 @@ static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaMachOSegments(voi
     return list.copy;
 }
 
-static NSArray<NSDictionary<NSString *, NSString *> *> *UCFilzaMachOSectionsForSegment(NSString *segName) {
-    NSMutableArray *list = [NSMutableArray array];
-    NSString *executable = NSBundle.mainBundle.executablePath;
-    if (!executable) return list.copy;
-    NSData *data = [NSData dataWithContentsOfFile:executable options:NSDataReadingMappedIfSafe error:nil];
-    if (!data || data.length < sizeof(struct mach_header_64)) return list.copy;
-    const struct mach_header_64 *hdr = (const struct mach_header_64 *)data.bytes;
-    if (hdr->magic != MH_MAGIC_64) return list.copy;
-    const uint8_t *cmds = (const uint8_t *)(hdr + 1);
-    uint32_t offset = 0;
-    for (uint32_t i = 0; i < hdr->ncmds; i++) {
-        if ((uint64_t)offset + sizeof(struct load_command) > data.length - sizeof(struct mach_header_64)) break;  // 边界检查修正：offset 相对 cmds(hdr+1)
-        const struct load_command *lc = (const struct load_command *)(cmds + offset);
-        if (lc->cmdsize == 0) break;
-        if (lc->cmd == LC_SEGMENT_64) {
-            // 验证可完整读取 segment_command_64（72字节），避免越界
-            if ((uint64_t)offset + sizeof(struct segment_command_64) > data.length - sizeof(struct mach_header_64)) break;
-            const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
-            char curSegName[17] = {0};
-            strncpy(curSegName, seg->segname, 16);
-            NSString *curSeg = [NSString stringWithUTF8String:curSegName];
-            if ([curSeg isEqualToString:segName]) {
-                // 验证 sections 数组完整可读，防止 nsects 越界
-                if ((uint8_t *)(seg + 1) + (uint64_t)seg->nsects * sizeof(struct section_64) > (uint8_t *)data.bytes + data.length) break;
-                const struct section_64 *sect = (const struct section_64 *)(seg + 1);
-                for (uint32_t j = 0; j < seg->nsects; j++) {
-                    char sectName[17] = {0};
-                    strncpy(sectName, sect[j].sectname, 16);
-                    [list addObject:@{
-                        @"title": [NSString stringWithUTF8String:sectName],
-                        @"subtitle": [NSString stringWithFormat:@"addr: 0x%016llx | size: %llu | offset: %u | align: %u",
-                                       sect[j].addr, sect[j].size, sect[j].offset, 1 << sect[j].align]
-                    }];
-                }
-                break;
-            }
-        }
-        offset += lc->cmdsize;
-    }
-    return list.copy;
-}
-
 typedef NS_ENUM(NSInteger, UCFilzaAppInfoSection) {
     UCFilzaAppInfoSectionBasic = 0,
     UCFilzaAppInfoSectionPaths,

@@ -632,7 +632,6 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
 
     NSDictionary *item = self.filteredItems[indexPath.row];
     NSString *text = item[@"longText"] ?: @"";
-    NSString *time = item[@"timestamp"] ?: @"";
 
     cell.textLabel.text = [self firstLineOfText:text];
     cell.textLabel.font = [UIFont boldSystemFontOfSize:12];
@@ -1067,10 +1066,12 @@ typedef NS_ENUM(NSInteger, CaptureTab) {
         UIPageViewControllerNavigationDirectionReverse;
 
     UIViewController *vc = self.viewControllers[newIndex];
+    __weak typeof(self) weakSelf = self;
     [self.pageVC setViewControllers:@[vc]
                          direction:direction
                           animated:YES
                         completion:^(BOOL finished) {
+        __strong typeof(weakSelf) self = weakSelf;
         self.currentIndex = newIndex;
         [self updateRightBarButtonItems];
     }];

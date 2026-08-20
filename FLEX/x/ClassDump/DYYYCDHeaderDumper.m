@@ -722,7 +722,8 @@ static uint32_t _cachedImageCount = 0;
             NSUInteger batchSize = 20;
             __block NSUInteger idx = 0;
 
-            void (^__block processBatch)(void);
+            __block void (^processBatch)(void);
+            __weak __block void (^weakProcessBatch)(void);
             processBatch = ^{
                 NSUInteger end = MIN(idx + batchSize, classes.count);
 
@@ -764,15 +765,15 @@ static uint32_t _cachedImageCount = 0;
                 progress(p, [NSString stringWithFormat:@"%lu/%lu  %@", (unsigned long)done, (unsigned long)total, imageName]);
 
                 if (idx < classes.count) {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        processBatch();
-                    });
+                    void (^nextBatch)(void) = weakProcessBatch;
+                    if (nextBatch) dispatch_async(dispatch_get_main_queue(), nextBatch);
                 } else {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         processNextImage();
                     });
                 }
             };
+            weakProcessBatch = processBatch;
 
             processBatch();
         };

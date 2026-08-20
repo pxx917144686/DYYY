@@ -674,7 +674,7 @@ static void IZXSwizzleResumeSelector(SEL selector, Class cls) {
     method_exchangeImplementations(originalMethod, newResume);
 }
 
-static void HookTaskResume(void) {
+static void __attribute__((unused)) HookTaskResume(void) {
     Class baseResumeClass = IZXGetResumeBaseClass();
     if (!baseResumeClass) {
         NSLog(@"[URLIntercept] 无法找到 resume 基类, 跳过 resume hook");
@@ -689,7 +689,7 @@ static void HookTaskResume(void) {
 typedef void (^DataCompletion)(NSData *, NSURLResponse *, NSError *);
 typedef void (^DownloadCompletion)(NSURL *, NSURLResponse *, NSError *);
 
-static void HookSessionAsyncMethods(Class sessionClass) {
+static void __attribute__((unused)) HookSessionAsyncMethods(Class sessionClass) {
     if (!sessionClass) return;
 
     Class sharedClass = [NSURLSession.sharedSession class];
@@ -838,7 +838,7 @@ static void HookSessionAsyncMethods(Class sessionClass) {
     NSLog(@"[URLIntercept] Session async methods hooked on %@", NSStringFromClass(targetClass));
 }
 
-static void HookUploadMethods(Class sessionClass) {
+static void __attribute__((unused)) HookUploadMethods(Class sessionClass) {
     if (!sessionClass) return;
     Class sharedClass = [NSURLSession.sharedSession class];
     Class targetClass = IZXInstanceRespondsButDoesNotImplement(

@@ -27,9 +27,9 @@ ARCHS = arm64
 TARGET = iphone:clang:latest:15.0
 USE_SWIFT = 1
 
-# 关闭严格错误检查和警告
+# 严格 Logos 语法；编译警告保持可见，由 audit-strict 升级为错误。
 export DEBUG = 0
-export THEOS_STRICT_LOGOS = 0
+export THEOS_STRICT_LOGOS = 1
 export ERROR_ON_WARNINGS = 0
 export LOGOS_DEFAULT_GENERATOR = internal
 
@@ -47,25 +47,83 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = DYYY++
 
 # 源代码文件
-$(TWEAK_NAME)_FILES = DYYY.xm \
-            DYYYFloatSpeedButton.xm \
-            DYYYFloatClearButton.xm \
-            AWEPlayInteractionViewController.xm \
-            AWEModernLongPressPanelTableViewController.xm \
-            DYYYCityManager.m \
-            DYYYManager.m \
-            DYYYSettingViewController.m \
-            DYYYSwitchManager.m \
-            DYYYToast.m \
-            DYYYBottomAlertView.m \
-            DYYYUtils.m
-$(TWEAK_NAME)_FILES += DYYYABTestHook.xm DYYYScreenshot.m DYYYSocialStats.xm AWEPlayerPlayControlHandler.xm AFDPrivacyHalfScreenViewController.xm UITextField.xm AWEElementStackView.xm AWELeftSideBarViewController.xm AWEFeedProgressSlider.xm AWEPOIDetailUGCPhotosPreviewViewController.xm
-$(TWEAK_NAME)_FILES += DYYYConfirmCloseView.m DYYYCustomInputView.m DYYYFilterSettingsView.m DYYYKeywordListView.m DYYYPipPlayer.m
-$(TWEAK_NAME)_FILES += DYYYSystemVersionSpoof.xm
-$(TWEAK_NAME)_FILES += DYYYSelfTest.m DYYYCrashCatcher.m DYYYPaths.m
+$(TWEAK_NAME)_FILES = Sources/Hooks/DYYYMainSupport.mm \
+            Sources/Hooks/DYYYSpeedHooks.xm \
+            Sources/Hooks/DYYYSettingsGestureHooks.xm \
+            Sources/Hooks/DYYYStoryFeedHooks.xm \
+            Sources/Hooks/DYYYFullScreenCommentHooks.xm \
+            Sources/Hooks/DYYYCommentPanelHooks.xm \
+            Sources/Hooks/DYYYAdFilterHooks.xm \
+            Sources/Hooks/DYYYTabBarHooks.xm \
+            Sources/Hooks/DYYYFeedLayoutHooks.xm \
+            Sources/Hooks/DYYYLongPressPanelManagerHooks.xm \
+            Sources/Hooks/DYYYPlayerInteractionHooks.xm \
+            Sources/Hooks/DYYYCityTimestampHooks.xm \
+            Sources/Hooks/DYYYIncognitoServiceHooks.xm \
+            Sources/Hooks/DYYYAutoPlayHooks.xm \
+            Sources/Hooks/DYYYSystemUIHooks.xm \
+            Sources/Hooks/DYYYFeedHooks.xm \
+            Sources/Hooks/DYYYPlaybackHooks.xm \
+            Sources/Hooks/DYYYCommentHooks.xm \
+            Sources/Hooks/DYYYLiveHooks.xm \
+            Sources/Hooks/DYYYServiceHooks.xm \
+            Sources/Hooks/DYYYNavigationHooks.xm \
+            Sources/Core/DYYYTheme.m \
+            Sources/Core/DYYYGlass.m \
+            Sources/Core/DYYYUtils.m \
+            Sources/Core/DYYYUtilsConfig.m \
+            Sources/Core/DYYYUtilsTraversal.m \
+            Sources/Core/DYYYUtilsAdFilter.m \
+            Sources/Core/DYYYUtilsMedia.m \
+            Sources/Core/DYYYPaths.m \
+            Sources/Core/DYYYFishhook.c \
+            Sources/Core/DYYYSDKPatch.m \
+            Sources/Hooks/DYYYFloatSpeedButton.xm \
+            Sources/Hooks/DYYYFloatClearButton.xm \
+            Sources/Hooks/DYYYPlayInteractionDoubleTapHooks.xm \
+            Sources/Hooks/DYYYPlayInteractionMenuHooks.xm \
+            Sources/Hooks/DYYYPlayInteractionVisualHooks.xm \
+            Sources/Views/DYYYMenuComponents.m \
+            Sources/Hooks/DYYYLongPressPanelHooks.xm \
+            Sources/Hooks/DYYYLongPressPanelCellHooks.xm \
+            Sources/Hooks/DYYYLongPressPanelSupport.m \
+            Sources/Manager/DYYYCityManager.m \
+            Sources/Manager/DYYYCityManagerGeoData.m \
+            Sources/Manager/DYYYCityManagerAddress.m \
+            Sources/Manager/DYYYCityManagerSelector.m \
+            Sources/Manager/DYYYManager.m \
+            Sources/Manager/DYYYManagerUI.m \
+            Sources/Manager/DYYYManagerDownload.m \
+            Sources/Manager/DYYYManagerCompose.m \
+            Sources/Manager/DYYYManagerComment.m \
+            Sources/Manager/DYYYSwitchManager.m \
+            Sources/Manager/DYYYScreenshot.m \
+            Sources/Settings/DYYYSettingViewController.m \
+            Sources/Settings/DYYYSettingViewControllerAppearance.m \
+            Sources/Settings/DYYYSettingViewControllerBackup.m \
+            Sources/Settings/DYYYSettingViewControllerTable.m \
+            Sources/Settings/DYYYSettingViewControllerPresentation.m \
+            Sources/Settings/DYYYSettingViewControllerActions.m \
+            Sources/Settings/DYYYSettingItem.m \
+            Sources/Settings/DYYYSettingSectionProvider.m \
+            Sources/Settings/DYYYSettingUIComponents.m \
+            Sources/Views/DYYYToast.m \
+            Sources/Views/DYYYBottomAlertView.m \
+            Sources/Views/DYYYConfirmCloseView.m \
+            Sources/Views/DYYYCustomInputView.m \
+            Sources/Views/DYYYFilterSettingsView.m \
+            Sources/Views/DYYYKeywordListView.m \
+            Sources/Views/DYYYPipContainerView.m \
+            Sources/Views/DYYYPipManager.m \
+            Sources/Diagnostics/DYYYSelfTest.m \
+            Sources/Diagnostics/DYYYCrashCatcher.m
+$(TWEAK_NAME)_FILES += Sources/Hooks/DYYYABTestHook.xm Sources/Hooks/DYYYSocialStatsHooks.xm Sources/Hooks/DYYYVideoStatsHooks.xm Sources/Hooks/DYYYVideoStatsMenu.mm Sources/Hooks/DYYYVideoStatsEditor.mm Sources/Hooks/AWEPlayerPlayControlHandler.xm Sources/Hooks/AFDPrivacyHalfScreenViewController.xm Sources/Hooks/UITextField.xm Sources/Hooks/AWEElementStackView.xm Sources/Hooks/AWELeftSideBarViewController.xm Sources/Hooks/AWEFeedProgressSlider.xm Sources/Hooks/AWEPOIDetailUGCPhotosPreviewViewController.xm
+$(TWEAK_NAME)_FILES += Sources/Hooks/DYYYSystemVersionSpoof.xm
 
-# Swift 源文件
-$(TWEAK_NAME)_FILES += DYYYSDKPatch.m
+# DYYY 内联玻璃、音频与评论体验模块
+$(TWEAK_NAME)_FILES += Sources/Features/DYYYCommentGlass.xm Sources/Features/DYYYCommentDanmaku.xm Sources/Features/DYYYCommentBottomBar.xm Sources/Features/DYYYCommentMediaCleaner.xm
+$(TWEAK_NAME)_FILES += Sources/Features/DYYYSharePanelGlass.xm Sources/Features/DYYYInnerNotificationGlass.xm Sources/Features/DYYYGlassTabBar.xm Sources/Features/DYYYAudioVisualizer.xm Sources/Features/DYYYDetailBottomBar.xm
+$(TWEAK_NAME)_FILES += Sources/Audio/DYYYAudioTap.mm Sources/Audio/DYYYAudioReport.mm Sources/Audio/DYYYAudioAnalysis.mm
 
 # ===== 发布版 / 调试版开关 =====
 # make            调试版（默认）：主功能 + FLEX + Capstone 反汇编 + 逆向助手 + 一键自检，dylib 约 14.6MB
@@ -84,7 +142,7 @@ $(TWEAK_NAME)_FILES += $(CAPSTONE_CORE) $(CAPSTONE_ARM) $(CAPSTONE_ARM64)
 endif
 
 # 编译标志
-$(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
+$(TWEAK_NAME)_CFLAGS = -fobjc-arc
 # 发布版宏（必须在基础 CFLAGS 赋值之后追加，否则被覆盖）
 ifeq ($(DYYY_RELEASE),1)
 $(TWEAK_NAME)_CFLAGS += -DDYYY_RELEASE_BUILD=1
@@ -100,30 +158,43 @@ $(TWEAK_NAME)_CFLAGS += -DCAPSTONE_HAS_ARM -DCAPSTONE_HAS_AARCH64 -DCAPSTONE_USE
 $(TWEAK_NAME)_LOGOS_DEFAULT_GENERATOR = internal
 
 # 框架
-$(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage SwiftUI Combine
+$(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage SwiftUI Combine AudioToolbox AVFAudio AVFoundation CoreMedia MediaToolbox Accelerate
 # 链接器标志，解决class_ro_t指针签名警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_adhoc_codesign -Xlinker -objc_abi_version -Xlinker 2
 # 统一class_ro_t指针签名设置，解决链接警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_warn_duplicate_libraries
-# 抑制class_ro_t指针签名不一致警告
-$(TWEAK_NAME)_LDFLAGS += -Wl,-w
-
 # FLEX 库和头文件路径
 $(TWEAK_NAME)_LIBRARIES = 
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS)/include
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Core
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Hooks
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Manager
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Settings
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Audio
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Views
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Features
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Diagnostics
+$(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/Sources/Headers
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
 $(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -fno-modules
 $(TWEAK_NAME)_CCFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
 
-# 编译标志
-$(TWEAK_NAME)_CFLAGS += -Wno-everything
+# 仅保留已知私有类 category/protocol 声明所需的定向抑制。
 $(TWEAK_NAME)_CFLAGS += -Wno-incomplete-implementation
 $(TWEAK_NAME)_CFLAGS += -Wno-protocol
+$(TWEAK_NAME)_CFLAGS += -Wno-objc-protocol-method-implementation
 
 # 预处理变量
 $(TWEAK_NAME)_CFLAGS += -DDOKIT_FULL_BUILD=1
 $(TWEAK_NAME)_CFLAGS += -DDORAEMON_FULL_BUILD=1
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+
+.PHONY: audit-hooks audit-strict
+audit-hooks:
+	@python3 scripts/check_hook_invariants.py
+
+audit-strict: ERROR_ON_WARNINGS = 1
+audit-strict: audit-hooks all

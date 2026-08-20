@@ -1,10 +1,10 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-// iOS版本检查宏
-#define FLEX_AT_LEAST_IOS11 (@available(iOS 11.0, *))
-#define FLEX_AT_LEAST_IOS13 (@available(iOS 13.0, *))
-#define FLEX_AT_LEAST_IOS14 (@available(iOS 14.0, *))
+// 项目最低支持 iOS 15；使用编译期常量，避免把 @available 放进三元表达式。
+#define FLEX_AT_LEAST_IOS11 1
+#define FLEX_AT_LEAST_IOS13 1
+#define FLEX_AT_LEAST_IOS14 1
 
 // 系统颜色兼容性宏
 #define FLEXSystemBackgroundColor \

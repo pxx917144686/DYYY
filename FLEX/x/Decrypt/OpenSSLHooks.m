@@ -113,13 +113,6 @@ static void UpdateEVPCtx(const void *ctx, const void *cipher, const unsigned cha
     }
 }
 
-static NSMutableDictionary *GetEVPCtx(const void *ctx) {
-    if (!EVPCaptureActive()) return nil;
-    @synchronized (EVPCtxMap()) {
-        return EVPCtxMap()[PtrKey(ctx)];
-    }
-}
-
 static void AppendEVPIO(const void *ctx, const void *dataIn, size_t inLen, const void *dataOut, size_t outLen) {
     if (!EVPCaptureActive()) return;
     @synchronized (EVPCtxMap()) {

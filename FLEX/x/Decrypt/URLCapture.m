@@ -592,37 +592,6 @@ static id HookedSessionInit(id self, SEL command, NSURLSessionConfiguration *con
     return original(self, command, configuration, delegate, queue);
 }
 
-static void HookAllSessionSubclasses(void) {
-    // 遍历所有类，寻找 NSURLSession 的子类
-    int numClasses = objc_getClassList(NULL, 0);
-    if (numClasses <= 0) return;
-    
-    Class *classes = (Class *)malloc(sizeof(Class) * numClasses);
-    if (!classes) return;
-    
-    numClasses = objc_getClassList(classes, numClasses);
-    Class baseClass = [NSURLSession class];
-    
-    for (int i = 0; i < numClasses; i++) {
-        Class cls = classes[i];
-        Class superCls = class_getSuperclass(cls);
-        
-        // 检查是否是 NSURLSession 的子类（但不是 NSURLSession 本身）
-        while (superCls) {
-            if (superCls == baseClass) {
-                HookMethod(cls, @selector(dataTaskWithRequest:completionHandler:),
-                           (IMP)HookedDataTaskWithRequest, &kRequestTaskOriginalKey, NULL, YES);
-                HookMethod(cls, @selector(dataTaskWithURL:completionHandler:),
-                           (IMP)HookedDataTaskWithURL, &kURLTaskOriginalKey, NULL, YES);
-                break;
-            }
-            superCls = class_getSuperclass(superCls);
-        }
-    }
-    
-    free(classes);
-}
-
 static void HookNSURLSessionClass(Class cls) {
     HookMethod(cls, @selector(dataTaskWithRequest:completionHandler:),
                (IMP)HookedDataTaskWithRequest, &kRequestTaskOriginalKey, NULL, YES);

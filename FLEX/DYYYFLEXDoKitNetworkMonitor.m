@@ -450,7 +450,6 @@ static const void *kFLEXDoKitOriginalRequestKey = &kFLEXDoKitOriginalRequestKey;
     };
     
     // 调用原始方法
-    SEL originalSelector = @selector(dataTaskWithRequest:completionHandler:);
     SEL swizzledSelector = NSSelectorFromString(@"flexdokit_dataTaskWithRequest:completionHandler:");
     
     NSURLSessionDataTask * (*originalIMP)(id, SEL, NSURLRequest *, void (^)(NSData *, NSURLResponse *, NSError *)) = 
@@ -486,7 +485,6 @@ static const void *kFLEXDoKitOriginalRequestKey = &kFLEXDoKitOriginalRequestKey;
     };
     
     // 调用原始方法
-    SEL originalSelector = @selector(uploadTaskWithRequest:fromData:completionHandler:);
     SEL swizzledSelector = NSSelectorFromString(@"flexdokit_uploadTaskWithRequest:fromData:completionHandler:");
     
     NSURLSessionUploadTask * (*originalIMP)(id, SEL, NSURLRequest *, NSData *, void (^)(NSData *, NSURLResponse *, NSError *)) = 
