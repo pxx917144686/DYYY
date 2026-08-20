@@ -147,8 +147,6 @@
     }
     
     @try {
-        // 获取屏幕缩放比例
-        CGFloat screenScale = [UIScreen mainScreen].scale;
         CGFloat imageScale = image.scale;
         
         // 确保裁剪区域在图像范围内
@@ -307,7 +305,7 @@ UIWindow * _Nullable DYYY_findKeyWindow() {
             }
         }
         
-        if (!keyWindow && @available(iOS 13.0, *)) {
+        if (!keyWindow) {
             for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
                 if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState == UISceneActivationStateForegroundActive) {
                     UIWindowScene *windowScene = (UIWindowScene *)scene;

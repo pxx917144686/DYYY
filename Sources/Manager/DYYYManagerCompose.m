@@ -792,7 +792,7 @@
     void *pxdata = CVPixelBufferGetBaseAddress(pixelBuffer);
     
     CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(pxdata, videoSize.width, videoSize.height, 8, CVPixelBufferGetBytesPerRow(pixelBuffer), rgbColorSpace, kCGImageAlphaPremultipliedFirst);
+    CGContextRef context = CGBitmapContextCreate(pxdata, videoSize.width, videoSize.height, 8, CVPixelBufferGetBytesPerRow(pixelBuffer), rgbColorSpace, (CGBitmapInfo)kCGImageAlphaPremultipliedFirst);
     
     // 填充背景
     CGContextSetFillColorWithColor(context, [UIColor blackColor].CGColor);

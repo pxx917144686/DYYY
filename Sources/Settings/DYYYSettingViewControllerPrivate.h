@@ -68,6 +68,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (UIColor *)colorForSettingItem:(DYYYSettingItem *)item;
 - (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view forSection:(NSInteger)section;
 - (NSArray<NSIndexPath *> *)rowsForSection:(NSInteger)section;
+- (nullable NSIndexPath *)visibleIndexPathForSettingKey:(NSString *)key;
 
 #pragma mark - +Presentation（颜色选择、样式选择、源码弹窗、长按和重置）
 

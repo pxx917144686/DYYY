@@ -619,17 +619,16 @@ static OSStatus DYYYHookComponentNew(AudioComponent component, AudioComponentIns
 
 static OSStatus DYYYHookComponentDispose(AudioComponentInstance instance) {
     uintptr_t caller = DYYY_CALLER();
-    DYYYSource *source = DYYYTapEnabled.load(std::memory_order_relaxed)
-        ? DYYYFindSource((uintptr_t)instance, DYYYAudioTapSourceKindAudioUnit) : nullptr;
+    DYYYSource *source = DYYYFindSource((uintptr_t)instance, DYYYAudioTapSourceKindAudioUnit);
     // 必须在实例失效之前摘掉 notify，否则回调指针悬空。
     if (source) DYYYRemoveRenderNotify(instance, source);
     OSStatus status = DYYYOrigComponentDispose ? DYYYOrigComponentDispose(instance) : kAudio_ParamError;
-    if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
-    DYYYHitSymbol(DYYYSymbolComponentDispose, status, caller);
     if (source && status == noErr) {
         source->active.store(0, std::memory_order_relaxed);
         source->disposed.store(1, std::memory_order_relaxed);
     }
+    if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
+    DYYYHitSymbol(DYYYSymbolComponentDispose, status, caller);
     DYYYRecordEvent(DYYYEventComponentDispose, source, status, caller, (uintptr_t)instance);
     return status;
 }
@@ -647,13 +646,16 @@ static OSStatus DYYYHookUnitInitialize(AudioUnit unit) {
 
 static OSStatus DYYYHookOutputStart(AudioUnit unit) {
     OSStatus status = DYYYOrigOutputStart ? DYYYOrigOutputStart(unit) : kAudio_ParamError;
-    if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
+    BOOL enabled = DYYYTapEnabled.load(std::memory_order_relaxed);
+    DYYYSource *source = enabled
+        ? DYYYCreateSource((uintptr_t)unit, DYYYAudioTapSourceKindAudioUnit, nullptr)
+        : DYYYFindSource((uintptr_t)unit, DYYYAudioTapSourceKindAudioUnit);
+    if (source && status == noErr) source->active.store(1, std::memory_order_relaxed);
+    if (!enabled) return status;
     uintptr_t caller = DYYY_CALLER();
     DYYYHitSymbol(DYYYSymbolOutputStart, status, caller);
     // 只有被 AudioOutputUnitStart 启动过的实例才是输出单元，也只有它值得挂旁路。
-    DYYYSource *source = DYYYCreateSource((uintptr_t)unit, DYYYAudioTapSourceKindAudioUnit, nullptr);
     if (source && status == noErr) {
-        source->active.store(1, std::memory_order_relaxed);
         DYYYCacheOutputUnitFormat(unit, source);
         DYYYInstallRenderNotify(unit, source, caller);
     }
@@ -664,12 +666,12 @@ static OSStatus DYYYHookOutputStart(AudioUnit unit) {
 
 static OSStatus DYYYHookOutputStop(AudioUnit unit) {
     OSStatus status = DYYYOrigOutputStop ? DYYYOrigOutputStop(unit) : kAudio_ParamError;
+    DYYYSource *source = DYYYFindSource((uintptr_t)unit, DYYYAudioTapSourceKindAudioUnit);
+    if (source && status == noErr) source->active.store(0, std::memory_order_relaxed);
     if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
     uintptr_t caller = DYYY_CALLER();
     DYYYHitSymbol(DYYYSymbolOutputStop, status, caller);
-    DYYYSource *source = DYYYFindSource((uintptr_t)unit, DYYYAudioTapSourceKindAudioUnit);
     // notify 留着：同一只 unit 常被反复启停，重复装卸没有收益。
-    if (source && status == noErr) source->active.store(0, std::memory_order_relaxed);
     DYYYRecordEvent(DYYYEventOutputStop, source, status, caller, (uintptr_t)unit);
     return status;
 }
@@ -711,36 +713,36 @@ static OSStatus DYYYHookQueueNewOutputDispatch(AudioQueueRef *queueOut,
 
 static OSStatus DYYYHookQueueStart(AudioQueueRef queue, const AudioTimeStamp *time) {
     OSStatus status = DYYYOrigQueueStart ? DYYYOrigQueueStart(queue, time) : kAudio_ParamError;
+    DYYYSource *source = DYYYFindSource((uintptr_t)queue, DYYYAudioTapSourceKindAudioQueue);
+    if (source && status == noErr) source->active.store(1, std::memory_order_relaxed);
     if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
     uintptr_t caller = DYYY_CALLER();
     DYYYHitSymbol(DYYYSymbolQueueStart, status, caller);
-    DYYYSource *source = DYYYFindSource((uintptr_t)queue, DYYYAudioTapSourceKindAudioQueue);
-    if (source && status == noErr) source->active.store(1, std::memory_order_relaxed);
     DYYYRecordEvent(DYYYEventQueueStart, source, status, caller, (uintptr_t)queue);
     return status;
 }
 
 static OSStatus DYYYHookQueueStop(AudioQueueRef queue, Boolean immediate) {
     OSStatus status = DYYYOrigQueueStop ? DYYYOrigQueueStop(queue, immediate) : kAudio_ParamError;
+    DYYYSource *source = DYYYFindSource((uintptr_t)queue, DYYYAudioTapSourceKindAudioQueue);
+    if (source && status == noErr) source->active.store(0, std::memory_order_relaxed);
     if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
     uintptr_t caller = DYYY_CALLER();
     DYYYHitSymbol(DYYYSymbolQueueStop, status, caller);
-    DYYYSource *source = DYYYFindSource((uintptr_t)queue, DYYYAudioTapSourceKindAudioQueue);
-    if (source && status == noErr) source->active.store(0, std::memory_order_relaxed);
     DYYYRecordEvent(DYYYEventQueueStop, source, status, caller, (uintptr_t)queue, immediate);
     return status;
 }
 
 static OSStatus DYYYHookQueueDispose(AudioQueueRef queue, Boolean immediate) {
     OSStatus status = DYYYOrigQueueDispose ? DYYYOrigQueueDispose(queue, immediate) : kAudio_ParamError;
-    if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
-    uintptr_t caller = DYYY_CALLER();
-    DYYYHitSymbol(DYYYSymbolQueueDispose, status, caller);
     DYYYSource *source = DYYYFindSource((uintptr_t)queue, DYYYAudioTapSourceKindAudioQueue);
     if (source && status == noErr) {
         source->active.store(0, std::memory_order_relaxed);
         source->disposed.store(1, std::memory_order_relaxed);
     }
+    if (!DYYYTapEnabled.load(std::memory_order_relaxed)) return status;
+    uintptr_t caller = DYYY_CALLER();
+    DYYYHitSymbol(DYYYSymbolQueueDispose, status, caller);
     DYYYRecordEvent(DYYYEventQueueDispose, source, status, caller, (uintptr_t)queue, immediate);
     return status;
 }
@@ -845,8 +847,29 @@ void DYYYAudioTapInstall(void) {
 }
 
 void DYYYAudioTapSetEnabled(BOOL enabled) {
-    DYYYTapEnabled.store(enabled, std::memory_order_release);
-    if (!enabled) DYYYCaptureActive.store(false, std::memory_order_release);
+    BOOL previous = DYYYTapEnabled.exchange(enabled, std::memory_order_acq_rel);
+    if (previous == enabled) return;
+    uint32_t count = DYYYSourceCount.load(std::memory_order_acquire);
+    if (!enabled) {
+        DYYYCaptureActive.store(false, std::memory_order_release);
+        DYYYLiveEnabled.store(false, std::memory_order_release);
+        for (uint32_t i = 0; i < count; i++) {
+            DYYYSource *source = &DYYYSources[i];
+            if (source->kind != DYYYAudioTapSourceKindAudioUnit) continue;
+            AudioUnit unit = (AudioUnit)source->handle.load(std::memory_order_acquire);
+            DYYYRemoveRenderNotify(unit, source);
+        }
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        DYYYSource *source = &DYYYSources[i];
+        if (source->kind != DYYYAudioTapSourceKindAudioUnit ||
+            source->disposed.load(std::memory_order_relaxed) ||
+            !source->active.load(std::memory_order_relaxed)) continue;
+        AudioUnit unit = (AudioUnit)source->handle.load(std::memory_order_acquire);
+        DYYYCacheOutputUnitFormat(unit, source);
+        DYYYInstallRenderNotify(unit, source, 0);
+    }
 }
 
 // MARK: - 实时电平旁路（读侧，主线程）

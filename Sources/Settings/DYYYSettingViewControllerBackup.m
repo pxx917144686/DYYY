@@ -259,6 +259,7 @@ NSDictionary *getCurrentABTestData(void) {
 
     // 强引用代理对象
     self.restorePickerDelegate = [[DYYYBackupPickerDelegate alloc] init];
+    __weak typeof(self) weakSelf = self;
     self.restorePickerDelegate.completionBlock = ^(NSURL *url) {
         if (!url) {
             [DYYYManager showToast:@"未选择备份文件"];
@@ -281,7 +282,6 @@ NSDictionary *getCurrentABTestData(void) {
         // 恢复图标文件
         NSDictionary *iconBase64Dict = dyyySettings[@"DYYYIconsBase64"];
         if (iconBase64Dict && [iconBase64Dict isKindOfClass:[NSDictionary class]]) {
-            NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
             NSString *dyyyFolderPath = [DYYYPaths iconsDir];
 
             // 确保DYYY文件夹存在
@@ -315,10 +315,11 @@ NSDictionary *getCurrentABTestData(void) {
 
         // 在主线程更新UI
         dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
             [DYYYManager showToast:@"设置已恢复，请重启应用以应用所有更改"];
             
             // 刷新设置界面
-            [self.tableView reloadData];
+            [strongSelf.tableView reloadData];
         });
     };
 
@@ -349,7 +350,6 @@ NSDictionary *getCurrentABTestData(void) {
     }
     
     // 保存到文档目录
-    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_config.json"];
     
@@ -376,8 +376,9 @@ NSDictionary *getCurrentABTestData(void) {
     picker.delegate = self.restorePickerDelegate;
     picker.allowsMultipleSelection = NO;
     
+    __weak typeof(self) weakSelf = self;
     self.restorePickerDelegate.completionBlock = ^(NSURL *url) {
-        [self processABTestConfigFile:url];
+        [weakSelf processABTestConfigFile:url];
     };
     
     [self presentViewController:picker animated:YES completion:nil];
@@ -411,8 +412,6 @@ NSDictionary *getCurrentABTestData(void) {
 }
 
 - (void)deleteABTestConfigFile {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsDirectory = [paths firstObject];
     NSString *dyyyFolderPath = [DYYYPaths abTestDir];
     NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
     

@@ -34,7 +34,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param confirmBlock 确认回调，参数为用户选择/输入的文本
  * @param cancelBlock 取消回调
  */
-- (void)showWithConfirmBlock:(void (^)(NSString *selectedText))confirmBlock cancelBlock:(void (^)(void))cancelBlock;
+- (void)showWithConfirmBlock:(void (^)(NSString *selectedText))confirmBlock cancelBlock:(nullable void (^)(void))cancelBlock;
 
 @end
 

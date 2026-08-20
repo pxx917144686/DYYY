@@ -325,8 +325,8 @@ static BOOL DYYYUtilsWriteGIFUsingYYDecoder(YYImageDecoder *decoder, NSURL *gifU
 
 + (BOOL)framesFromAnimatedData:(NSData *)data
                          scale:(CGFloat)scale
-                        images:(NSArray<UIImage *> *_Nullable *)images
-                 totalDuration:(CGFloat *_Nullable)totalDuration {
+                        images:(NSArray<UIImage *> * _Nullable * _Nullable)images
+                 totalDuration:(CGFloat * _Nullable)totalDuration {
     if (images) {
         *images = nil;
     }

@@ -457,9 +457,6 @@
 
 
 @interface AWELeftSideBarWeatherLabel : UILabel
-@property(nonatomic, assign) BOOL userInteractionEnabled;
-@property(nonatomic, strong) UIColor *textColor;
-- (void)addGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer;
 @end
 
 @interface AWELeftSideBarWeatherView : UIView

@@ -1,6 +1,32 @@
 #import "DYYYCityManagerPrivate.h"
 #import <objc/runtime.h>
 
+@interface DYYYCityPickerProxy : NSObject <UIPickerViewDataSource, UIPickerViewDelegate>
+@property(nonatomic, copy) NSInteger (^rowCount)(UIPickerView *pickerView);
+@property(nonatomic, copy) NSString *(^titleForRow)(UIPickerView *pickerView, NSInteger row);
+@property(nonatomic, copy) void (^didSelectRow)(UIPickerView *pickerView, NSInteger row);
+@end
+
+@implementation DYYYCityPickerProxy
+- (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
+    return 1;
+}
+
+- (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
+    return self.rowCount ? self.rowCount(pickerView) : 0;
+}
+
+- (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
+    return self.titleForRow ? self.titleForRow(pickerView, row) : @"";
+}
+
+- (void)pickerView:(UIPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component {
+    if (self.didSelectRow) {
+        self.didSelectRow(pickerView, row);
+    }
+}
+@end
+
 @implementation DYYYCityManager (Selector)
 - (void)showCitySelectorInViewController:(UIViewController *)viewController 
                                 delegate:(id<CitySelectorDelegate>)delegate
@@ -107,17 +133,9 @@
     __block NSMutableArray<NSString *> *streetNames = [NSMutableArray array];
     __block NSMutableArray<NSString *> *streetCodes = [NSMutableArray array];
     
-    // 数据源和代理
-    id<UIPickerViewDataSource, UIPickerViewDelegate> dataSource = [[NSObject alloc] init];
-    
-    // 使用runtime添加方法
-    class_addMethod([dataSource class], @selector(numberOfComponentsInPickerView:), 
-        (IMP)imp_implementationWithBlock(^NSInteger(id self, UIPickerView *pickerView) {
-        return 1;
-    }), "l@:@");
-    
-    class_addMethod([dataSource class], @selector(pickerView:numberOfRowsInComponent:), 
-        (IMP)imp_implementationWithBlock(^NSInteger(id self, UIPickerView *pickerView, NSInteger component) {
+    // 数据源和代理：使用独立对象，避免向 NSObject 全局注入方法。
+    DYYYCityPickerProxy *dataSource = [[DYYYCityPickerProxy alloc] init];
+    dataSource.rowCount = ^NSInteger(UIPickerView *pickerView) {
         switch (pickerView.tag) {
             case 1: return provinceNames.count;
             case 2: return cityNames.count;
@@ -125,10 +143,9 @@
             case 4: return streetNames.count;
             default: return 0;
         }
-    }), "l@:@l");
-    
-    class_addMethod([dataSource class], @selector(pickerView:titleForRow:forComponent:), 
-        (IMP)imp_implementationWithBlock(^NSString *(id self, UIPickerView *pickerView, NSInteger row, NSInteger component) { 
+    };
+
+    dataSource.titleForRow = ^NSString *(UIPickerView *pickerView, NSInteger row) {
         switch (pickerView.tag) {
             case 1: return provinceNames[row];
             case 2: return cityNames[row];
@@ -136,10 +153,9 @@
             case 4: return streetNames[row];
             default: return @"";
         }
-    }), "@@:@ll");
-    
-    class_addMethod([dataSource class], @selector(pickerView:didSelectRow:inComponent:), 
-        (IMP)imp_implementationWithBlock(^(id self, UIPickerView *pickerView, NSInteger row, NSInteger component) {
+    };
+
+    dataSource.didSelectRow = ^(UIPickerView *pickerView, NSInteger row) {
         switch (pickerView.tag) {
             case 1: {
                 // 选择省份后，更新城市列表
@@ -259,7 +275,7 @@
                 break;
             }
         }
-    }), "v@:@ll");
+    };
     
     provincePicker.dataSource = dataSource;
     provincePicker.delegate = dataSource;
@@ -269,6 +285,8 @@
     districtPicker.delegate = dataSource;
     streetPicker.dataSource = dataSource;
     streetPicker.delegate = dataSource;
+    objc_setAssociatedObject(pickerVC, @selector(showCitySelectorInViewController:delegate:initialSelectedCode:),
+                             dataSource, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     
     // 添加按钮
     UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -283,8 +301,8 @@
     [pickerVC.view addSubview:confirmButton];
     
     // 确认按钮事件
-    [confirmButton addTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
-    objc_setAssociatedObject(confirmButton, "confirmAction", ^{
+    __weak UIViewController *weakPickerVC = pickerVC;
+    [confirmButton addAction:[UIAction actionWithHandler:^(__kindof UIAction *action) {
         // 当选择完成后调用代理方法
         if ([delegate respondsToSelector:@selector(citySelectorDidSelect:provinceName:cityCode:cityName:districtCode:districtName:)]) {
             [delegate citySelectorDidSelect:selectedProvinceCode 
@@ -294,26 +312,8 @@
                              districtCode:selectedDistrictCode 
                              districtName:selectedDistrictName];
         }
-        [pickerVC dismissViewControllerAnimated:YES completion:nil];
-    }, OBJC_ASSOCIATION_COPY);
-    
-    // 使用方法交换为按钮添加事件处理
-    Method originalMethod = class_getInstanceMethod([confirmButton class], @selector(sendAction:to:forEvent:));
-    Method swizzledMethod = class_getInstanceMethod([NSObject class], @selector(confirmButton_sendAction:to:forEvent:));
-    if (!swizzledMethod) {
-        class_addMethod([NSObject class], @selector(confirmButton_sendAction:to:forEvent:), imp_implementationWithBlock(^(id self, SEL action, id target, UIEvent *event) {
-            // 调用原始方法
-            ((void (*)(id, SEL, SEL, id, UIEvent *))objc_msgSend)(self, @selector(confirmButton_sendAction:to:forEvent:), action, target, event);
-            
-            // 执行确认操作
-            void (^confirmAction)(void) = objc_getAssociatedObject(self, "confirmAction");
-            if (confirmAction) {
-                confirmAction();
-            }
-        }), method_getTypeEncoding(originalMethod));
-        swizzledMethod = class_getInstanceMethod([NSObject class], @selector(confirmButton_sendAction:to:forEvent:));
-    }
-    method_exchangeImplementations(originalMethod, swizzledMethod);
+        [weakPickerVC dismissViewControllerAnimated:YES completion:nil];
+    }] forControlEvents:UIControlEventTouchUpInside];
     
     // 如果有初始代码，尝试预选
     if (selectedProvinceCode) {

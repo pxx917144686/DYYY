@@ -7,7 +7,7 @@
 
 @property(nonatomic, strong) CAShapeLayer *progressLayer;
 @property(nonatomic, strong) UILabel *percentLabel;
-@property(nonatomic, assign) CGFloat progress;
+@property(nonatomic, assign) float progress;
 @property(nonatomic, strong) UIVisualEffectView *blurEffectView;
 // 新增属性
 @property(nonatomic, strong) CAShapeLayer *checkmarkLayer;
@@ -58,7 +58,6 @@
     _containerView.layer.shadowOpacity = 0.2;
 
     CGFloat circleSize = 30;
-    CGFloat yCenter = containerHeight / 2;
     // 修改为属性而非局部变量
     _progressView = [[UIView alloc]
         initWithFrame:CGRectMake(10, (containerHeight - circleSize) / 2,
@@ -206,7 +205,7 @@
   return nil;
 }
 // 下载成功动画方法
-- (void)showSuccessAnimation:(void (^)(void))completion {
+- (void)showSuccessAnimation:(nullable void (^)(void))completion {
   BOOL isDarkMode = DYYYThemeIsDark();
 
   UIColor *successColor = isDarkMode ? [UIColor colorWithRed:48 / 255.0
@@ -441,7 +440,7 @@
     [toast showSuccessToastWithMessage:message completion:nil];
 }
 
-- (void)showSuccessToastWithMessage:(NSString *)message completion:(void (^)(void))completion {
+- (void)showSuccessToastWithMessage:(NSString *)message completion:(nullable void (^)(void))completion {
     UIWindow *window = [UIApplication sharedApplication].keyWindow;
     if (!window)
         return;

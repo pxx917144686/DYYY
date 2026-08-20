@@ -1,4 +1,5 @@
 #import "DYYYSettingViewControllerActions.h"
+#import "DYYYSettingViewControllerPrivate.h"
 #import "DYYYSettingItem.h"
 #import "DYYYSettingUIComponents.h"
 #import "DYYYManager.h"
@@ -13,11 +14,6 @@
 #import <Photos/Photos.h>
 #import <objc/runtime.h>
 #import <math.h>
-
-@interface UISwitch (DYYY_FuturisticEffects)
-- (void)applyFuturisticEffects;
-- (void)updateFuturisticEffectsWithState:(BOOL)isOn animated:(BOOL)animated;
-@end
 
 @interface DYYYImagePickerDelegate : NSObject <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, copy) void (^completionBlock)(NSDictionary *info);
@@ -62,7 +58,6 @@
     }
     
     if (saveFilename) {
-        NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
         NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
@@ -273,7 +268,7 @@
     }
     
     if (item.type == DYYYSettingItemTypeSpeedPicker) {
-        [self showSpeedPicker];
+        [self showSpeedPickerForItem:item fromIndexPath:indexPath];
     } else if (item.type == DYYYSettingItemTypeColorPicker) {
         [self showColorPicker];
     } else if ([item.key isEqualToString:@"DYYYfilterKeywords"]) {
@@ -311,7 +306,6 @@
     
     if (saveFilename) {
         // 获取图标路径
-        NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
         NSString *dyyyFolderPath = [DYYYPaths iconsDir];
         NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
         
@@ -329,7 +323,6 @@
     DYYYIconOptionsDialogView *optionsDialog = [[DYYYIconOptionsDialogView alloc] initWithTitle:title previewImage:previewImage];
     
     // 确保DYYY文件夹存在
-    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *dyyyFolderPath = [DYYYPaths iconsDir];
     NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
     
@@ -430,12 +423,16 @@
         if (percent > 100) percent = 100;
         [[NSUserDefaults standardUserDefaults] setInteger:percent forKey:item.key];
         [[NSUserDefaults standardUserDefaults] synchronize];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYSettingChanged"
+                                                            object:nil
+                                                          userInfo:@{@"key": item.key, @"value": @(percent)}];
         [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
                                              }];
     [self presentViewController:sliderController animated:YES completion:nil];
 }
 
-- (void)showSpeedPicker {
+- (void)showSpeedPickerForItem:(DYYYSettingItem *)item fromIndexPath:(NSIndexPath *)indexPath {
+    if (item.key.length == 0) return;
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选择倍速"
                                                                    message:nil
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
@@ -445,23 +442,13 @@
         UIAlertAction *action = [UIAlertAction actionWithTitle:[NSString stringWithFormat:@"%.2f", speed.floatValue]
                                                          style:UIAlertActionStyleDefault
                                                        handler:^(UIAlertAction * _Nonnull action) {
-            [[NSUserDefaults standardUserDefaults] setFloat:speed.floatValue forKey:@"DYYYDefaultSpeed"];
+            [[NSUserDefaults standardUserDefaults] setFloat:speed.floatValue forKey:item.key];
             [[NSUserDefaults standardUserDefaults] synchronize];
-            
-            for (NSInteger section = 0; section < self.settingSections.count; section++) {
-                NSArray *items = self.settingSections[section];
-                for (NSInteger row = 0; row < items.count; row++) {
-                    DYYYSettingItem *item = items[row];
-                    if (item.type == DYYYSettingItemTypeSpeedPicker) {
-                        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-                        UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
-                        UITextField *speedField = [cell.accessoryView viewWithTag:999];
-                        if (speedField) {
-                            speedField.text = [NSString stringWithFormat:@"%.2f", speed.floatValue];
-                        }
-                        break;
-                    }
-                }
+            NSIndexPath *visiblePath = [self visibleIndexPathForSettingKey:item.key] ?: indexPath;
+            if (visiblePath && visiblePath.section < [self.tableView numberOfSections] &&
+                visiblePath.row < [self.tableView numberOfRowsInSection:visiblePath.section]) {
+                [self.tableView reloadRowsAtIndexPaths:@[visiblePath]
+                                      withRowAnimation:UITableViewRowAnimationFade];
             }
         }];
         [alert addAction:action];
@@ -518,15 +505,10 @@
             [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DYYYScheduleStyle"];
         }
         // 刷新相关cell
-        for (NSInteger s = 0; s < self.settingSections.count; s++) {
-            NSArray *items = self.settingSections[s];
-            for (NSInteger r = 0; r < items.count; r++) {
-                DYYYSettingItem *subItem = items[r];
-                if ([subItem.key isEqualToString:@"DYYYScheduleStyle"]) {
-                    NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
-                    [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
-                }
-            }
+        NSIndexPath *stylePath = [self visibleIndexPathForSettingKey:@"DYYYScheduleStyle"];
+        if (stylePath) {
+            [self.tableView reloadRowsAtIndexPaths:@[stylePath]
+                                  withRowAnimation:UITableViewRowAnimationAutomatic];
         }
     }
 

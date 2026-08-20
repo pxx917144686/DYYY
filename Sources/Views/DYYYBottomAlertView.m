@@ -9,7 +9,7 @@
              confirmButton:(NSString *)confirmButtonTitle
               cancelButton:(NSString *)cancelButtonTitle
               confirmBlock:(void (^)(void))confirmBlock
-               cancelBlock:(void (^)(void))cancelBlock {
+               cancelBlock:(nullable void (^)(void))cancelBlock {
     
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                    message:message

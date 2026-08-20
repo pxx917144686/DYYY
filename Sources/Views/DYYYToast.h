@@ -7,7 +7,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) UIView *containerView;
 @property(nonatomic, strong) UIView *progressBarBackground;
 @property(nonatomic, strong) UIView *progressBar;
-@property(nonatomic, copy) void (^cancelBlock)(void);
+@property(nonatomic, copy, nullable) void (^cancelBlock)(void);
 @property(nonatomic, assign) BOOL isCancelled;
 @property(nonatomic, assign) BOOL allowSuccessAnimation;
 
@@ -15,10 +15,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setProgress:(float)progress;
 - (void)show;
 - (void)dismiss;
-- (void)showSuccessAnimation:(void (^)(void))completion;
+- (void)showSuccessAnimation:(nullable void (^)(void))completion;
 
 + (void)showSuccessToastWithMessage:(NSString *)message;
-- (void)showSuccessToastWithMessage:(NSString *)message completion:(void (^)(void))completion;
+- (void)showSuccessToastWithMessage:(NSString *)message completion:(nullable void (^)(void))completion;
 
 @end
 

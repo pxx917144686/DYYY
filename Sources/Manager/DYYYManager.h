@@ -16,7 +16,7 @@
  * DYYY 主管理器类
  * 处理UI、媒体下载、保存和视频合成等功能
  */
-@interface DYYYManager : NSObject
+@interface DYYYManager : NSObject <NSURLSessionDownloadDelegate>
 
 #pragma mark - 属性和基础方法
 //存储文件类型

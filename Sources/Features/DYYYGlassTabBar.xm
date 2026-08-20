@@ -218,8 +218,9 @@ NSString *DYYYGlassPlatterGlassStatus(void) {
     id installed = gPlatterGlassInstalled;
     if (!installed) return @"清透开关开启但尚未装上，下一次布局补";
     UIColor *tint = DYYYGlassTintForStyle(gPlatterGlassStyle);
-    BOOL interactive = [installed isKindOfClass:UIGlassEffect.class]
-        && ((UIGlassEffect *)installed).interactive;
+    Class glassEffectClass = NSClassFromString(@"UIGlassEffect");
+    BOOL interactive = glassEffectClass && [installed isKindOfClass:glassEffectClass]
+        && [[installed valueForKey:@"interactive"] boolValue];
     return [NSString stringWithFormat:@"已改写 · Clear · interactive=%@ · 染色 %@",
             interactive ? @"YES" : @"NO", tint ? tint.description : @"(nil，浅色档)"];
 }

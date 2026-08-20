@@ -105,8 +105,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (BOOL)framesFromAnimatedData:(NSData *)data
                          scale:(CGFloat)scale
-                        images:(NSArray<UIImage *> *_Nullable *)images
-                 totalDuration:(CGFloat *_Nullable)totalDuration;
+                        images:(NSArray<UIImage *> * _Nullable * _Nullable)images
+                 totalDuration:(CGFloat * _Nullable)totalDuration;
 
 /**
  * 根据帧数组生成 GIF 文件

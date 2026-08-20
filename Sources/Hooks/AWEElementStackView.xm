@@ -70,7 +70,6 @@ static BOOL containsSubviewOfClass(UIView *view, Class targetClass) {
 %hook AWEElementStackView
 static CGFloat stream_frame_y = 0;
 static CGFloat right_tx = 0;
-static CGFloat left_tx = 0;
 static CGFloat currentScale = 1.0;
 
 %new

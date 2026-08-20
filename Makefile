@@ -27,9 +27,9 @@ ARCHS = arm64
 TARGET = iphone:clang:latest:15.0
 USE_SWIFT = 1
 
-# 关闭严格错误检查和警告
+# 严格 Logos 语法；编译警告保持可见，由 audit-strict 升级为错误。
 export DEBUG = 0
-export THEOS_STRICT_LOGOS = 0
+export THEOS_STRICT_LOGOS = 1
 export ERROR_ON_WARNINGS = 0
 export LOGOS_DEFAULT_GENERATOR = internal
 
@@ -142,7 +142,7 @@ $(TWEAK_NAME)_FILES += $(CAPSTONE_CORE) $(CAPSTONE_ARM) $(CAPSTONE_ARM64)
 endif
 
 # 编译标志
-$(TWEAK_NAME)_CFLAGS = -fobjc-arc -w
+$(TWEAK_NAME)_CFLAGS = -fobjc-arc
 # 发布版宏（必须在基础 CFLAGS 赋值之后追加，否则被覆盖）
 ifeq ($(DYYY_RELEASE),1)
 $(TWEAK_NAME)_CFLAGS += -DDYYY_RELEASE_BUILD=1
@@ -163,9 +163,6 @@ $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security Metal MetalKit CoreImage Sw
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_adhoc_codesign -Xlinker -objc_abi_version -Xlinker 2
 # 统一class_ro_t指针签名设置，解决链接警告
 $(TWEAK_NAME)_LDFLAGS += -Xlinker -no_warn_duplicate_libraries
-# 抑制class_ro_t指针签名不一致警告
-$(TWEAK_NAME)_LDFLAGS += -Wl,-w
-
 # FLEX 库和头文件路径
 $(TWEAK_NAME)_LIBRARIES = 
 $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)
@@ -184,13 +181,20 @@ $(TWEAK_NAME)_CFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
 $(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -fno-modules
 $(TWEAK_NAME)_CCFLAGS += -I$(THEOS_PROJECT_DIR)/FLEX/x/capstone/include
 
-# 编译标志
-$(TWEAK_NAME)_CFLAGS += -Wno-everything
+# 仅保留已知私有类 category/protocol 声明所需的定向抑制。
 $(TWEAK_NAME)_CFLAGS += -Wno-incomplete-implementation
 $(TWEAK_NAME)_CFLAGS += -Wno-protocol
+$(TWEAK_NAME)_CFLAGS += -Wno-objc-protocol-method-implementation
 
 # 预处理变量
 $(TWEAK_NAME)_CFLAGS += -DDOKIT_FULL_BUILD=1
 $(TWEAK_NAME)_CFLAGS += -DDORAEMON_FULL_BUILD=1
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+
+.PHONY: audit-hooks audit-strict
+audit-hooks:
+	@python3 scripts/check_hook_invariants.py
+
+audit-strict: ERROR_ON_WARNINGS = 1
+audit-strict: audit-hooks all

@@ -501,37 +501,3 @@ BOOL DYYYLegacyCommentBlurActive(void) {
     return DYYYCachedBool(@"DYYYisEnableCommentBlur")
         && !DYYYCachedBool(@"DYYYCommentGlass");
 }
-
-// 隐藏键盘ai（保留原静态函数）
-static void hideParentViewsSubviews(UIView *view) {
-	if (!view)
-		return;
-	// 获取第一层父视图
-	UIView *parentView = [view superview];
-	if (!parentView)
-		return;
-	// 获取第二层父视图
-	UIView *grandParentView = [parentView superview];
-	if (!grandParentView)
-		return;
-	// 获取第三层父视图
-	UIView *greatGrandParentView = [grandParentView superview];
-	if (!greatGrandParentView)
-		return;
-	// 隐藏所有子视图
-	for (UIView *subview in greatGrandParentView.subviews) {
-		subview.hidden = YES;
-	}
-}
-
-
-// 递归查找目标视图
-static void findTargetViewInView(UIView *view) {
-	if ([view isKindOfClass:NSClassFromString(@"AWESearchKeyboardVoiceSearchEntranceView")]) {
-		hideParentViewsSubviews(view);
-		return;
-	}
-	for (UIView *subview in view.subviews) {
-		findTargetViewInView(subview);
-	}
-}

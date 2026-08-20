@@ -453,19 +453,6 @@ UIImage *createColorCircleImage(UIColor *color, CGSize size) {
     button.backgroundColor = [UIColor colorWithWhite:0.98 alpha:1.0];
     button.layer.cornerRadius = 12;
     
-    // 获取按钮的索引和总数，用于确定位置
-    NSInteger buttonIndex = 0;
-    NSInteger totalButtons = 1;
-    
-    // 安全地获取按钮索引
-    if ([button isKindOfClass:[DYYYDraggableButton class]]) {
-        buttonIndex = ((DYYYDraggableButton *)button).originalIndex;
-        
-        // 尝试获取总按钮数
-        NSArray *moduleViews = objc_getAssociatedObject(self.scrollView, "moduleViews");
-        totalButtons = moduleViews ? moduleViews.count : 1;
-    }
-    
     button.layer.cornerRadius = 12;
     button.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     
@@ -670,22 +657,12 @@ UIImage *createColorCircleImage(UIColor *color, CGSize size) {
     
     // 根据视图模式使用不同参数
     CGFloat cellHeight;
-    CGFloat verticalSpacing;
-    CGFloat horizontalMargin;
-    CGFloat verticalMargin;
-    
     if (isListView) {
         // 列表模式参数
         cellHeight = 56;
-        verticalSpacing = 0;
-        horizontalMargin = 8;
-        verticalMargin = 2;
     } else {
         // 卡片视图模式参数
         cellHeight = 80;
-        verticalSpacing = 16;
-        horizontalMargin = 12;
-        verticalMargin = 0;
     }
     
     // 创建新拟态风格的列表单元格容器

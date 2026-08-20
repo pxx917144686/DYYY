@@ -4,7 +4,7 @@
 
 @implementation DYYYCustomInputView
 
-- (instancetype)initWithTitle:(NSString *)title defaultText:(NSString *)defaultText placeholder:(NSString *)placeholder {
+- (instancetype)initWithTitle:(NSString *)title defaultText:(nullable NSString *)defaultText placeholder:(nullable NSString *)placeholder {
     if (self = [super initWithFrame:UIScreen.mainScreen.bounds]) {
         self.defaultText = defaultText;
         self.placeholderText = placeholder;
@@ -104,7 +104,7 @@
     return self;
 }
 
-- (instancetype)initWithTitle:(NSString *)title defaultText:(NSString *)defaultText {
+- (instancetype)initWithTitle:(NSString *)title defaultText:(nullable NSString *)defaultText {
     return [self initWithTitle:title defaultText:defaultText placeholder:nil];
 }
 

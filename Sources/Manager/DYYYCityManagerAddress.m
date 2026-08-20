@@ -183,8 +183,6 @@
         streetName = streets[arc4random_uniform((uint32_t)streets.count)] ?: streetName;
     } else {
         // 基于区县生成真实感街道 - 使用真实街道命名规则
-        NSString *prefix = cityCode.length >= 4 ? [cityCode substringToIndex:4] : @"0000";
-
         // 提取区县关键词（去掉"区"、"新区"、"县"等后缀）
         NSString *districtKey = districtName;
         NSArray *suffixes = @[@"新区", @"自治县", @"回族区", @"满族区", @"藏族区", @"壮族区",

@@ -4,7 +4,7 @@
 #import <objc/runtime.h>
 
 @interface AWEABTestManager : NSObject
-@property(retain, nonatomic) NSDictionary *abTestData;
+@property(retain, nonatomic) id abTestData;
 @property(retain, nonatomic) NSMutableDictionary *consistentABTestDic;
 @property(copy, nonatomic) NSDictionary *performanceReversalDic;
 - (void)setAbTestData:(id)arg1;
@@ -182,18 +182,6 @@ NSDictionary *loadFixedABTestData(void) {
 	lastLoadAttemptTime = now;
 
 	ensureABTestDataLoaded();
-	return gFileExists ? gFixedABTestData : nil;
-}
-
-static NSDictionary *fixedABTestData(void) {
-	if (!abTestBlockEnabled) {
-		return nil;
-	}
-
-	if (!gDataLoaded) {
-		ensureABTestDataLoaded();
-	}
-
 	return gFileExists ? gFixedABTestData : nil;
 }
 

@@ -844,9 +844,6 @@
         NSLog(@"DYYY: PIP 按钮已添加，当前按钮总数: %lu", (unsigned long)viewModels.count);
     }
 
-    // 再检查是否有自定义功能启用
-    BOOL hasCustomFeaturesEnabled = viewModels.count > 0;
-
     // 处理原始面板，收集所有未被隐藏的官方按钮
     NSMutableArray *modifiedOriginalGroups = [NSMutableArray array];
     for (id group in originalArray) {
@@ -1193,4 +1190,3 @@
     // 初始化主面板钩子组
     %init(ColorPickerGroup);
 }
-

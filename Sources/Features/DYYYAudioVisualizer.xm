@@ -237,6 +237,7 @@ static void DYYYVizRebuildLayers(void) {
 
 static void DYYYVizTeardown(void) {
     DYYYAudioTapSetLiveMeteringEnabled(NO);
+    DYYYAudioTapSetEnabled(NO);
     [gLink invalidate];
     gLink = nil;
     gDriver = nil;
@@ -390,7 +391,7 @@ static void DYYYVizSetVisible(BOOL visible) {
 
 void DYYYAudioVisualizerLayout(UIView *douyinBar) {
     if (!DYYYGlassOSAvailable()) {
-        if (gHost) DYYYVizTeardown();
+        DYYYVizTeardown();
         return;
     }
     DYYYVizMode mode = DYYYVizCurrentMode();
@@ -398,17 +399,18 @@ void DYYYAudioVisualizerLayout(UIView *douyinBar) {
     UIView *plusKey = DYYYGlassPlusKeyCurrent();
     // 三个位置都以玻璃胶囊/圆键为基准，悬浮玻璃底栏关着时整体不成立。
     if (mode == DYYYVizModeOff || !douyinBar || !platter) {
-        if (gHost) DYYYVizTeardown();
+        DYYYVizTeardown();
         return;
     }
 
     CGRect capsule = [platter convertRect:platter.bounds toView:douyinBar];
     CGRect plus = plusKey && !plusKey.isHidden ? plusKey.frame : CGRectNull;
     if (mode == DYYYVizModePlusRing && CGRectIsNull(plus)) {
-        if (gHost) DYYYVizTeardown();
+        DYYYVizTeardown();
         return;
     }
     BOOL fluid = DYYYPrefInteger(DYYYKeyAudioVizStyle) != 0;
+    DYYYAudioTapSetEnabled(YES);
     DYYYAudioTapSetLiveMeteringEnabled(YES);
 
     if (!gHost) {
@@ -500,7 +502,7 @@ void DYYYAudioVisualizerLayout(UIView *douyinBar) {
 // DYYYAudioVisualizerLayout 每次底栏布局都会重读，位置/形态变了自然会重建，
 // 不需要额外的即时刷新通路。
 %ctor {
-    // 音频可视化依赖实时电平旁路；DYYY 原本由调试入口负责安装，DYYY 合并后在功能模块内安装。
+    // 只安装透明转发；实际登记、事件记录与 Render Notify 由布局中的有效模式开启。
     DYYYAudioTapInstall();
-    DYYYAudioTapSetEnabled(YES);
+    DYYYAudioTapSetEnabled(NO);
 }

@@ -44,7 +44,9 @@ static BOOL DYYYIsAdFilteredValid(NSArray *array) {
 %hook AWEListDataController
 
 - (void)setDataSource:(NSMutableArray *)dataSource {
-    NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
+    NSArray *result = [DYYYUtils arrayByRemovingAdvertisements:dataSource];
+    NSMutableArray *filtered = [result isKindOfClass:[NSMutableArray class]]
+        ? (NSMutableArray *)result : [result mutableCopy];
     %orig(filtered);
 }
 
@@ -64,7 +66,9 @@ static BOOL DYYYIsAdFilteredValid(NSArray *array) {
 }
 
 - (void)setFilteredDataSource:(NSMutableArray *)filteredDataSource {
-    NSArray *filtered = [DYYYUtils arrayByRemovingAdvertisements:filteredDataSource];
+    NSArray *result = [DYYYUtils arrayByRemovingAdvertisements:filteredDataSource];
+    NSMutableArray *filtered = [result isKindOfClass:[NSMutableArray class]]
+        ? (NSMutableArray *)result : [result mutableCopy];
     %orig(filtered);
 }
 

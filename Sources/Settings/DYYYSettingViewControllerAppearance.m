@@ -760,7 +760,6 @@
 }
 
 - (NSString *)saveCustomAlbumImage:(UIImage *)image {
-    NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *dyyyFolder = [DYYYPaths iconsDir];
     
     NSError *error;

@@ -26,7 +26,7 @@
 
 - (void)applySmartTextColorToAllMenuItems;
 - (void)safelyUpdateUI:(void (^)(void))block;
-- (UIBlurEffectStyle)inferVisualEffectStyle:(UIBlurEffect *)effect;
+- (UIBlurEffectStyle)inferVisualEffectStyle:(UIVisualEffect *)effect;
 - (void)updateTextColorsInView:(UIView *)view withTextColor:(UIColor *)textColor;
 
 - (void)enhanceModernVisualStyle:(UIScrollView *)scrollView;

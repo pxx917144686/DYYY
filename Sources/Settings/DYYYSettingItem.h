@@ -18,7 +18,7 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) {
 @interface DYYYSettingItem : NSObject
 
 @property (nonatomic, strong) NSString *title;
-@property (nonatomic, strong) NSString *key;
+@property (nonatomic, strong, nullable) NSString *key;
 @property (nonatomic, assign) NSInteger type;
 @property (nonatomic, strong, nullable) NSString *placeholder;
 @property (nonatomic, strong, nullable) NSArray<NSString *> *options;

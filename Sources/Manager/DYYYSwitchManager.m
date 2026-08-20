@@ -1,6 +1,7 @@
 #import "DYYYSwitchManager.h"
 #import "DYYYManager.h"
 #import "DYYYSettingViewController.h"
+#import "DYYYUtils.h"
 #if __has_include(<UIKit/UIKit.h>)
 #import <UIKit/UIKit.h>
 
@@ -588,7 +589,12 @@ static NSLock *settingsLock = nil;
         @"DYYYEnableFloatSpeedButton",
         @"DYYYSpeedSettings",
         @"DYYYSpeedButtonShowX",
-        @"DYYYSpeedButtonSize"
+        @"DYYYSpeedButtonSize",
+        // 玻璃面板实时刷新
+        DYYYKeySharePanelGlass,
+        DYYYKeySharePanelGlassClear,
+        DYYYKeyInnerNotiGlass,
+        DYYYKeyInnerNotiGlassClear
     ];
     
     if ([notificationKeys containsObject:key] || [key hasPrefix:@"DYYYHide"]) {

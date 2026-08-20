@@ -379,7 +379,6 @@ bool commentLivePhotoNotWaterMark = DYYYCachedBool(@"DYYYCommentLivePhotoNotWate
 	}
 
 	NSString *urlString = nil;
-	MediaType mediaType = MediaTypeImage;
 
 	// 尝试动态URL
 	if ([emoticonModel valueForKey:@"animate_url"]) {
@@ -410,4 +409,3 @@ bool commentLivePhotoNotWaterMark = DYYYCachedBool(@"DYYYCommentLivePhotoNotWate
 }
 
 %end
-

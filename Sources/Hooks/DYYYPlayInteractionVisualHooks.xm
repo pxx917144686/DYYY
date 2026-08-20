@@ -74,7 +74,7 @@
 }
 
 %new
-- (UIBlurEffectStyle)inferVisualEffectStyle:(UIBlurEffect *)effect {
+- (UIBlurEffectStyle)inferVisualEffectStyle:(UIVisualEffect *)effect {
     // 改进视觉效果样式检测
     if (!effect) return UIBlurEffectStyleDark;
     
@@ -1498,7 +1498,6 @@
     // 1. 减少主线程负担
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         // 提前准备核心资源
-        UIImage *placeholderImage = [UIImage new];
         NSMutableDictionary *preloadedResources = [NSMutableDictionary dictionary];
         
         // 回到主线程优化UI
@@ -1633,10 +1632,7 @@
 
 %new
 - (void)syncRenderLoop:(CADisplayLink *)displayLink {
-    // 记录绘制时间
-    static CFTimeInterval lastTimestamp = 0;
-    CFTimeInterval timeDelta = lastTimestamp == 0 ? 0 : displayLink.timestamp - lastTimestamp;
-    lastTimestamp = displayLink.timestamp;
+    (void)displayLink;
     
     // 获取 scrollView：避免使用 assign 关联造成悬挂指针，这里每帧安全获取
     UIScrollView *scrollView = nil;

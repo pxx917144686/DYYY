@@ -62,7 +62,6 @@ static BOOL uc_safe_read_memory(uint64_t address, void *buffer, size_t size) {
         block.successors = nil;
         block.predecessors = nil;
     }
-    self.basicBlocks = nil;
 }
 @end
 
@@ -751,8 +750,6 @@ static BOOL uc_safe_read_memory(uint64_t address, void *buffer, size_t size) {
     NSMutableDictionary<NSNumber *, NSMutableArray<NSNumber *> *> *xrefMap = [NSMutableDictionary dictionary];
     
     for (DYYYUCDisasmInstruction *insn in result.instructions) {
-        NSMutableArray *xrefs = [NSMutableArray array];
-        
         if (insn.isBranch && insn.branchTarget > 0) {
             NSNumber *targetAddr = @(insn.branchTarget);
             if (!xrefMap[targetAddr]) {

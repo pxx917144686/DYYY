@@ -122,14 +122,6 @@
 
 @end
 
-// 显示图标选项弹窗
-static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSString *saveFilename, void (^onClear)(void), void (^onSelect)(void)) {
-    DYYYIconOptionsDialogView *optionsDialog = [[DYYYIconOptionsDialogView alloc] initWithTitle:title previewImage:previewImage];
-    optionsDialog.onClear = onClear;
-    optionsDialog.onSelect = onSelect;
-    [optionsDialog show];
-}
-
 @implementation DYYYSettingViewController (Presentation)
 
 #pragma mark - Color Picker
@@ -166,18 +158,10 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
                 NSData *colorData = [NSKeyedArchiver archivedDataWithRootObject:color];
                 [[NSUserDefaults standardUserDefaults] setObject:colorData forKey:@"DYYYBackgroundColor"];
                 [[NSUserDefaults standardUserDefaults] synchronize];
-                for (NSInteger section = 0; section < self.settingSections.count; section++) {
-                    NSArray *items = self.settingSections[section];
-                    for (NSInteger row = 0; row < items.count; row++) {
-                        DYYYSettingItem *item = items[row];
-                        if (item.type == DYYYSettingItemTypeColorPicker) {
-                            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-                            if (self.tableView) {
-                                [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-                            }
-                            break;
-                        }
-                    }
+                NSIndexPath *indexPath = [self visibleIndexPathForSettingKey:@"DYYYBackgroundColor"];
+                if (indexPath) {
+                    [self.tableView reloadRowsAtIndexPaths:@[indexPath]
+                                          withRowAnimation:UITableViewRowAnimationFade];
                 }
             }];
             UIImage *colorImage = [self imageWithColor:color size:CGSizeMake(20, 20)];
@@ -204,18 +188,10 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
     [[NSUserDefaults standardUserDefaults] synchronize];
     // 通知弹窗刷新
     [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYBackgroundColorChanged" object:nil];
-    for (NSInteger section = 0; section < self.settingSections.count; section++) {
-        NSArray *items = self.settingSections[section];
-        for (NSInteger row = 0; row < items.count; row++) {
-            DYYYSettingItem *item = items[row];
-            if (item.type == DYYYSettingItemTypeColorPicker) {
-                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-                if (self.tableView) {
-                    [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-                }
-                break;
-            }
-        }
+    NSIndexPath *indexPath = [self visibleIndexPathForSettingKey:@"DYYYBackgroundColor"];
+    if (indexPath) {
+        [self.tableView reloadRowsAtIndexPaths:@[indexPath]
+                              withRowAnimation:UITableViewRowAnimationFade];
     }
 }
 - (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)viewController API_AVAILABLE(ios(14.0)){

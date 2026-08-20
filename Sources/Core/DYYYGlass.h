@@ -10,16 +10,16 @@ extern "C" {
 
 UIGlassEffect * _Nullable DYYYGlassMakeEffect(BOOL clear,
                                               UIUserInterfaceStyle style,
-                                              BOOL interactive);
+                                              BOOL interactive) API_AVAILABLE(ios(26.0));
 
 BOOL DYYYGlassNeedsUpdate(UIVisualEffectView *glass,
                           BOOL clear,
-                          UIUserInterfaceStyle style);
+                          UIUserInterfaceStyle style) API_AVAILABLE(ios(26.0));
 
 void DYYYGlassInstallEffect(UIVisualEffectView *glass,
                             UIGlassEffect *effect,
                             BOOL clear,
-                            UIUserInterfaceStyle style);
+                            UIUserInterfaceStyle style) API_AVAILABLE(ios(26.0));
 
 void DYYYGlassRunAnimation(UIViewController * _Nullable controller,
                            BOOL animated,

@@ -576,23 +576,6 @@ static UITextField *kDummyTextField = nil;
 }
 
 
-#pragma mark UISearchControllerDelegate
-
-- (void)willPresentSearchController:(UISearchController *)searchController {
-    // 手动显示iOS 13以下版本的取消按钮
-    if (!@available(iOS 13, *) && self.automaticallyShowsSearchBarCancelButton) {
-        [searchController.searchBar setShowsCancelButton:YES animated:YES];
-    }
-}
-
-- (void)willDismissSearchController:(UISearchController *)searchController {
-    // 手动隐藏iOS 13以下版本的取消按钮
-    if (!@available(iOS 13, *) && self.automaticallyShowsSearchBarCancelButton) {
-        [searchController.searchBar setShowsCancelButton:NO animated:YES];
-    }
-}
-
-
 #pragma mark UISearchBarDelegate
 
 /// iOS 13中不需要；当iOS 13成为部署目标时移除此项

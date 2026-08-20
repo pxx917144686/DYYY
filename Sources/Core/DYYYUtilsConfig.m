@@ -82,15 +82,6 @@ void DYYYConfigCacheInvalidate(void) {
     }
 }
 
-static void DYYYGlassResetPrefsIfUnsupported(void) {
-    if (DYYYGlassOSAvailable()) return;
-    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    for (NSString *key in DYYYGlassGatedKeySet()) {
-        [defaults removeObjectForKey:key];
-    }
-    [defaults synchronize];
-}
-
 static void DYYYMigrateLegacyFeatureKeys(void) {
     NSDictionary<NSString *, NSString *> *mapping = @{
         @"DYKillerCommentGlass": DYYYKeyCommentGlass,
@@ -125,5 +116,4 @@ static void DYYYMigrateLegacyFeatureKeys(void) {
 __attribute__((constructor))
 static void DYYYFeatureSupportCtor(void) {
     DYYYMigrateLegacyFeatureKeys();
-    DYYYGlassResetPrefsIfUnsupported();
 }

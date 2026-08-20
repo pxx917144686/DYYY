@@ -12,6 +12,8 @@ UIWindow * _Nullable DYYY_findKeyWindow(void);
 }
 #endif
 
+NS_ASSUME_NONNULL_BEGIN
+
 // 截图工具类声明
 @interface DYYYScreenshot : NSObject
 
@@ -30,12 +32,12 @@ UIWindow * _Nullable DYYY_findKeyWindow(void);
 /**
  * 捕获全屏截图
  */
-+ (UIImage *)captureFullScreenshot:(UIWindow *)window;
++ (nullable UIImage *)captureFullScreenshot:(UIWindow *)window;
 
 /**
  * 裁剪图片
  */
-+ (UIImage *)cropImage:(UIImage *)image toRect:(CGRect)cropRect;
++ (nullable UIImage *)cropImage:(UIImage *)image toRect:(CGRect)cropRect;
 
 /**
  * 显示分享菜单
@@ -65,9 +67,9 @@ UIWindow * _Nullable DYYY_findKeyWindow(void);
 // AWEPlayInteractionViewController 分类声明
 @interface AWEPlayInteractionViewController (DYYYScreenshot)
 - (void)dyyy_startCustomScreenshotProcess;
-- (UIImage *)screenshotEntireScreen;
-- (UIImage *)dyyy_cropImage:(UIImage *)image toRect:(CGRect)cropRect;
+- (nullable UIImage *)screenshotEntireScreen;
+- (nullable UIImage *)dyyy_cropImage:(UIImage *)image toRect:(CGRect)cropRect;
 - (void)dyyy_presentShareSheetWithImage:(UIImage *)image fromView:(UIView *)sourceView;
 @end
 
-UIWindow *DYYY_findKeyWindow(void);
+NS_ASSUME_NONNULL_END

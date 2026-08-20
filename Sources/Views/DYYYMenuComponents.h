@@ -37,7 +37,7 @@ typedef NS_ENUM(NSInteger, DYYYMenuVisualStyle) {
 @property (nonatomic, assign) NSInteger originalIndex;
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, assign) CGPoint originalCenter;
-@property (nonatomic, strong) UIView *dragPreviewView;
+@property (nonatomic, strong, nullable) UIView *dragPreviewView;
 @property (nonatomic, assign) BOOL isDragging;
 @end
 

@@ -125,10 +125,6 @@ static void DYYYMediaRestoreViewsUnderRoot(UIView *root) {
     }
 }
 
-static void DYYYMediaRestoreAllViews(void) {
-    for (UIView *view in gDYYYMediaManagedViews.allObjects) DYYYMediaRestoreView(view);
-}
-
 #pragma mark - 结构匹配
 
 static Class DYYYMediaInputClass(void) {

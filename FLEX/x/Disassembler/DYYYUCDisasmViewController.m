@@ -69,9 +69,6 @@
     
     NSString *className = NSStringFromClass(cls);
     NSString *selName = NSStringFromSelector(selector);
-    NSString *title = [NSString stringWithFormat:@"%@[%@ %@]",
-                       isClassMethod ? @"+" : @"-",
-                       className, selName];
     
     return [self initWithMethod:method class:className selector:selName];
 }
@@ -379,8 +376,6 @@
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"选项"
                                                                     message:nil
                                                              preferredStyle:UIAlertControllerStyleActionSheet];
-
-    __weak typeof(self) weakSelf = self;
 
     [alert addAction:[UIAlertAction actionWithTitle:@"取消"
                                               style:UIAlertActionStyleCancel
@@ -794,8 +789,6 @@
         fromY = CGRectGetMaxY(fromView.frame);
         toX = CGRectGetMidX(toView.frame);
         toY = CGRectGetMinY(toView.frame);
-        
-        CGFloat midY = (fromY + toY) / 2;
         
         UIBezierPath *path = [UIBezierPath bezierPath];
         [path moveToPoint:CGPointMake(fromX, fromY)];

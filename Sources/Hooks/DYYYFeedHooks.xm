@@ -875,24 +875,6 @@
 }
 %end
 
-%hook AWELongPressPanelDataManager
-+ (BOOL)enableModernLongPressPanelConfigWithSceneIdentifier:(id)arg1 {
-    return DYYYCachedBool(@"DYYYisEnableModern") ?: YES;
-}
-%end
-
-%hook AWELongPressPanelABSettings
-+ (NSUInteger)modernLongPressPanelStyleMode {
-    return DYYYCachedBool(@"DYYYisEnableModern") ? 1 : 0;
-}
-%end
-
-%hook AWEModernLongPressPanelUIConfig
-+ (NSUInteger)modernLongPressPanelStyleMode {
-    return DYYYCachedBool(@"DYYYisEnableModern") ? 1 : 0;
-}
-%end
-
 %hook AWEUserTabListModel
 
 - (NSInteger)profileLandingTab {
@@ -1490,4 +1472,3 @@
     }
 }
 %end
-

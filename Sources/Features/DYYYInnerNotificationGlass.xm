@@ -7,10 +7,6 @@
 #import "AwemeHeaders.h"
 #import "DYYYGlass.h"
 #import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
 
 #import <objc/runtime.h>
 
@@ -688,5 +684,16 @@ static void DYYYNotiRefreshVisible(void) {
 
     if (DYYYGlassOSAvailable()) {
         %init(DYYYInnerNotificationGlassHooks);
+        [[NSNotificationCenter defaultCenter] addObserverForName:@"DYYYSettingChanged"
+                                                          object:nil
+                                                           queue:NSOperationQueue.mainQueue
+                                                      usingBlock:^(NSNotification *note) {
+            NSString *changedKey = note.userInfo[@"key"];
+            if ([changedKey isEqualToString:DYYYKeyInnerNotiGlass] ||
+                [changedKey isEqualToString:DYYYKeyInnerNotiGlassClear] ||
+                [changedKey isEqualToString:DYYYKeyInnerNotiCorner]) {
+                DYYYNotiRefreshVisible();
+            }
+        }];
     }
 }

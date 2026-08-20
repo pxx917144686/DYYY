@@ -12,7 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)showIconOptionsDialogWithTitle:(NSString *)title previewImage:(UIImage *)previewImage saveFilename:(NSString *)saveFilename;
 - (void)showChoiceForItem:(DYYYSettingItem *)item fromIndexPath:(NSIndexPath *)indexPath;
 - (void)showSliderForItem:(DYYYSettingItem *)item fromIndexPath:(NSIndexPath *)indexPath;
-- (void)showSpeedPicker;
+- (void)showSpeedPickerForItem:(DYYYSettingItem *)item fromIndexPath:(NSIndexPath *)indexPath;
 - (void)switchToggled:(UISwitch *)sender;
 - (void)updateClearButtonSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled;
 - (void)updateLongPressSubSwitchesUI:(NSInteger)section enabled:(BOOL)enabled;

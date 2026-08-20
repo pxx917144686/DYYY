@@ -43,7 +43,7 @@ typedef void (^DYYYAlertActionHandler)(void);
              confirmButton:(NSString *)confirmButtonTitle 
               cancelButton:(NSString *)cancelButtonTitle 
               confirmBlock:(void (^)(void))confirmBlock 
-               cancelBlock:(void (^)(void))cancelBlock;
+               cancelBlock:(nullable void (^)(void))cancelBlock;
 
 @end
 

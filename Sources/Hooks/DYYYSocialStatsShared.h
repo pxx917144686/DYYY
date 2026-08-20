@@ -49,13 +49,9 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface DYYYVideoEditViewController : UIViewController <UITextFieldDelegate, UIGestureRecognizerDelegate>
-@property (nonatomic, strong) NSString *videoId;
-@property (nonatomic, strong) NSDictionary *existingStats;
+@property (nonatomic, strong, nullable) NSString *videoId;
+@property (nonatomic, strong, nullable) NSDictionary *existingStats;
 @property (nonatomic, strong) NSMutableDictionary *currentValues;
-@end
-
-@interface NSObject (DYYYBlockTableDelegate)
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
 @end
 
 #pragma mark - 跨文件 C 函数

@@ -250,10 +250,11 @@
     if (!view) return nil;
     
     // 检查视图的控制器
-    UIViewController *vc = [view nextResponder];
-    while (vc && ![vc isKindOfClass:[UIViewController class]]) {
-        vc = [vc nextResponder];
+    UIResponder *responder = [view nextResponder];
+    while (responder && ![responder isKindOfClass:[UIViewController class]]) {
+        responder = [responder nextResponder];
     }
+    UIViewController *vc = (UIViewController *)responder;
     
     if ([vc isKindOfClass:NSClassFromString(@"AWEPlayInteractionViewController")]) {
         return vc;

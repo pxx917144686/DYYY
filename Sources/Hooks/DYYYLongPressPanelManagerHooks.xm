@@ -7,10 +7,34 @@
 
 #import "DYYYMainHooksShared.h"
 
+static BOOL DYYYModernLongPressPanelEnabled(void) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *key = @"DYYYisEnableModern";
+    return [defaults objectForKey:key] ? [defaults boolForKey:key] : YES;
+}
+
 %group needDelay
 %hook AWELongPressPanelManager
 - (BOOL)shouldShowModernLongPressPanel {
-    return DYYYCachedBool(@"DYYYisEnableModern") ?: YES;
+    return DYYYModernLongPressPanelEnabled();
+}
+%end
+
+%hook AWELongPressPanelDataManager
++ (BOOL)enableModernLongPressPanelConfigWithSceneIdentifier:(id)arg1 {
+    return DYYYModernLongPressPanelEnabled();
+}
+%end
+
+%hook AWELongPressPanelABSettings
++ (NSUInteger)modernLongPressPanelStyleMode {
+    return DYYYModernLongPressPanelEnabled() ? 1 : 0;
+}
+%end
+
+%hook AWEModernLongPressPanelUIConfig
++ (NSUInteger)modernLongPressPanelStyleMode {
+    return DYYYModernLongPressPanelEnabled() ? 1 : 0;
 }
 %end
 %end

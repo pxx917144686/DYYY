@@ -172,13 +172,9 @@
 
         if (labelColorHex && labelColorHex.length > 0) {
             @try {
-                SEL colorSelector = NSSelectorFromString(@"colorWithHexString:");
-                Class dyyyManagerClass = NSClassFromString(@"DYYYManager");
-                if (dyyyManagerClass && [dyyyManagerClass respondsToSelector:colorSelector]) {
-                    UIColor *labelColor = [dyyyManagerClass performSelector:colorSelector withObject:labelColorHex];
-                    if (labelColor) {
-                        leftLabel.textColor = labelColor;
-                    }
+                UIColor *labelColor = [DYYYManager colorWithHexString:labelColorHex];
+                if (labelColor) {
+                    leftLabel.textColor = labelColor;
                 }
             } @catch (NSException *exception) {
             }
@@ -220,13 +216,9 @@
 
         if (labelColorHex && labelColorHex.length > 0) {
             @try {
-                SEL colorSelector = NSSelectorFromString(@"colorWithHexString:");
-                Class dyyyManagerClass = NSClassFromString(@"DYYYManager");
-                if (dyyyManagerClass && [dyyyManagerClass respondsToSelector:colorSelector]) {
-                    UIColor *labelColor = [dyyyManagerClass performSelector:colorSelector withObject:labelColorHex];
-                    if (labelColor) {
-                        rightLabel.textColor = labelColor;
-                    }
+                UIColor *labelColor = [DYYYManager colorWithHexString:labelColorHex];
+                if (labelColor) {
+                    rightLabel.textColor = labelColor;
                 }
             } @catch (NSException *exception) {
             }
@@ -342,11 +334,7 @@
     UIColor *labelColor = [UIColor whiteColor];
     if (labelColorHex && labelColorHex.length > 0) {
         @try {
-            SEL colorSelector = NSSelectorFromString(@"colorWithHexString:");
-            Class dyyyManagerClass = NSClassFromString(@"DYYYManager");
-            if (dyyyManagerClass && [dyyyManagerClass respondsToSelector:colorSelector]) {
-                labelColor = [dyyyManagerClass performSelector:colorSelector withObject:labelColorHex];
-            }
+            labelColor = [DYYYManager colorWithHexString:labelColorHex];
         } @catch (NSException *exception) {
         }
     }

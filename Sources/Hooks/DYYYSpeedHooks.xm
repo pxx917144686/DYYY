@@ -19,7 +19,6 @@
 %hook AWEPlayInteractionSpeedController
 
 static CGFloat currentLongPressSpeed = 0;
-static CGFloat initialTouchX = 0;
 static BOOL isGestureActive = NO;
 
 - (CGFloat)longPressFastSpeedValue {

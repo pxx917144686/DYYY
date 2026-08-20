@@ -365,7 +365,6 @@ static void updateModelData(id model) {
         NSLog(@"[DYYY] 收到设置变更通知: %@", note.userInfo);
     
         NSString *key = note.userInfo[@"key"];
-        id value = note.userInfo[@"value"];
         
         // 重新加载所有数据
         loadCustomSocialStats();

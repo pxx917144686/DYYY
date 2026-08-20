@@ -19,14 +19,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIImageView *playPauseIconView;
 @property (nonatomic, strong) UIView *progressBarView;
 @property (nonatomic, strong) UIView *progressBarFillView;
-@property (nonatomic, weak) UIView *originalParentView;
+@property (nonatomic, weak, nullable) UIView *originalParentView;
 @property (nonatomic, assign) CGRect originalFrame;
-@property (nonatomic, weak) UIView *playerView;
+@property (nonatomic, weak, nullable) UIView *playerView;
 @property (nonatomic, strong) AWEAwemeModel *awemeModel;
-@property (nonatomic, strong) AVPlayer *pipPlayer;
-@property (nonatomic, strong) AVPlayerLayer *pipPlayerLayer;
+@property (nonatomic, strong, nullable) AVPlayer *pipPlayer;
+@property (nonatomic, strong, nullable) AVPlayerLayer *pipPlayerLayer;
 @property (nonatomic, assign) BOOL isPlayingInPip;
-@property (nonatomic, strong) id timeObserver;
+@property (nonatomic, strong, nullable) id timeObserver;
 
 - (void)dyyy_restoreFullScreen;
 - (NSString *)getAwemeId;

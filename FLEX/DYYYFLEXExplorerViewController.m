@@ -497,8 +497,6 @@ typedef NS_ENUM(NSUInteger, FLEXExplorerMode) {
             [DYYYUCDecryptTool presentDecryptPanelFromViewController:self];
         }]];
         
-        alert.popoverPresentationController.barButtonItem = sender;
-        
         [self presentViewController:alert animated:YES completion:nil];
     }
 }

@@ -6,10 +6,6 @@
 #import "AwemeHeaders.h"
 #import "DYYYGlass.h"
 #import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
-#import "DYYYUtils.h"
 
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
@@ -601,9 +597,10 @@ static void DYYYShareRefreshVisible(void) {
     while (parent && ![parent isKindOfClass:%c(AWESharePanelContainerViewController)]) {
         parent = parent.parentViewController;
     }
-    if ([parent isKindOfClass:%c(AWESharePanelContainerViewController)]
-        && @available(iOS 26.0, *)) {
-        DYYYShareSync((AWESharePanelContainerViewController *)parent);
+    if ([parent isKindOfClass:%c(AWESharePanelContainerViewController)]) {
+        if (@available(iOS 26.0, *)) {
+            DYYYShareSync((AWESharePanelContainerViewController *)parent);
+        }
     }
 }
 
@@ -613,9 +610,10 @@ static void DYYYShareRefreshVisible(void) {
     while (parent && ![parent isKindOfClass:%c(AWESharePanelContainerViewController)]) {
         parent = parent.parentViewController;
     }
-    if ([parent isKindOfClass:%c(AWESharePanelContainerViewController)]
-        && @available(iOS 26.0, *)) {
-        DYYYShareSync((AWESharePanelContainerViewController *)parent);
+    if ([parent isKindOfClass:%c(AWESharePanelContainerViewController)]) {
+        if (@available(iOS 26.0, *)) {
+            DYYYShareSync((AWESharePanelContainerViewController *)parent);
+        }
     }
 }
 
@@ -662,5 +660,15 @@ static void DYYYShareRefreshVisible(void) {
 
     if (DYYYGlassOSAvailable()) {
         %init(DYYYSharePanelGlassHooks);
+        [[NSNotificationCenter defaultCenter] addObserverForName:@"DYYYSettingChanged"
+                                                          object:nil
+                                                           queue:NSOperationQueue.mainQueue
+                                                      usingBlock:^(NSNotification *note) {
+            NSString *changedKey = note.userInfo[@"key"];
+            if ([changedKey isEqualToString:DYYYKeySharePanelGlass] ||
+                [changedKey isEqualToString:DYYYKeySharePanelGlassClear]) {
+                DYYYShareRefreshVisible();
+            }
+        }];
     }
 }

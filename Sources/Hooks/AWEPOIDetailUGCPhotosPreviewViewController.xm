@@ -12,7 +12,6 @@ static void dyyy_doSaveAtPoint(id self, CGPoint p);
 static UIImageView *dyyy_findFirstImageView(UIView *view);
 static UIImageView *dyyy_findBestImageView(UIView *root, CGPoint location);
 static UIImage *dyyy_extractImageFromImageView(UIImageView *iv);
-static UIImage *dyyy_extractImageAtPoint(UIView *root, CGPoint location);
 static UICollectionView *dyyy_findAnyCollection(UIView *root);
 static BOOL dyyy_tryDownloadFromPhotoAtPoint(UIView *root, CGPoint location);
 static BOOL dyyy_ensurePhotoAuthThen(void (^grantedBlock)(void));
@@ -238,42 +237,6 @@ static UIImage *dyyy_extractImageFromImageView(UIImageView *iv) {
     id contents = iv.layer.contents;
     if ([contents isKindOfClass:[NSNumber class]] || contents == nil) return nil;
     // 避免崩溃
-    return nil;
-}
-
-// 通过业务视图 AWEPOIDetailUGCPhotosPreviewScrollView 定位图片模型并下载为 UIImage
-static UIImage *dyyy_extractImageAtPoint(UIView *root, CGPoint location) {
-    if (!root) return nil;
-    UIView *hit = [root hitTest:location withEvent:nil];
-    UIView *cursor = hit;
-    while (cursor) {
-        // 层级：AWEPOIDetailUGCPhotosPreviewScrollView -> imageView / photo
-        if ([NSStringFromClass([cursor class]) containsString:@"AWEPOIDetailUGCPhotosPreviewScrollView"]) {
-            @try {
-                id photo = [cursor valueForKey:@"photo"]; // AWEPOIDetailPhotoBaseInfo *
-                NSString *best = nil;
-                @try {
-                    NSArray *origin = [photo valueForKey:@"originURLList"]; if ([origin isKindOfClass:[NSArray class]] && origin.count>0) best = origin.firstObject;
-                } @catch (__unused NSException *e) {}
-                if (!best) {
-                    @try {
-                        NSArray *list = [photo valueForKey:@"urlList"]; if ([list isKindOfClass:[NSArray class]] && list.count>0) {
-                            for (id u in list) { if ([u isKindOfClass:[NSString class]] && ![(NSString*)u hasSuffix:@".image"]) { best = (NSString*)u; break; } }
-                            if (!best) best = list.firstObject;
-                        }
-                    } @catch (__unused NSException *e) {}
-                }
-                if (best && best.length > 0) {
-                    NSURL *u = [NSURL URLWithString:best];
-                    if (!u) return nil;
-                    NSData *d = [NSData dataWithContentsOfURL:u];
-                    if (d.length > 0) return [UIImage imageWithData:d];
-                }
-            } @catch (__unused NSException *e) {}
-            break;
-        }
-        cursor = cursor.superview;
-    }
     return nil;
 }
 

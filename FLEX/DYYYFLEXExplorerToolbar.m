@@ -188,8 +188,6 @@
     const CGFloat kDescriptionVerticalPadding = [[self class] descriptionVerticalPadding];
     const CGFloat kDescriptionContainerHeight = [[self class] descriptionContainerHeight];
     
-    CGFloat bottomY = kToolbarItemHeight * 2;
-    
     CGRect descriptionContainerFrame = CGRectZero;
     descriptionContainerFrame.size.width = CGRectGetWidth(self.bounds);
     descriptionContainerFrame.size.height = kDescriptionContainerHeight;

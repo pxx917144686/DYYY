@@ -254,6 +254,22 @@
     return visible;
 }
 
+- (NSIndexPath *)visibleIndexPathForSettingKey:(NSString *)key {
+    if (key.length == 0) return nil;
+    NSArray *sections = self.isSearching ? self.filteredSections : self.settingSections;
+    for (NSInteger section = 0; section < (NSInteger)sections.count; section++) {
+        if (!self.isSearching && ![self.expandedSections containsObject:@(section)]) continue;
+        NSArray<DYYYSettingItem *> *visibleItems = [self visibleItemsForSection:section];
+        for (NSInteger row = 0; row < (NSInteger)visibleItems.count; row++) {
+            DYYYSettingItem *item = visibleItems[row];
+            if ([item.key isEqualToString:key]) {
+                return [NSIndexPath indexPathForRow:row inSection:section];
+            }
+        }
+    }
+    return nil;
+}
+
 // 条目所属子分组序号（flat 数组内第几个子分组标题）
 - (NSInteger)groupIndexForItem:(DYYYSettingItem *)targetItem inSection:(NSInteger)section {
     NSArray *sections = self.isSearching ? self.filteredSections : self.settingSections;
@@ -420,7 +436,6 @@
             saveFilename = @"share.png";
         }
         if (saveFilename) {
-            NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
             NSString *dyyyFolderPath = [DYYYPaths iconsDir];
             NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
             BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
@@ -828,11 +843,14 @@
 }
 
 - (NSArray<NSIndexPath *> *)rowsForSection:(NSInteger)section {
-    NSArray<NSArray<DYYYSettingItem *> *> *sections = self.isSearching ? self.filteredSections : self.settingSections;
-    if (section >= sections.count) {
+    NSArray *sections = self.isSearching ? self.filteredSections : self.settingSections;
+    if (section < 0 || section >= (NSInteger)sections.count) {
         return @[];
     }
-    NSInteger rowCount = sections[section].count;
+    if (!self.isSearching && ![self.expandedSections containsObject:@(section)]) {
+        return @[];
+    }
+    NSInteger rowCount = [self visibleItemsForSection:section].count;
     NSMutableArray *rows = [NSMutableArray arrayWithCapacity:rowCount];
     for (NSInteger row = 0; row < rowCount; row++) {
         [rows addObject:[NSIndexPath indexPathForRow:row inSection:section]];

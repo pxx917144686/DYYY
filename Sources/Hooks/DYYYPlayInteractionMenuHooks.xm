@@ -235,7 +235,6 @@
     [headerView bringSubviewToFront:menuButton];
     [headerView bringSubviewToFront:styleButton];
 
-    BOOL isImageContent = (awemeModel.awemeType == 68);
     // 调整scrollView位置以适应新的headerView位置
     UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 70, menuWidth, menuHeight - 70)]; // 从Y=70开始
     scrollView.showsVerticalScrollIndicator = YES;
@@ -1080,8 +1079,6 @@
     // 使用工厂创建对应样式的构建器
     DYYYMenuStyleBuilder *builder = nil;
     DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
-    BOOL currentListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
-
     if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
         builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];
     } else {
@@ -1299,8 +1296,8 @@
         }
     }
 
-    if (!isImageContent && [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnablePipPlayer"] || 
-        ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnablePipPlayer"]) {
+    if (!isImageContent && ([[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnablePipPlayer"] ||
+                            ![[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYEnablePipPlayer"])) {
         
         DYYYMenuModule *pipModule = [DYYYMenuModule moduleWithTitle:@"小窗播放"
                                                                 icon:@"pip.enter"
@@ -2411,7 +2408,6 @@
     }];
     
     // 禁用ScrollView滚动
-    UIScrollView *scrollView = nil;
     UIView *view = button.superview;
     while (view && ![view isKindOfClass:[UIScrollView class]]) {
         view = view.superview;
@@ -3140,7 +3136,6 @@
     
     // 执行相应操作
     if ([action isEqualToString:@"download"]) {
-        AWEAwemeModel *model = [self getCurrentAwemeModel];
         // 执行下载操作
     } 
     else if ([action isEqualToString:@"screenshot"]) {
@@ -3350,10 +3345,8 @@
     BOOL isListView = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYListViewMode"];
     
     // 使用工厂创建对应样式的构建器
-    DYYYMenuStyle style = isListView ? DYYYMenuStyleList : DYYYMenuStyleCard;
     DYYYMenuStyleBuilder *builder = nil;
     DYYYMenuVisualStyle visualStyle = (DYYYMenuVisualStyle)[[NSUserDefaults standardUserDefaults] integerForKey:@"DYYYMenuVisualStyle"];
-    BOOL isListLayout = (style == DYYYMenuStyleList);
 
     if (visualStyle == DYYYMenuVisualStyleNeuomorphic) {
         builder = [[DYYYNeuomorphicStyleBuilder alloc] initWithScrollView:scrollView modules:modules];

@@ -9,54 +9,36 @@
 #import <objc/runtime.h>
 #import "DYYYSocialStatsShared.h"
 
-@implementation NSObject (DYYYBlockTableDelegate)
-static char BlockDictionaryKey;
+@interface DYYYBlockTableDelegate : NSObject <UITableViewDataSource, UITableViewDelegate>
+@property(nonatomic, copy) NSDictionary *blocks;
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary;
+@end
 
+static char DYYYVideoStatsTableAdaptersKey;
+
+@implementation DYYYBlockTableDelegate
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [self init];
-    if (self && dictionary) {
-        objc_setAssociatedObject(self, &BlockDictionaryKey, dictionary, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (self) {
+        _blocks = [dictionary copy];
     }
     return self;
 }
 
-- (void)forwardInvocation:(NSInvocation *)invocation {
-    NSDictionary *dict = objc_getAssociatedObject(self, &BlockDictionaryKey);
-    if (!dict) return;
-    
-    NSString *selectorName = NSStringFromSelector(invocation.selector);
-    id block = dict[selectorName];
-    if (!block) return;
-    
-    @try {
-        if ([selectorName isEqualToString:@"tableView:numberOfRowsInSection:"]) {
-            __unsafe_unretained id tableView;
-            NSInteger section;
-            [invocation getArgument:&tableView atIndex:2];
-            [invocation getArgument:&section atIndex:3];
-            
-            NSInteger result = ((NSInteger (^)(id, NSInteger))block)(tableView, section);
-            [invocation setReturnValue:&result];
-        } 
-        else if ([selectorName isEqualToString:@"tableView:cellForRowAtIndexPath:"]) {
-            __unsafe_unretained id tableView;
-            __unsafe_unretained id indexPath;
-            [invocation getArgument:&tableView atIndex:2];
-            [invocation getArgument:&indexPath atIndex:3];
-            
-            id result = ((id (^)(id, id))block)(tableView, indexPath);
-            [invocation setReturnValue:&result];
-        }
-        else if ([selectorName isEqualToString:@"tableView:didSelectRowAtIndexPath:"]) {
-            __unsafe_unretained id tableView;
-            __unsafe_unretained id indexPath;
-            [invocation getArgument:&tableView atIndex:2];
-            [invocation getArgument:&indexPath atIndex:3];
-            
-            ((void (^)(id, id))block)(tableView, indexPath);
-        }
-    } @catch (NSException *e) {
-        NSLog(@"[DYYY] 消息转发异常: %@", e);
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    NSInteger (^block)(UITableView *, NSInteger) = self.blocks[@"tableView:numberOfRowsInSection:"];
+    return block ? block(tableView, section) : 0;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *(^block)(UITableView *, NSIndexPath *) = self.blocks[@"tableView:cellForRowAtIndexPath:"];
+    return block ? block(tableView, indexPath) : [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    void (^block)(UITableView *, NSIndexPath *) = self.blocks[@"tableView:didSelectRowAtIndexPath:"];
+    if (block) {
+        block(tableView, indexPath);
     }
 }
 @end
@@ -117,7 +99,7 @@ void showVideoStatsListController(UIViewController *parentVC) {
     }
     
     // 自定义显示数据
-    listVC.tableView.dataSource = [[NSObject alloc] initWithDictionary:@{
+    DYYYBlockTableDelegate *dataSource = [[DYYYBlockTableDelegate alloc] initWithDictionary:@{
         @"tableView:numberOfRowsInSection:": ^NSInteger(UITableView *tableView, NSInteger section) {
             return [videoIds count];
         },
@@ -150,9 +132,11 @@ void showVideoStatsListController(UIViewController *parentVC) {
             return cell;
         }
     }];
+    listVC.tableView.dataSource = dataSource;
     
     // 添加删除功能
-    listVC.tableView.delegate = [[NSObject alloc] initWithDictionary:@{
+    __weak UITableViewController *weakListVC = listVC;
+    DYYYBlockTableDelegate *delegate = [[DYYYBlockTableDelegate alloc] initWithDictionary:@{
         @"tableView:didSelectRowAtIndexPath:": ^(UITableView *tableView, NSIndexPath *indexPath) {
             [tableView deselectRowAtIndexPath:indexPath animated:YES];
             
@@ -169,7 +153,7 @@ void showVideoStatsListController(UIViewController *parentVC) {
                 [defaults setObject:videoId forKey:@"DYYYTempEditingVideoId"];
                 [defaults synchronize];
                 
-                [listVC dismissViewControllerAnimated:YES completion:^{
+                [weakListVC dismissViewControllerAnimated:YES completion:^{
                     showVideoStatsEditAlert(parentVC);
                 }];
             }]];
@@ -198,7 +182,7 @@ void showVideoStatsListController(UIViewController *parentVC) {
                     [defaults synchronize];
                     
                     // 刷新列表
-                    [listVC dismissViewControllerAnimated:YES completion:^{
+                    [weakListVC dismissViewControllerAnimated:YES completion:^{
                         // 如果列表为空，直接返回
                         NSUInteger count;
                         @synchronized(videoSpecificStats) {
@@ -221,7 +205,7 @@ void showVideoStatsListController(UIViewController *parentVC) {
                     }];
                 }]];
                 
-                [listVC presentViewController:confirmAlert animated:YES completion:nil];
+                [weakListVC presentViewController:confirmAlert animated:YES completion:nil];
             }]];
             
             [actionSheet addAction:[UIAlertAction actionWithTitle:@"复制视频ID" 
@@ -236,7 +220,7 @@ void showVideoStatsListController(UIViewController *parentVC) {
                                                                                      message:[NSString stringWithFormat:@"视频ID: %@ 已复制到剪贴板", videoId]
                                                                               preferredStyle:UIAlertControllerStyleAlert];
                 [successAlert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-                [listVC presentViewController:successAlert animated:YES completion:nil];
+                [weakListVC presentViewController:successAlert animated:YES completion:nil];
             }]];
             
             [actionSheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
@@ -247,9 +231,12 @@ void showVideoStatsListController(UIViewController *parentVC) {
                 actionSheet.popoverPresentationController.sourceRect = [tableView rectForRowAtIndexPath:indexPath];
             }
             
-            [listVC presentViewController:actionSheet animated:YES completion:nil];
+            [weakListVC presentViewController:actionSheet animated:YES completion:nil];
         }
     }];
+    listVC.tableView.delegate = delegate;
+    objc_setAssociatedObject(listVC, &DYYYVideoStatsTableAdaptersKey,
+                             @[dataSource, delegate], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     
     // 添加导航栏按钮
     UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone 

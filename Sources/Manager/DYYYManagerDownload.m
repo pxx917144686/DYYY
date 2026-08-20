@@ -398,18 +398,6 @@ static BOOL DYYYWriteStaticImageToGIF(UIImage *image, NSURL *gifURL) {
     });
 }
 
-// 辅助函数：复制上下文像素数据
-static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
-                               int height) {
-  size_t bytesPerRow = CGBitmapContextGetBytesPerRow(src);
-  void *srcData = CGBitmapContextGetData(src);
-  void *dstData = CGBitmapContextGetData(dst);
-
-  if (srcData && dstData) {
-    memcpy(dstData, srcData, bytesPerRow * height);
-  }
-}
-
 // 将HEIC转换为GIF的方法
 + (void)convertHeicToGif:(NSURL *)heicURL
               completion:(void (^)(NSURL *gifURL, BOOL success))completion {
@@ -428,8 +416,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
 
         // 2. 获取帧数
         size_t count = CGImageSourceGetCount(src);
-        BOOL isAnimated = (count > 1);
-
         // 3. 生成GIF路径
         NSString *gifFileName =
             [[heicURL.lastPathComponent stringByDeletingPathExtension]
@@ -630,17 +616,7 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                                        (imageProgress + videoProgress) / 2.0;
                                    [progressView setProgress:totalProgress];
 
-                                   // 更新进度文字
-                                   NSString *statusText =
-                                       @"正在下载实况照片...";
-                                   if (imageDownloaded && !videoDownloaded) {
-                                     statusText = @"图片下载完成，等待视频...";
-                                   } else if (!imageDownloaded &&
-                                              videoDownloaded) {
-                                     statusText = @"视频下载完成，等待图片...";
-                                   } else if (imageDownloaded &&
-                                              videoDownloaded) {
-                                     statusText = @"下载完成，准备保存...";
+                                   if (imageDownloaded && videoDownloaded) {
                                      [timer invalidate]; // 全部完成时停止定时器
                                    }
                                  }];
@@ -992,7 +968,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
 
     [progressView show];
 
-    __block NSInteger completedCount = 0;
     __block NSInteger successCount = 0;
     NSInteger totalCount = imageURLs.count;
 
@@ -1505,26 +1480,26 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                 outputFile:(NSString *)outputFile
                 identifier:(NSString *)identifier {
   NSError *error = nil;
-  AVAsset *asset = [AVAsset assetWithURL:videoURL];
-  AVAssetReader *reader = [AVAssetReader assetReaderWithAsset:asset
-                                                        error:&error];
+  AVAsset *videoAsset = [AVAsset assetWithURL:videoURL];
+  AVAssetReader *assetReader = [AVAssetReader assetReaderWithAsset:videoAsset
+                                                             error:&error];
   if (error) {
     return;
   }
-  NSMutableArray<AVMetadataItem *> *metadata = asset.metadata.mutableCopy;
+  NSMutableArray<AVMetadataItem *> *metadata = videoAsset.metadata.mutableCopy;
   AVMetadataItem *item = [self createContentIdentifierMetadataItem:identifier];
   [metadata addObject:item];
   NSURL *videoFileURL = [NSURL fileURLWithPath:outputFile];
   [self deleteFile:outputFile];
-  AVAssetWriter *writer =
+  AVAssetWriter *assetWriter =
       [AVAssetWriter assetWriterWithURL:videoFileURL
                                fileType:AVFileTypeQuickTimeMovie
                                   error:&error];
   if (error) {
     return;
   }
-  [writer setMetadata:metadata];
-  NSArray<AVAssetTrack *> *tracks = [asset tracks];
+  [assetWriter setMetadata:metadata];
+  NSArray<AVAssetTrack *> *tracks = [videoAsset tracks];
   for (AVAssetTrack *track in tracks) {
     NSDictionary *readerOutputSettings = nil;
     NSDictionary *writerOuputSettings = nil;
@@ -1543,33 +1518,33 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
     AVAssetWriterInput *input =
         [AVAssetWriterInput assetWriterInputWithMediaType:track.mediaType
                                            outputSettings:writerOuputSettings];
-    if ([reader canAddOutput:output] && [writer canAddInput:input]) {
-      [reader addOutput:output];
-      [writer addInput:input];
+    if ([assetReader canAddOutput:output] && [assetWriter canAddInput:input]) {
+      [assetReader addOutput:output];
+      [assetWriter addInput:input];
     }
   }
   AVAssetWriterInput *input = [self createStillImageTimeAssetWriterInput];
   AVAssetWriterInputMetadataAdaptor *adaptor =
       [AVAssetWriterInputMetadataAdaptor
           assetWriterInputMetadataAdaptorWithAssetWriterInput:input];
-  if ([writer canAddInput:input]) {
-    [writer addInput:input];
+  if ([assetWriter canAddInput:input]) {
+    [assetWriter addInput:input];
   }
-  [writer startWriting];
-  [writer startSessionAtSourceTime:kCMTimeZero];
-  [reader startReading];
+  [assetWriter startWriting];
+  [assetWriter startSessionAtSourceTime:kCMTimeZero];
+  [assetReader startReading];
   AVMetadataItem *timedItem = [self createStillImageTimeMetadataItem];
   CMTimeRange timedRange = CMTimeRangeMake(kCMTimeZero, CMTimeMake(1, 100));
   AVTimedMetadataGroup *timedMetadataGroup =
       [[AVTimedMetadataGroup alloc] initWithItems:@[ timedItem ]
                                         timeRange:timedRange];
   [adaptor appendTimedMetadataGroup:timedMetadataGroup];
-  DYYYManager.shared->reader = reader;
-  DYYYManager.shared->writer = writer;
+  DYYYManager.shared->reader = assetReader;
+  DYYYManager.shared->writer = assetWriter;
   DYYYManager.shared->queue =
       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
   DYYYManager.shared->group = dispatch_group_create();
-  for (NSInteger i = 0; i < reader.outputs.count; ++i) {
+  for (NSInteger i = 0; i < assetReader.outputs.count; ++i) {
     dispatch_group_enter(DYYYManager.shared->group);
     [self writeTrack:i];
   }
@@ -1731,7 +1706,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
         // 进度计算 - 为三个阶段分配权重
         NSInteger totalSteps = livePhotos.count * 10; // 每个实况照片总共10步(4+4+2)
         __block NSInteger completedSteps = 0;
-        __block NSInteger phase = 0; // 0:下载图片阶段，1:下载视频阶段，2:合成阶段
         
         // 创建临时目录
         NSString *livePhotoPath = [[DYYYPaths tempDir] stringByAppendingPathComponent:@"LivePhotoBatch"];
@@ -1785,7 +1759,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                         return;
                     }
                     
-                    float progressPerItem = (float)(livePhotos.count * 2) / totalSteps;
                     __block NSInteger processedCount = 0;
                     
                     for (NSDictionary *fileInfo in downloadedFiles) {
@@ -1942,7 +1915,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
         
         // 所有图片下载完成后，开始下载视频
         dispatch_group_notify(imageDownloadGroup, dispatch_get_main_queue(), ^{
-            phase = 1; // 进入视频下载阶段
             updateProgress(@"正在下载视频...");
             
             dispatch_group_t videoDownloadGroup = dispatch_group_create();
@@ -1995,7 +1967,6 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
             
             // 所有视频下载完成后，开始合成实况照片
             dispatch_group_notify(videoDownloadGroup, dispatch_get_main_queue(), ^{
-                phase = 2; // 进入合成阶段
                 finishProcess();
             });
         });
@@ -2008,35 +1979,35 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                             identifier:(NSString *)identifier
                                 reader:(AVAssetReader **)readerPtr
                                 writer:(AVAssetWriter **)writerPtr
-                                 queue:(dispatch_queue_t)queue
-                                 group:(dispatch_group_t)group
+                                 queue:(dispatch_queue_t)workQueue
+                                 group:(dispatch_group_t)workGroup
                               complete:(void (^)(BOOL success, NSString *photoFile, NSString *videoFile, NSError *error))complete {
     NSError *error = nil;
-    AVAsset *asset = [AVAsset assetWithURL:videoURL];
-    AVAssetReader *reader = [AVAssetReader assetReaderWithAsset:asset error:&error];
+    AVAsset *videoAsset = [AVAsset assetWithURL:videoURL];
+    AVAssetReader *assetReader = [AVAssetReader assetReaderWithAsset:videoAsset error:&error];
     if (error) {
         if (complete) complete(NO, nil, nil, error);
         return;
     }
     
-    *readerPtr = reader;
+    *readerPtr = assetReader;
     
-    NSMutableArray<AVMetadataItem *> *metadata = asset.metadata.mutableCopy;
+    NSMutableArray<AVMetadataItem *> *metadata = videoAsset.metadata.mutableCopy;
     AVMetadataItem *item = [self createContentIdentifierMetadataItem:identifier];
     [metadata addObject:item];
     NSURL *videoFileURL = [NSURL fileURLWithPath:outputFile];
     [self deleteFile:outputFile];
     
-    AVAssetWriter *writer = [AVAssetWriter assetWriterWithURL:videoFileURL fileType:AVFileTypeQuickTimeMovie error:&error];
+    AVAssetWriter *assetWriter = [AVAssetWriter assetWriterWithURL:videoFileURL fileType:AVFileTypeQuickTimeMovie error:&error];
     if (error) {
         if (complete) complete(NO, nil, nil, error);
         return;
     }
     
-    *writerPtr = writer;
-    [writer setMetadata:metadata];
+    *writerPtr = assetWriter;
+    [assetWriter setMetadata:metadata];
     
-    NSArray<AVAssetTrack *> *tracks = [asset tracks];
+    NSArray<AVAssetTrack *> *tracks = [videoAsset tracks];
     for (AVAssetTrack *track in tracks) {
         NSDictionary *readerOutputSettings = nil;
         NSDictionary *writerOuputSettings = nil;
@@ -2053,42 +2024,42 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
         AVAssetReaderTrackOutput *output = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:track outputSettings:readerOutputSettings];
         AVAssetWriterInput *input = [AVAssetWriterInput assetWriterInputWithMediaType:track.mediaType outputSettings:writerOuputSettings];
         
-        if ([reader canAddOutput:output] && [writer canAddInput:input]) {
-            [reader addOutput:output];
-            [writer addInput:input];
+        if ([assetReader canAddOutput:output] && [assetWriter canAddInput:input]) {
+            [assetReader addOutput:output];
+            [assetWriter addInput:input];
         }
     }
     
     AVAssetWriterInput *input = [self createStillImageTimeAssetWriterInput];
     AVAssetWriterInputMetadataAdaptor *adaptor = [AVAssetWriterInputMetadataAdaptor assetWriterInputMetadataAdaptorWithAssetWriterInput:input];
-    if ([writer canAddInput:input]) {
-        [writer addInput:input];
+    if ([assetWriter canAddInput:input]) {
+        [assetWriter addInput:input];
     }
     
-    [writer startWriting];
-    [writer startSessionAtSourceTime:kCMTimeZero];
-    [reader startReading];
+    [assetWriter startWriting];
+    [assetWriter startSessionAtSourceTime:kCMTimeZero];
+    [assetReader startReading];
     
     AVMetadataItem *timedItem = [self createStillImageTimeMetadataItem];
     CMTimeRange timedRange = CMTimeRangeMake(kCMTimeZero, CMTimeMake(1, 100));
     AVTimedMetadataGroup *timedMetadataGroup = [[AVTimedMetadataGroup alloc] initWithItems:@[ timedItem ] timeRange:timedRange];
     [adaptor appendTimedMetadataGroup:timedMetadataGroup];
     
-    for (NSInteger i = 0; i < reader.outputs.count; ++i) {
-        dispatch_group_enter(group);
-        [self writeTrackWithLocalVars:i reader:reader writer:writer queue:queue group:group];
+    for (NSInteger i = 0; i < assetReader.outputs.count; ++i) {
+        dispatch_group_enter(workGroup);
+        [self writeTrackWithLocalVars:i reader:assetReader writer:assetWriter queue:workQueue group:workGroup];
     }
     
-    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        [reader cancelReading];
-        [writer finishWritingWithCompletionHandler:^{
-            AVAssetWriterStatus status = writer.status;
+    dispatch_group_notify(workGroup, dispatch_get_main_queue(), ^{
+        [assetReader cancelReading];
+        [assetWriter finishWritingWithCompletionHandler:^{
+            AVAssetWriterStatus status = assetWriter.status;
             if (status == AVAssetWriterStatusCompleted) {
                 NSString *photoName = [[videoURL lastPathComponent] stringByDeletingPathExtension];
                 NSString *photoFile = [self filePathFromTmp:[photoName stringByAppendingPathExtension:@"heic"]];
                 if (complete) complete(YES, photoFile, outputFile, nil);
             } else {
-                if (complete) complete(NO, nil, nil, writer.error);
+                if (complete) complete(NO, nil, nil, assetWriter.error);
             }
         }];
     });
@@ -2096,28 +2067,28 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
 
 // 处理视频曲目的写入
 - (void)writeTrackWithLocalVars:(NSInteger)trackIndex 
-                         reader:(AVAssetReader *)reader
-                         writer:(AVAssetWriter *)writer
-                          queue:(dispatch_queue_t)queue 
-                          group:(dispatch_group_t)group {
-    AVAssetReaderOutput *output = reader.outputs[trackIndex];
-    AVAssetWriterInput *input = writer.inputs[trackIndex];
+                         reader:(AVAssetReader *)assetReader
+                         writer:(AVAssetWriter *)assetWriter
+                          queue:(dispatch_queue_t)workQueue
+                          group:(dispatch_group_t)workGroup {
+    AVAssetReaderOutput *output = assetReader.outputs[trackIndex];
+    AVAssetWriterInput *input = assetWriter.inputs[trackIndex];
 
-    [input requestMediaDataWhenReadyOnQueue:queue usingBlock:^{
+    [input requestMediaDataWhenReadyOnQueue:workQueue usingBlock:^{
         while (input.readyForMoreMediaData) {
-            AVAssetReaderStatus status = reader.status;
+            AVAssetReaderStatus status = assetReader.status;
             CMSampleBufferRef buffer = NULL;
             if ((status == AVAssetReaderStatusReading) && (buffer = [output copyNextSampleBuffer])) {
                 BOOL success = [input appendSampleBuffer:buffer];
                 CFRelease(buffer);
                 if (!success) {
                     [input markAsFinished];
-                    dispatch_group_leave(group);
+                    dispatch_group_leave(workGroup);
                     return;
                 }
             } else {
                 [input markAsFinished];
-                dispatch_group_leave(group);
+                dispatch_group_leave(workGroup);
                 return;
             }
         }
@@ -2287,17 +2258,12 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
     [imageFiles addObject:[NSNull null]];
 
   dispatch_group_t downloadGroup = dispatch_group_create();
-  __block NSInteger totalDownloads = 0;
-  __block NSInteger completedDownloads = 0;
-  __block NSInteger successfulDownloads = 0;
 
   if (hasVideos) {
-    totalDownloads += videos.count;
     for (NSInteger i = 0; i < videos.count; i++) {
       NSDictionary *videoDict = videos[i];
       NSString *videoUrl = videoDict[@"url"];
       if (videoUrl.length == 0) {
-        completedDownloads++;
         continue;
       }
       dispatch_group_enter(downloadGroup);
@@ -2310,20 +2276,16 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                                @synchronized(videoFiles) {
                                  videoFiles[i] = fileURL;
                                }
-                               successfulDownloads++;
                              }
-                             completedDownloads++;
                              dispatch_group_leave(downloadGroup);
                            }];
     }
   }
 
   if (hasImages) {
-    totalDownloads += images.count;
     for (NSInteger i = 0; i < images.count; i++) {
       NSString *imageUrl = images[i];
       if (imageUrl.length == 0) {
-        completedDownloads++;
         continue;
       }
       dispatch_group_enter(downloadGroup);
@@ -2336,28 +2298,22 @@ static void CGContextCopyBytes(CGContextRef dst, CGContextRef src, int width,
                                @synchronized(imageFiles) {
                                  imageFiles[i] = fileURL;
                                }
-                               successfulDownloads++;
                              }
-                             completedDownloads++;
                              dispatch_group_leave(downloadGroup);
                            }];
     }
   }
 
   dispatch_group_notify(downloadGroup, dispatch_get_main_queue(), ^{
-    NSInteger videoSuccessCount = 0;
     for (id file in videoFiles) {
       if ([file isKindOfClass:[NSURL class]]) {
         [self saveMedia:(NSURL *)file mediaType:MediaTypeVideo completion:nil];
-        videoSuccessCount++;
       }
     }
 
-    NSInteger imageSuccessCount = 0;
     for (id file in imageFiles) {
       if ([file isKindOfClass:[NSURL class]]) {
         [self saveMedia:(NSURL *)file mediaType:MediaTypeImage completion:nil];
-        imageSuccessCount++;
       }
     }
   });
