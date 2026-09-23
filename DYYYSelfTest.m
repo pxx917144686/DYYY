@@ -8,9 +8,6 @@
 #import "DYYYFloatSpeedButton.h"
 #import "DYYYCrashCatcher.h"
 #import "DYYYPaths.h"
-#ifndef DYYY_RELEASE_BUILD
-#import "FLEX/x/Decrypt/DYYYDatabaseManager.h"
-#endif
 #import <objc/runtime.h>
 
 // 城市库单参数属地方法（头文件仅声明 5 参数版，实际实现为单参数，与 DYYY.xm 用法一致）
@@ -318,38 +315,6 @@ static DYYYSelfTestResult *DYYYTestFileSystem(void) {
     return DYYYMakeResult(@"文件系统", 2, [NSString stringWithFormat:@"目录不可写: %@", err.localizedDescription]);
 }
 
-// 15. 逆向助手数据库（发布版不含，跳过）
-#ifndef DYYY_RELEASE_BUILD
-static DYYYSelfTestResult *DYYYTestDatabase(void) {
-    DYYYDatabaseManager *db = [DYYYDatabaseManager sharedManager];
-    NSString *probeBundle = @"com.dyyy.selftest.probe";
-    NSString *probeText = @"selftest-probe";
-
-    [db insertDataIntoTable:@"zhaiyao" bundleID:probeBundle text:probeText];
-    NSArray<NSString *> *texts = [db queryTextsFromTable:@"zhaiyao" bundleID:probeBundle];
-
-    BOOL written = NO;
-    for (NSString *t in texts) {
-        if ([t isEqualToString:probeText]) {
-            written = YES;
-            break;
-        }
-    }
-
-    if (written) {
-        return DYYYMakeResult(@"逆向助手数据库", 0, @"写入/查询正常(测试数据受 500 条上限自动裁剪)");
-    }
-    return DYYYMakeResult(@"逆向助手数据库", 2, @"写入后未能查询到测试数据");
-}
-
-static DYYYSelfTestResult *DYYYTestFlexEntry(void) {
-    return DYYYCheckClasses(@"FLEX 调试工具", @[
-        @"DYYYFLEXManager",
-        @"DYYYIZXURLCaptureProtocol"
-    ]);
-}
-#endif
-
 // 16. 网络可达性（douyin.com 5s 超时，⚠️ 容错）
 static DYYYSelfTestResult *DYYYTestNetwork(void) {
     __block NSInteger status = 1;
@@ -590,10 +555,6 @@ static DYYYSelfTestResult *DYYYTestCrashCatcher(void) {
         ^DYYYSelfTestResult *(void){ return DYYYTestABTest(); },
         ^DYYYSelfTestResult *(void){ return DYYYTestFileSystem(); }
     ]];
-#ifndef DYYY_RELEASE_BUILD
-    [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestDatabase(); }];
-    [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestFlexEntry(); }];
-#endif
     [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestCrashCatcher(); }];
     [tests addObject:^DYYYSelfTestResult *(void){ return DYYYTestNetwork(); }];
 

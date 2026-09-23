@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSString *)abTestDir;      // DYYY/ABTest（ABTest 配置 json）
 + (NSString *)backupDir;      // DYYY/Backup（设置备份 json）
 + (NSString *)tempDir;        // DYYY/Temp（临时文件，用完即删）
-+ (NSString *)logsDir;        // DYYY/Logs（调试类平铺：崩溃日志 + 逆向助手数据库）
++ (NSString *)logsDir;        // DYYY/Logs（调试类平铺：崩溃日志等）
 
 // 旧文件一次性迁移（幂等；CrashCatcher 等依赖方可在清理前显式调用保证顺序）
 + (void)runLegacyMigrationIfNeeded;

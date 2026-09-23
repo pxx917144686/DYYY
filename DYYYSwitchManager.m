@@ -244,7 +244,6 @@ static NSLock *settingsLock = nil;
         NSArray<NSString *> *subKeys = @[
             @"DYYYLongPressSaveVideo",
             @"DYYYLongPressSaveAudio", 
-            @"DYYYEnableFLEX",
             @"DYYYLongPressPip",
             @"DYYYLongPressSaveCurrentImage",
             @"DYYYLongPressSaveAllImages",

@@ -66,10 +66,6 @@ static void DYYYMigrateLegacyFiles(void) {
     NSString *root = [DYYYPaths dyyyRootDir];
     NSString *logs = [DYYYPaths logsDir];
 
-    // 逆向助手数据库：Documents 根 → Logs/（平铺）
-    DYYYMigrateFile([doc stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"],
-                    [logs stringByAppendingPathComponent:@"iosnixiangzhushoutest.sqlite"]);
-
     // 崩溃日志：旧 CrashLogs/ 目录 → Logs/（平铺）
     DYYYMigrateDirectoryContents([root stringByAppendingPathComponent:@"CrashLogs"], logs);
 

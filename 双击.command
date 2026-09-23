@@ -95,14 +95,12 @@ display_task_status() {
 # 更现代化的统计面板 - 改进边框和内部间距
 display_stats() {
   local source_files=$1
-  local flex_files=$2
-  local total_files=$3
+  local total_files=$2
   
   echo -e "\n${BOLD}${DARK_BLUE}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
   echo -e "${BOLD}${DARK_BLUE}┃  ${BOLD}${BRIGHT_GREEN}编译统计${NC}                                           ${BOLD}${DARK_BLUE}┃${NC}"
   echo -e "${BOLD}${DARK_BLUE}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┫${NC}"
   echo -e "${BOLD}${DARK_BLUE}┃  ${CYAN}主要源代码文件${NC}              ┃  ${YELLOW}${source_files}${NC} 个文件              ┃${NC}"
-  echo -e "${BOLD}${DARK_BLUE}┃  ${CYAN}FLEX 框架文件${NC}               ┃  ${YELLOW}${flex_files}${NC} 个文件              ┃${NC}"
   echo -e "${BOLD}${DARK_BLUE}┃  ${BOLD}${BRIGHT_GREEN}编译文件总数${NC}                ┃  ${BOLD}${YELLOW}${total_files}${NC} 个文件              ┃${NC}"
   echo -e "${BOLD}${DARK_BLUE}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━┛${NC}"
 }
@@ -207,8 +205,7 @@ main() {
   INDICATOR_PID=$!
   
   SOURCE_FILES=$(grep -o "\.xm\|\.m\|\.mm\|\.c\|\.cpp" Makefile | wc -l | xargs)
-  FLEX_FILES=$(find FLEX -name "*.m" -o -name "*.mm" 2>/dev/null | wc -l | xargs)
-  TOTAL_FILES=$((SOURCE_FILES + FLEX_FILES))
+  TOTAL_FILES=$SOURCE_FILES
   
   # 防止除零错误
   if [ $TOTAL_FILES -eq 0 ]; then
@@ -220,7 +217,7 @@ main() {
   echo -ne "\r\033[K" # 清除动画行
   
   # 显示统计
-  display_stats "$SOURCE_FILES" "$FLEX_FILES" "$TOTAL_FILES"
+  display_stats "$SOURCE_FILES" "$TOTAL_FILES"
   
   # 准备阶段
   display_stage "准备编译环境" "🧹"

@@ -10,9 +10,6 @@
 #import <objc/runtime.h>
 #import "AwemeHeaders.h"
 #import "DYYYManager.h"
-#ifndef DYYY_RELEASE_BUILD
-#import "FLEXHeaders.h"
-#endif
 #import "DYYYConfirmCloseView.h"
 #import "DYYYUtils.h"
 #import "DYYYKeywordListView.h"
@@ -50,8 +47,7 @@
 @property (nonatomic, assign) BOOL isDYYYCustomGroup;
 @end
 
-@interface AWEModernLongPressPanelTableViewController (DYYY_FLEX)
-- (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel;
+@interface AWEModernLongPressPanelTableViewController (DYYYPanel)
 - (NSArray *)applyOriginalArrayFilters:(NSArray *)originalArray;
 - (NSArray<NSNumber *> *)calculateButtonDistribution:(NSInteger)totalButtons;
 - (AWELongPressPanelViewGroupModel *)createCustomGroup:(NSArray<AWELongPressPanelBaseViewModel *> *)buttons;
@@ -107,17 +103,6 @@
 }
 
 %new
-- (void)fixFLEXMenu:(AWEAwemeModel *)awemeModel {    
-    // 直接打开 FLEX 调试器（发布版无 FLEX 类，nil 安全 no-op；入口已在调用侧条件编译隐藏）
-    // performSelector 避免依赖 FLEXHeaders.h 的方法声明（发布版已 guard）
-    id flexManagerClass = %c(DYYYFLEXManager);
-    id flexManager = [flexManagerClass sharedManager];
-    if (flexManager) {
-        [flexManager performSelector:@selector(showExplorer)];
-    }
-}
-
-%new
 - (void)refreshCurrentView {
     UIViewController *topVC = [DYYYManager getActiveTopController];
     if ([topVC respondsToSelector:@selector(viewDidLoad)]) {
@@ -147,7 +132,6 @@
     BOOL enableFilterKeyword = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressFilterTitle"];
     BOOL enableTimerClose = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressTimerClose"];
     BOOL enableCreateVideo = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressCreateVideo"];
-    BOOL enableFLEX = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYEnableFLEX"];
     // PIP 功能开关检查
     BOOL enablePip = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressDownload"] &&
                          [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYLongPressPip"];
@@ -155,7 +139,7 @@
     // 检查是否有任何功能启用
     hasAnyFeatureEnabled = enableSaveVideo || enableSaveCover || enableSaveAudio || enableSaveCurrentImage || enableSaveAllImages || 
                            enableCopyText || enableCopyLink || enableApiDownload || enableFilterUser || enableFilterKeyword || 
-                           enableTimerClose || enableCreateVideo || enableFLEX || enablePip;
+                           enableTimerClose || enableCreateVideo || enablePip;
 
     // 获取需要隐藏的按钮设置
     BOOL hideDaily = [[NSUserDefaults standardUserDefaults] boolForKey:@"DYYYHideDaily"];
@@ -871,24 +855,6 @@
         [viewModels addObject:timerCloseViewModel];
     }
 
-#ifndef DYYY_RELEASE_BUILD
-    // FLEX调试功能（发布版不含 FLEX，隐藏面板项）
-    if (enableFLEX) {
-        AWELongPressPanelBaseViewModel *flexViewModel = [[%c(AWELongPressPanelBaseViewModel) alloc] init];
-        flexViewModel.awemeModel = self.awemeModel;
-        flexViewModel.actionType = 675;
-        flexViewModel.duxIconName = @"ic_xiaoxihuazhonghua_outlined";
-        flexViewModel.describeString = @"FLEX调试";
-        flexViewModel.action = ^{            
-            // 关闭长按面板
-            AWELongPressPanelManager *panelManager = [%c(AWELongPressPanelManager) shareInstance];
-            [panelManager dismissWithAnimation:YES completion:^{
-                [self fixFLEXMenu:self.awemeModel];
-            }];
-        };
-        [viewModels addObject:flexViewModel];
-    }
-#endif
     
     // 小窗PIP播放功能
     if (enablePip && self.awemeModel.awemeType != 68) {

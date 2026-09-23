@@ -1091,7 +1091,6 @@ NSDictionary *getCurrentABTestData(void) {
                 [DYYYSettingItem itemWithTitle:@"长按功能-开关" key:@"DYYYLongPressDownload" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -保存视频" key:@"DYYYLongPressSaveVideo" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -分享音频" key:@"DYYYLongPressSaveAudio" type:DYYYSettingItemTypeSwitch],
-                [DYYYSettingItem itemWithTitle:@"  -启用FLEX" key:@"DYYYEnableFLEX" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -PIP小窗播放" key:@"DYYYLongPressPip" type:DYYYSettingItemTypeSwitch],                
                 [DYYYSettingItem itemWithTitle:@"  -保存当前图片" key:@"DYYYLongPressSaveCurrentImage" type:DYYYSettingItemTypeSwitch],
                 [DYYYSettingItem itemWithTitle:@"  -保存所有图片" key:@"DYYYLongPressSaveAllImages" type:DYYYSettingItemTypeSwitch],
@@ -2896,7 +2895,6 @@ NSDictionary *getCurrentABTestData(void) {
     NSArray<NSString *> *subKeys = @[
         @"DYYYLongPressSaveVideo",
         @"DYYYLongPressSaveAudio",
-        @"DYYYEnableFLEX",
         @"DYYYLongPressSaveCurrentImage",
         @"DYYYLongPressSaveAllImages",
         @"DYYYLongPressCopyLink",
