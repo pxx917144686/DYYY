@@ -110,7 +110,7 @@ static CGFloat currentScale = 1.0;
     UIResponder *nextResponder = [self nextResponder];
     if ([nextResponder isKindOfClass:[UIView class]]) {
         UIView *parentView = (UIView *)nextResponder;
-        UIViewController *viewController = [parentView firstAvailableUIViewController];
+        UIViewController *viewController = [DYYYUtils findViewControllerFromView:parentView];
         if ([viewController isKindOfClass:%c(AWELiveNewPreStreamViewController)]) {
             NSString *vcScaleValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"DYYYNicknameScale"];
             if (vcScaleValue.length > 0) {
@@ -137,7 +137,7 @@ static CGFloat currentScale = 1.0;
         UIResponder *nextResponder = [self nextResponder];
         if ([nextResponder isKindOfClass:[UIView class]]) {
             UIView *parentView = (UIView *)nextResponder;
-            UIViewController *viewController = [parentView firstAvailableUIViewController];
+            UIViewController *viewController = [DYYYUtils findViewControllerFromView:parentView];
             if ([viewController isKindOfClass:%c(AWELiveNewPreStreamViewController)]) {
                 CGRect frame = self.frame;
                 frame.origin.y -= tabHeight;
